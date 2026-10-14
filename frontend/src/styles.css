@@ -44,3 +44,5 @@ textarea { font-size: 1rem; padding: 0.6rem; font-family: inherit; }
 .button { border: 1px solid; border-radius: 0.3rem; text-decoration: none; color: inherit; }
 button.secondary { background: none; border: 1px solid #8886; }
 .panel { border-top: 1px solid #8884; margin-top: 1.25rem; padding-top: 0.5rem; }
+.page > h2 { margin-top: 1.5rem; }
+form.row input { flex: 1; min-width: 0; }
