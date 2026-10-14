@@ -28,21 +28,27 @@ export function VisibilityPanel({ work, role, onChanged }: Props) {
   }
 
   return (
-    <section aria-label="공개 상태" className="panel">
+    <section aria-label="공개 상태" className="card visibility">
       <h2>공개 상태</h2>
       {work.공개여부 ? (
         <>
-          <p><strong>공개 중</strong>입니다.</p>
-          <button type="button" disabled={busy} onClick={() => void act("unpublish")}>비공개로 전환</button>
+          <p className="status-line">
+            <span className="status-dot on" aria-hidden="true" />
+            <span className="chip success">공개 중</span>
+          </p>
+          <button type="button" className="secondary" disabled={busy} onClick={() => void act("unpublish")}>
+            비공개로 전환
+          </button>
         </>
       ) : (
         <>
-          <p>
-            <strong>비공개</strong>
-            {right !== "제작자" && ` — ${right}가 비공개 처리했습니다.`}
+          <p className="status-line">
+            <span className="status-dot" aria-hidden="true" />
+            <span className="chip">비공개</span>
+            {right !== "제작자" && <span className="chip warning">{right}가 비공개 처리했습니다.</span>}
           </p>
           {canPublish(right, level) ? (
-            <div className="row">
+            <div className="row start">
               <button type="button" disabled={busy || !work.확정버전_있음} onClick={() => void act("publish")}>
                 공개하기
               </button>

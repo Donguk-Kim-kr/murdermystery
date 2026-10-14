@@ -46,56 +46,62 @@ export function WorkPage() {
     );
   if (!work) return <p className="center">불러오는 중…</p>;
 
+  const closeForm = () => setEditing(null);
+  const savedForm = () => {
+    setEditing(null);
+    void load();
+  };
+
   return (
     <main className="page">
-      <p><Link to="/">← 내 작품</Link></p>
-      <WorkInfoForm work={work} onSaved={load} />
-      <VisibilityPanel work={work} role={role} onChanged={load} />
-      <TestersPanel workId={workId} />
-
-      <h2>인물 <span className="muted">({characters.length})</span></h2>
-      <ul className="list">
-        {characters.map((c) => (
-          <li key={c.순서}>
-            {editing === c.순서 ? (
-              <CharacterForm
-                workId={workId}
-                character={c}
-                onCancel={() => setEditing(null)}
-                onSaved={() => {
-                  setEditing(null);
-                  void load();
-                }}
-              />
-            ) : (
-              <div className="row">
-                <span>
-                  <strong>{c.순서}. {c.이름}</strong>{" "}
-                  <span className="muted">
-                    {[c.직업, c.NPC && "NPC", c.범인 && "범인"].filter(Boolean).join(" · ")}
-                  </span>
-                </span>
-                <button type="button" className="small secondary" onClick={() => setEditing(c.순서)}>
-                  편집
-                </button>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
-      {characters.length === 0 && <p className="muted">아직 인물이 없습니다.</p>}
-      {editing === "new" ? (
-        <CharacterForm
-          workId={workId}
-          onCancel={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            void load();
-          }}
-        />
-      ) : (
-        <button type="button" onClick={() => setEditing("new")}>인물 추가</button>
-      )}
+      <Link to="/" className="back">← 내 작품</Link>
+      <div className="work-title">
+        <h1>{work.제목}</h1>
+        <span className={work.공개여부 ? "chip success" : "chip"}>{work.공개여부 ? "공개" : "비공개"}</span>
+      </div>
+      <div className="work-layout">
+        <div className="col">
+          <WorkInfoForm work={work} onSaved={load} />
+          <section aria-label="인물 목록" className="card characters">
+            <div className="row">
+              <h2>인물 <span className="muted">({characters.length})</span></h2>
+              {editing !== "new" && (
+                <button type="button" className="small" onClick={() => setEditing("new")}>인물 추가</button>
+              )}
+            </div>
+            {characters.length === 0 && editing !== "new" && <p className="muted">아직 인물이 없습니다.</p>}
+            <ul className="person-list">
+              {characters.map((c) => (
+                <li key={c.순서}>
+                  {editing === c.순서 ? (
+                    <CharacterForm workId={workId} character={c} onCancel={closeForm} onSaved={savedForm} />
+                  ) : (
+                    <div className="person">
+                      <span className="order">{c.순서}</span>
+                      <span className="body">
+                        <span className="name">{c.이름}</span>
+                        {c.직업 && <span className="muted">{c.직업}</span>}
+                      </span>
+                      <span className="tags">
+                        {c.NPC && <span className="chip">NPC</span>}
+                        {c.범인 && <span className="chip danger">범인</span>}
+                      </span>
+                      <button type="button" className="small secondary" onClick={() => setEditing(c.순서)}>
+                        편집
+                      </button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {editing === "new" && <CharacterForm workId={workId} onCancel={closeForm} onSaved={savedForm} />}
+          </section>
+        </div>
+        <div className="col">
+          <VisibilityPanel work={work} role={role} onChanged={load} />
+          <TestersPanel workId={workId} />
+        </div>
+      </div>
     </main>
   );
 }
@@ -128,8 +134,8 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
   }
 
   return (
-    <form onSubmit={onSubmit} aria-label="기본정보">
-      <h1>기본정보</h1>
+    <form onSubmit={onSubmit} aria-label="기본정보" className="card info">
+      <h2>기본정보</h2>
       <label>
         제목
         <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} required />
@@ -138,24 +144,30 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
         시놉시스
         <textarea rows={4} value={synopsis} onChange={(e) => setSynopsis(e.target.value)} />
       </label>
-      <label>
-        장르
-        <input value={genre} onChange={(e) => setGenre(e.target.value)} maxLength={50} />
-      </label>
-      <label>
-        예상 시간
-        <input value={time} onChange={(e) => setTime(e.target.value)} maxLength={50} required />
-      </label>
-      <label>
-        최소 인원
-        <input type="number" min={1} value={minPlayers} onChange={(e) => setMinPlayers(e.target.value)} required />
-      </label>
-      <p className="muted">
-        최대 인원: <strong>{work.최대인원}명</strong> (NPC가 아닌 인물 수로 자동 계산, 인물이 없으면 임시로 1명)
-      </p>
+      <div className="field-grid two">
+        <label>
+          장르
+          <input value={genre} onChange={(e) => setGenre(e.target.value)} maxLength={50} />
+        </label>
+        <label>
+          예상 시간
+          <input value={time} onChange={(e) => setTime(e.target.value)} maxLength={50} required />
+        </label>
+        <label>
+          최소 인원
+          <input type="number" min={1} value={minPlayers} onChange={(e) => setMinPlayers(e.target.value)} required />
+        </label>
+        <div className="capacity">
+          <span className="capacity-label">최대 인원</span>
+          <span className="chip accent">{work.최대인원}명</span>
+          <span className="muted">NPC가 아닌 인물 수로 자동 계산, 인물이 없으면 임시로 1명</span>
+        </div>
+      </div>
       {error && <p role="alert" className="error">{error}</p>}
       {saved && <p role="status" className="ok">저장했습니다.</p>}
-      <button type="submit" disabled={busy}>저장</button>
+      <div className="row start">
+        <button type="submit" disabled={busy}>저장</button>
+      </div>
     </form>
   );
 }

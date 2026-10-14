@@ -43,25 +43,31 @@ export function TestersPanel({ workId }: { workId: number }) {
   }
 
   return (
-    <section aria-label="테스터" className="panel">
+    <section aria-label="테스터" className="card testers">
       <h2>테스터 <span className="muted">({testers.length})</span></h2>
       <p className="muted">
         테스터는 이 작품이 공개 전이거나 제작자가 비공개한 동안에도 비공개 플레이(방 만들기)를 할 수 있습니다. 공개하지 않고 지인끼리 플레이할 때 쓰세요. 방 입장은 입장코드를 아는 사람이면 됩니다. 관리자·운영자가 비공개한 작품은 공개 권한이 제작자에게 돌아올 때까지 비공개 플레이를 할 수 없습니다.
       </p>
-      <ul className="list">
-        {testers.map((t) => (
-          <li key={t.계정_번호} className="row">
-            <span>{t.닉네임} <span className="muted">({t.아이디})</span></span>
-            <button type="button" className="small secondary" onClick={() => void remove(t.계정_번호)}>
-              삭제
-            </button>
-          </li>
-        ))}
-      </ul>
+      {testers.length > 0 && (
+        <ul className="person-list">
+          {testers.map((t) => (
+            <li key={t.계정_번호} className="person">
+              <span className="order" aria-hidden="true">{t.닉네임.slice(0, 1)}</span>
+              <span className="body">
+                <span className="name">{t.닉네임}</span>
+                <span className="muted">{t.아이디}</span>
+              </span>
+              <button type="button" className="small secondary" onClick={() => void remove(t.계정_번호)}>
+                삭제
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <form onSubmit={add} className="row">
         <input
           aria-label="테스터 아이디"
-          placeholder="아이디"
+          placeholder="추가할 아이디"
           value={loginId}
           onChange={(e) => setLoginId(e.target.value)}
           required

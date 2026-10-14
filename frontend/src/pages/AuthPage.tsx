@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 
 import { useAuth } from "../auth/AuthContext";
+import { BrandMark } from "../Layout";
 
 export function AuthPage() {
   const { login, signup } = useAuth();
@@ -22,51 +23,60 @@ export function AuthPage() {
   }
 
   return (
-    <main className="card">
-      <h1>머더미스터리</h1>
-      <h2>{mode === "login" ? "로그인" : "회원가입"}</h2>
-      <form onSubmit={onSubmit}>
-        <label>
-          아이디
-          <input value={id} onChange={(e) => setId(e.target.value)} autoComplete="username" required />
-        </label>
-        <label>
-          패스워드
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            required
-          />
-        </label>
-        {mode === "signup" && (
+    <main className="auth">
+      <div className="auth-card">
+        <div className="auth-brand">
+          <BrandMark />
+          <h1>머더미스터리</h1>
+          <p>시나리오를 만들고, 함께 추리하세요</p>
+        </div>
+        <h2>{mode === "login" ? "로그인" : "회원가입"}</h2>
+        <form onSubmit={onSubmit}>
           <label>
-            닉네임
-            <input value={nickname} onChange={(e) => setNickname(e.target.value)} required />
+            아이디
+            <input value={id} onChange={(e) => setId(e.target.value)} autoComplete="username" required />
           </label>
-        )}
-        {mode === "login" && (
-          <label className="check">
-            <input type="checkbox" checked={autoLogin} onChange={(e) => setAutoLogin(e.target.checked)} />
-            자동 로그인
+          <label>
+            패스워드
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              required
+            />
           </label>
-        )}
-        {error && <p role="alert" className="error">{error}</p>}
-        <button type="submit" disabled={busy}>
-          {mode === "login" ? "로그인" : "가입하기"}
-        </button>
-      </form>
-      <button
-        type="button"
-        className="link"
-        onClick={() => {
-          setMode(mode === "login" ? "signup" : "login");
-          setError(null);
-        }}
-      >
-        {mode === "login" ? "회원가입" : "로그인으로 돌아가기"}
-      </button>
+          {mode === "signup" && (
+            <label>
+              닉네임
+              <input value={nickname} onChange={(e) => setNickname(e.target.value)} required />
+            </label>
+          )}
+          {mode === "login" && (
+            <label className="check">
+              <input type="checkbox" checked={autoLogin} onChange={(e) => setAutoLogin(e.target.checked)} />
+              자동 로그인
+            </label>
+          )}
+          {error && <p role="alert" className="error">{error}</p>}
+          <button type="submit" disabled={busy}>
+            {mode === "login" ? "로그인" : "가입하기"}
+          </button>
+        </form>
+        <p className="auth-switch">
+          {mode === "login" ? "계정이 없으신가요? " : "이미 계정이 있으신가요? "}
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              setMode(mode === "login" ? "signup" : "login");
+              setError(null);
+            }}
+          >
+            {mode === "login" ? "회원가입" : "로그인으로 돌아가기"}
+          </button>
+        </p>
+      </div>
     </main>
   );
 }

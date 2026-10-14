@@ -62,38 +62,42 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
 
   return (
     <form onSubmit={onSubmit} className="subform" aria-label={character ? "인물 수정" : "인물 추가"}>
-      <label>
-        이름
-        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={50} required />
-      </label>
-      <label>
-        나이
-        <input type="number" min={0} max={200} value={age} onChange={(e) => setAge(e.target.value)} />
-      </label>
-      {TEXT_FIELDS.map((f) => (
-        <label key={f}>
-          {f}
-          {LONG.has(f) ? (
-            <textarea rows={2} value={texts[f]} onChange={(e) => setTexts({ ...texts, [f]: e.target.value })} />
-          ) : (
-            <input value={texts[f]} onChange={(e) => setTexts({ ...texts, [f]: e.target.value })} />
-          )}
+      <div className="field-grid two">
+        <label>
+          이름
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={50} required />
         </label>
-      ))}
-      <label>
-        서사
-        <textarea rows={4} value={story} onChange={(e) => setStory(e.target.value)} />
-      </label>
-      <label className="check">
-        <input type="checkbox" checked={culprit} onChange={(e) => setCulprit(e.target.checked)} />
-        범인
-      </label>
-      <label className="check">
-        <input type="checkbox" checked={npc} onChange={(e) => setNpc(e.target.checked)} />
-        NPC (플레이할 수 없는 인물)
-      </label>
+        <label>
+          나이
+          <input type="number" min={0} max={200} value={age} onChange={(e) => setAge(e.target.value)} />
+        </label>
+        {TEXT_FIELDS.map((f) => (
+          <label key={f} className={LONG.has(f) ? "wide" : undefined}>
+            {f}
+            {LONG.has(f) ? (
+              <textarea rows={2} value={texts[f]} onChange={(e) => setTexts({ ...texts, [f]: e.target.value })} />
+            ) : (
+              <input value={texts[f]} onChange={(e) => setTexts({ ...texts, [f]: e.target.value })} />
+            )}
+          </label>
+        ))}
+        <label className="wide">
+          서사
+          <textarea rows={4} value={story} onChange={(e) => setStory(e.target.value)} />
+        </label>
+      </div>
+      <div className="row start">
+        <label className="check">
+          <input type="checkbox" checked={culprit} onChange={(e) => setCulprit(e.target.checked)} />
+          범인
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={npc} onChange={(e) => setNpc(e.target.checked)} />
+          NPC (플레이할 수 없는 인물)
+        </label>
+      </div>
       {error && <p role="alert" className="error">{error}</p>}
-      <div className="row">
+      <div className="row start">
         <button type="submit" disabled={busy}>저장</button>
         <button type="button" className="secondary" onClick={onCancel}>취소</button>
       </div>

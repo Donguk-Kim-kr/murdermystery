@@ -144,7 +144,7 @@ describe("작품", () => {
     routes["GET /api/works"] = () => json([work]);
     renderApp();
     expect(await screen.findByText("저택의 비밀")).toBeInTheDocument();
-    expect(screen.getByText(/추리 · 개발 · 비공개 · 인원 1~1명/)).toBeInTheDocument();
+    for (const chip of ["추리", "개발", "비공개", "인원 1~1명"]) expect(screen.getByText(chip)).toBeInTheDocument();
   });
 
   it("작품이 없으면 안내 문구를 보여 준다", async () => {
@@ -182,7 +182,7 @@ describe("작품", () => {
     await userEvent.type(within(form).getByLabelText("직업"), "의사");
     await userEvent.click(within(form).getByRole("button", { name: "저장" }));
 
-    expect(await screen.findByText(/1\. 홍길동/)).toBeInTheDocument();
+    expect(await screen.findByText("홍길동")).toBeInTheDocument();
     const body = await calls.find((c) => c.key === "POST /api/works/7/characters")!.req.json();
     expect(body).toMatchObject({ 이름: "홍길동", 직업: "의사", 성별: null, 나이: null, 범인: false, NPC: false });
   });
@@ -297,10 +297,10 @@ describe("작품", () => {
     const panel = await screen.findByRole("region", { name: "테스터" });
     await userEvent.type(within(panel).getByLabelText("테스터 아이디"), "bob");
     await userEvent.click(within(panel).getByRole("button", { name: "추가" }));
-    expect(await within(panel).findByText("밥")).toBeInTheDocument();
+    expect(await within(panel).findByText("bob")).toBeInTheDocument();
     expect(await calls.find((c) => c.key === "POST /api/works/7/testers")!.req.json()).toEqual({ 아이디: "bob" });
     await userEvent.click(within(panel).getByRole("button", { name: "삭제" }));
-    await waitFor(() => expect(within(panel).queryByText("밥")).not.toBeInTheDocument());
+    await waitFor(() => expect(within(panel).queryByText("bob")).not.toBeInTheDocument());
   });
 
   it("없는 아이디를 테스터로 추가하면 오류를 보여 준다", async () => {

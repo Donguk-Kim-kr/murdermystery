@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { api, errorMessage } from "../api/client";
 
@@ -21,16 +21,17 @@ export function WorkNewPage() {
 
   return (
     <main className="page narrow">
-      <h1>새 작품</h1>
-      <form onSubmit={onSubmit}>
+      <Link to="/" className="back">← 내 작품</Link>
+      <form onSubmit={onSubmit} className="card">
+        <h1>새 작품</h1>
         <label>
           제목
           <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} required autoFocus />
         </label>
         {error && <p role="alert" className="error">{error}</p>}
         <button type="submit" disabled={busy}>만들기</button>
+        <p className="muted">시놉시스·장르·인물은 만든 뒤에 입력합니다.</p>
       </form>
-      <p className="muted">시놉시스·장르·인물은 만든 뒤에 입력합니다.</p>
     </main>
   );
 }
