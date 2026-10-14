@@ -253,6 +253,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/rooms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Room */
+        post: operations["create_room_api_rooms_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rooms/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Join Room */
+        post: operations["join_room_api_rooms_join_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rooms/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Room
+         * @description 내가 있는 방의 현재 상태. 대기실 화면이 2~3초마다 부르며, 이 호출이 입장 유지 신호(하트비트)도 겸한다.
+         */
+        get: operations["my_room_api_rooms_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Participation
+         * @description 방장이 플레이어로 참여할지 바꾼다.
+         */
+        patch: operations["set_participation_api_rooms_me_patch"];
+        trace?: never;
+    };
+    "/api/rooms/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Leave Room
+         * @description 방에서 나간다. 방장이 나가면 방이 닫힌다.
+         */
+        post: operations["leave_room_api_rooms_leave_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -385,6 +463,11 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** JoinIn */
+        JoinIn: {
+            /** 입장코드 */
+            "\uC785\uC7A5\uCF54\uB4DC": string;
+        };
         /** LoginIn */
         LoginIn: {
             /** 아이디 */
@@ -410,6 +493,22 @@ export interface components {
             "\uB9CC\uB8CC\uC77C\uC2DC": string;
             "\uACC4\uC815": components["schemas"]["AccountOut"];
         };
+        /** MemberOut */
+        MemberOut: {
+            /** 계정 번호 */
+            "\uACC4\uC815_\uBC88\uD638": number;
+            /** 닉네임 */
+            "\uB2C9\uB124\uC784": string;
+            /** 방장 */
+            "\uBC29\uC7A5": boolean;
+            /** 플레이 */
+            "\uD50C\uB808\uC774": boolean;
+        };
+        /** ParticipationIn */
+        ParticipationIn: {
+            /** 플레이 */
+            "\uD50C\uB808\uC774": boolean;
+        };
         /**
          * PrivatePlayWorkOut
          * @description 비공개 플레이 대상 작품 요약. 인물·단서 같은 내용(범인·비밀 포함)은 포함하지 않는다.
@@ -429,6 +528,56 @@ export interface components {
             "\uCD5C\uB300\uC778\uC6D0": number;
             /** 예상시간 */
             "\uC608\uC0C1\uC2DC\uAC04": string;
+        };
+        /** RoomCreateIn */
+        RoomCreateIn: {
+            /** 작품 번호 */
+            "\uC791\uD488_\uBC88\uD638": number;
+            /**
+             * 방장 참여
+             * @default true
+             */
+            "\uBC29\uC7A5_\uCC38\uC5EC"?: boolean;
+        };
+        /** RoomOut */
+        RoomOut: {
+            /** 번호 */
+            "\uBC88\uD638": number;
+            /** 입장코드 */
+            "\uC785\uC7A5\uCF54\uB4DC": string;
+            /** 상태 */
+            "\uC0C1\uD0DC": string;
+            "\uC791\uD488": components["schemas"]["RoomWorkOut"];
+            /** 버전 */
+            "\uBC84\uC804": string;
+            /** 내가 방장 */
+            "\uB0B4\uAC00_\uBC29\uC7A5": boolean;
+            /** 참가자 */
+            "\uCC38\uAC00\uC790": components["schemas"]["MemberOut"][];
+            /** 플레이어 수 */
+            "\uD50C\uB808\uC774\uC5B4_\uC218": number;
+            /**
+             * 생성일시
+             * Format: date-time
+             */
+            "\uC0DD\uC131\uC77C\uC2DC": string;
+        };
+        /** RoomWorkOut */
+        RoomWorkOut: {
+            /** 번호 */
+            "\uBC88\uD638": number;
+            /** 제목 */
+            "\uC81C\uBAA9": string;
+            /** 시놉시스 */
+            "\uC2DC\uB189\uC2DC\uC2A4": string;
+            /** 장르 */
+            "\uC7A5\uB974": string;
+            /** 예상시간 */
+            "\uC608\uC0C1\uC2DC\uAC04": string;
+            /** 최소인원 */
+            "\uCD5C\uC18C\uC778\uC6D0": number;
+            /** 최대인원 */
+            "\uCD5C\uB300\uC778\uC6D0": number;
         };
         /** SignupIn */
         SignupIn: {
@@ -1162,6 +1311,171 @@ export interface operations {
                 work_id: number;
                 account_id: number;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_room_api_rooms_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoomCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoomOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    join_room_api_rooms_join_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoomOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_room_api_rooms_me_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoomOut"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_participation_api_rooms_me_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoomOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leave_room_api_rooms_leave_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,7 +14,11 @@ let routes: Record<string, Handler>;
 const calls: { key: string; req: Request }[] = [];
 
 beforeEach(() => {
-  routes = { "GET /api/works": () => json([]), "GET /api/private-play-works": () => json([]) };
+  routes = {
+    "GET /api/works": () => json([]),
+    "GET /api/private-play-works": () => json([]),
+    "GET /api/rooms/me": () => json(null),
+  };
   calls.length = 0;
   localStorage.clear();
   vi.stubGlobal("fetch", async (input: Request) => {
@@ -25,7 +29,11 @@ beforeEach(() => {
     return handler(input);
   });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  cleanup(); // 화면(폴링 포함)을 먼저 정리한 뒤 모의 fetch 를 해제한다
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 const renderApp = (path = "/") =>
   render(
@@ -344,5 +352,179 @@ describe("작품", () => {
     routes["GET /api/works/99/characters"] = () => json({ detail: "작품을 찾을 수 없습니다" }, 404);
     renderApp("/works/99");
     expect(await screen.findByRole("alert")).toHaveTextContent("작품을 찾을 수 없습니다");
+  });
+});
+
+
+const baseRoom = {
+  번호: 1, 입장코드: "K7M2QX", 상태: "대기",
+  작품: { 번호: 7, 제목: "저택의 비밀", 시놉시스: "", 장르: "추리", 예상시간: "3시간", 최소인원: 3, 최대인원: 4 },
+  버전: "1.0", 내가_방장: true,
+  참가자: [{ 계정_번호: 1, 닉네임: "탐정", 방장: true, 플레이: true }],
+  플레이어_수: 1, 생성일시: "2026-10-14T00:00:00Z",
+};
+
+describe("방", () => {
+  beforeEach(() => {
+    localStorage.setItem("mm.token", "saved");
+    routes["GET /api/auth/me"] = () => json(account);
+  });
+
+  it("입장코드를 대문자로 바꿔 입장하고 대기실을 보여 준다", async () => {
+    let inRoom = false;
+    const asGuest = { ...baseRoom, 내가_방장: false };
+    routes["GET /api/rooms/me"] = () => json(inRoom ? asGuest : null);
+    routes["POST /api/rooms/join"] = () => {
+      inRoom = true;
+      return json(asGuest);
+    };
+    renderApp("/rooms/join");
+    await userEvent.type(await screen.findByLabelText("입장코드"), "k7m2qx");
+    expect(screen.getByLabelText("입장코드")).toHaveValue("K7M2QX");
+    await userEvent.click(screen.getByRole("button", { name: "입장하기" }));
+    expect(await screen.findByRole("heading", { name: "저택의 비밀" })).toBeInTheDocument();
+    expect(await calls.find((c) => c.key === "POST /api/rooms/join")!.req.json()).toEqual({ 입장코드: "K7M2QX" });
+    expect(screen.getByRole("button", { name: "나가기" })).toBeInTheDocument();
+  });
+
+  it("입장코드가 틀리거나 너무 많이 틀리면 서버 메시지를 보여 준다", async () => {
+    routes["POST /api/rooms/join"] = () => json({ detail: "입장코드가 올바르지 않습니다" }, 404);
+    renderApp("/rooms/join");
+    await userEvent.type(await screen.findByLabelText("입장코드"), "ZZZZZZ");
+    await userEvent.click(screen.getByRole("button", { name: "입장하기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("입장코드가 올바르지 않습니다");
+  });
+
+  it("방 만들기: 방장 참여를 끄고 만들면 그 값을 보내고 대기실로 간다", async () => {
+    let inRoom = false;
+    routes["GET /api/rooms/me"] = () => json(inRoom ? baseRoom : null);
+    routes["POST /api/rooms"] = () => {
+      inRoom = true;
+      return json(baseRoom, 201);
+    };
+    renderApp("/rooms/new/7");
+    await userEvent.click(await screen.findByLabelText("나도 플레이어로 참여"));
+    await userEvent.click(screen.getByRole("button", { name: "방 만들기" }));
+    expect(await screen.findByRole("heading", { name: "저택의 비밀" })).toBeInTheDocument();
+    expect(await calls.find((c) => c.key === "POST /api/rooms")!.req.json()).toEqual({ 작품_번호: 7, 방장_참여: false });
+  });
+
+  it("방을 만들 수 없으면 사유를 보여 준다", async () => {
+    routes["POST /api/rooms"] = () => json({ detail: "확정된 버전이 없는 작품으로는 방을 만들 수 없습니다" }, 409);
+    renderApp("/rooms/new/7");
+    await userEvent.click(await screen.findByRole("button", { name: "방 만들기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("확정된 버전이 없는");
+  });
+
+  it("작품 상세에서 확정 버전이 없으면 방 만들기가 막히고 이유가 보인다", async () => {
+    routes["GET /api/works/7"] = () => json({ ...work, 확정버전_있음: false });
+    routes["GET /api/works/7/characters"] = () => json([]);
+    routes["GET /api/works/7/testers"] = () => json([]);
+    renderApp("/works/7");
+    const panel = await screen.findByRole("region", { name: "방" });
+    expect(within(panel).getByRole("button", { name: "방 만들기" })).toBeDisabled();
+    expect(within(panel).getByText("확정된 버전이 없어 방을 만들 수 없습니다.")).toBeInTheDocument();
+  });
+
+  it("작품 상세에서 확정 버전이 있으면 방 만들기로 이동할 수 있다", async () => {
+    routes["GET /api/works/7"] = () => json(work);
+    routes["GET /api/works/7/characters"] = () => json([]);
+    routes["GET /api/works/7/testers"] = () => json([]);
+    renderApp("/works/7");
+    const panel = await screen.findByRole("region", { name: "방" });
+    expect(within(panel).getByRole("link", { name: "이 작품으로 방 만들기" })).toHaveAttribute("href", "/rooms/new/7");
+  });
+
+  it("관리자가 비공개한 작품은 제작자에게 방 만들기를 막는다", async () => {
+    routes["GET /api/works/7"] = () => json({ ...work, 공개권한: "관리자" });
+    routes["GET /api/works/7/characters"] = () => json([]);
+    routes["GET /api/works/7/testers"] = () => json([]);
+    renderApp("/works/7");
+    const panel = await screen.findByRole("region", { name: "방" });
+    expect(within(panel).getByRole("button", { name: "방 만들기" })).toBeDisabled();
+    expect(within(panel).getByText(/관리자가 비공개 처리한 작품은/)).toBeInTheDocument();
+  });
+
+  it("대기실: 방장은 코드와 참가자, 인원, 방 닫기를 본다", async () => {
+    routes["GET /api/rooms/me"] = () => json({
+      ...baseRoom,
+      참가자: [
+        { 계정_번호: 1, 닉네임: "탐정", 방장: true, 플레이: true },
+        { 계정_번호: 2, 닉네임: "의사", 방장: false, 플레이: true },
+      ],
+      플레이어_수: 2,
+    });
+    renderApp("/room");
+    expect(await screen.findByLabelText("입장코드", { selector: "strong" })).toHaveTextContent("K7M2QX");
+    const list = screen.getByRole("region", { name: "참가자" });
+    expect(within(list).getByText("의사")).toBeInTheDocument();
+    expect(within(list).getByText("플레이어 2/4명")).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: "방 닫기" })).toBeInTheDocument();
+    expect(within(list).getByLabelText("나도 플레이어로 참여")).toBeChecked();
+  });
+
+  it("대기실은 주기적으로 갱신되어 새 입장자를 보여 준다", async () => {
+    let members = [{ 계정_번호: 1, 닉네임: "탐정", 방장: true, 플레이: true }];
+    routes["GET /api/rooms/me"] = () => json({ ...baseRoom, 참가자: members, 플레이어_수: members.length });
+    renderApp("/room");
+    await screen.findByText("탐정");
+    expect(screen.queryByText("의사")).not.toBeInTheDocument();
+    members = [...members, { 계정_번호: 2, 닉네임: "의사", 방장: false, 플레이: true }];
+    expect(await screen.findByText("의사")).toBeInTheDocument();
+  });
+
+  it("방이 닫히면 대기실이 안내 화면으로 바뀐다", async () => {
+    let open = true;
+    routes["GET /api/rooms/me"] = () => json(open ? baseRoom : null);
+    renderApp("/room");
+    await screen.findByRole("heading", { name: "저택의 비밀" });
+    open = false;
+    expect(await screen.findByText("참여 중인 방이 없습니다.")).toBeInTheDocument();
+  });
+
+  it("방장이 방 닫기를 누르면 확인 후 서버에 알리고 목록으로 돌아간다", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    let open = true;
+    routes["GET /api/rooms/me"] = () => json(open ? baseRoom : null);
+    routes["POST /api/rooms/leave"] = () => {
+      open = false;
+      return new Response(null, { status: 204 });
+    };
+    renderApp("/room");
+    await userEvent.click(await screen.findByRole("button", { name: "방 닫기" }));
+    expect(await screen.findByRole("heading", { name: "내 작품" })).toBeInTheDocument();
+    expect(calls.map((c) => c.key)).toContain("POST /api/rooms/leave");
+  });
+
+  it("확인을 취소하면 방을 닫지 않는다", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    routes["GET /api/rooms/me"] = () => json(baseRoom);
+    renderApp("/room");
+    await userEvent.click(await screen.findByRole("button", { name: "방 닫기" }));
+    expect(calls.map((c) => c.key)).not.toContain("POST /api/rooms/leave");
+  });
+
+  it("방장은 플레이 참여 여부를 바꾼다", async () => {
+    routes["GET /api/rooms/me"] = () => json(baseRoom);
+    routes["PATCH /api/rooms/me"] = () => json(baseRoom);
+    renderApp("/room");
+    await userEvent.click(await screen.findByLabelText("나도 플레이어로 참여"));
+    await waitFor(() => expect(calls.map((c) => c.key)).toContain("PATCH /api/rooms/me"));
+    expect(await calls.find((c) => c.key === "PATCH /api/rooms/me")!.req.json()).toEqual({ 플레이: false });
+  });
+
+  it("방에 있으면 상단에 내 방 코드가 보인다", async () => {
+    routes["GET /api/rooms/me"] = () => json(baseRoom);
+    renderApp("/");
+    expect(await screen.findByRole("link", { name: "내 방" })).toHaveTextContent("K7M2QX");
+  });
+
+  it("테스터로 지정된 작품 카드에서 비공개 플레이 방을 만들 수 있다", async () => {
+    routes["GET /api/private-play-works"] = () => json([
+      { 번호: 8, 제목: "남의 작품", 시놉시스: "", 장르: "", 최소인원: 2, 최대인원: 4, 예상시간: "2시간" },
+    ]);
+    renderApp();
+    const link = await screen.findByRole("link", { name: "비공개 플레이 방 만들기" });
+    expect(link).toHaveAttribute("href", "/rooms/new/8");
   });
 });

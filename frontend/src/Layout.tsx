@@ -2,6 +2,7 @@ import { Link, Outlet } from "react-router-dom";
 
 import type { Account } from "./auth/AuthContext";
 import { useAuth } from "./auth/AuthContext";
+import { RoomProvider, useRoom } from "./rooms/RoomContext";
 
 /** 앱 로고 마크 (돋보기). 외부 이미지 없이 SVG 로 그린다. */
 export function BrandMark() {
@@ -15,15 +16,26 @@ export function BrandMark() {
   );
 }
 
+function RoomChip() {
+  const { room } = useRoom();
+  if (!room) return null;
+  return (
+    <Link to="/room" className="chip accent room-chip" aria-label="내 방">
+      방 {room.입장코드}
+    </Link>
+  );
+}
+
 export function Layout({ account }: { account: Account }) {
   const { logout } = useAuth();
   return (
-    <>
+    <RoomProvider>
       <header className="topbar">
         <Link to="/" className="brand">
           <BrandMark />
           머더미스터리
         </Link>
+        <RoomChip />
         <span className="who">
           <span className="avatar" aria-hidden="true">{account.닉네임.slice(0, 1)}</span>
           <span className="who-name">{account.닉네임}</span>
@@ -33,6 +45,6 @@ export function Layout({ account }: { account: Account }) {
         </button>
       </header>
       <Outlet />
-    </>
+    </RoomProvider>
   );
 }

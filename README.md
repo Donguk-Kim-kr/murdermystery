@@ -31,6 +31,16 @@ cd frontend && npm install
 npm run dev
 ```
 
+## 방 시험하기 (확정 기능이 생기기 전)
+
+방은 확정된 버전이 있는 작품으로만 만들 수 있고, 확정 기능이 아직 없다. 개발 중에는 작품의 확정 버전을 SQL 로 넣어서 시험한다.
+
+```sql
+INSERT INTO "버전" ("작품_번호", "버전", "시나리오") VALUES (<작품 번호>, '1.0', '{}'::jsonb);
+```
+
+대기실의 입장자 목록은 서버 메모리에 있으므로 백엔드는 **한 프로세스**로 실행해야 한다 (`uvicorn` 에 `--workers` 를 쓰지 않는다).
+
 ## 글꼴
 
 앱 화면의 글꼴은 [Pretendard](https://github.com/orioncactus/pretendard)(SIL OFL 1.1)를 `npm` 패키지로 포함해서 기기마다 같게 보인다. 라이선스 문서는 `/licenses/Pretendard-OFL-1.1.txt` 로 함께 배포된다.

@@ -35,7 +35,10 @@ export function WorksListPage() {
     <main className="page">
       <div className="page-head">
         <h1>내 작품</h1>
-        <Link to="/works/new" className="button">새 작품</Link>
+        <div className="row start">
+          <Link to="/rooms/join" className="button secondary">방 입장</Link>
+          <Link to="/works/new" className="button">새 작품</Link>
+        </div>
       </div>
       {error && <p role="alert" className="error">{error}</p>}
       {works === null && !error && <p className="muted">불러오는 중…</p>}
@@ -75,6 +78,9 @@ export function WorksListPage() {
                   <span className="chip">{w.장르 || "장르 미정"}</span>
                   <span className="chip">인원 {w.최소인원}~{w.최대인원}명</span>
                 </div>
+                <Link to={`/rooms/new/${w.번호}`} state={{ title: w.제목 }} className="button small">
+                  비공개 플레이 방 만들기
+                </Link>
               </div>
             ))}
           </div>

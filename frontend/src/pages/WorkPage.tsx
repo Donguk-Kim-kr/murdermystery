@@ -5,6 +5,7 @@ import { api, errorMessage } from "../api/client";
 import type { components } from "../api/schema";
 import { useAuth } from "../auth/AuthContext";
 import { CharacterForm, type Character } from "./CharacterForm";
+import { RoomPanel } from "./RoomPanel";
 import { TestersPanel } from "./TestersPanel";
 import { VisibilityPanel } from "./VisibilityPanel";
 
@@ -99,6 +100,7 @@ export function WorkPage() {
         </div>
         <div className="col">
           <VisibilityPanel work={work} role={role} onChanged={load} />
+          <RoomPanel work={work} />
           <TestersPanel workId={workId} />
         </div>
       </div>
