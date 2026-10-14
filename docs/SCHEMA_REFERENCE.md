@@ -47,6 +47,7 @@
 | 4 | 닉네임 | text | 불가 |  |
 | 5 | 가입일시 | timestamp with time zone | 불가 | CURRENT_TIMESTAMP |
 | 6 | 상태 | text | 불가 | '정상'::text |
+| 7 | 권한 | text | 불가 | '사용자'::text |
 
 **제약조건**
 
@@ -54,6 +55,7 @@
 |---|---|---|
 | PK | `pk_계정` | `PRIMARY KEY ("번호")` |
 | UNIQUE | `uq_계정_아이디` | `UNIQUE ("아이디")` |
+| CHECK | `ck_계정_권한` | `CHECK (("권한" = ANY (ARRAY['사용자'::text, '관리자'::text, '운영자'::text])))` |
 | CHECK | `ck_계정_상태` | `CHECK (("상태" = ANY (ARRAY['정상'::text, '정지'::text, '탈퇴'::text])))` |
 
 ## 로그인세션

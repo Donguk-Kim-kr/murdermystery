@@ -33,7 +33,8 @@ def auth(token):
 
 
 def test_signup_returns_account_without_password(user):
-    assert set(user) == {"번호", "아이디", "닉네임"}
+    assert set(user) == {"번호", "아이디", "닉네임", "권한"}
+    assert user["권한"] == "사용자"
     assert user["닉네임"] == "탐정"
 
 
@@ -131,3 +132,22 @@ def test_expired_session_denied(client, user, db):
 def test_me_requires_valid_bearer_token(client, headers):
     res = client.get("/api/auth/me", headers=headers)
     assert res.status_code == 401 and res.headers["www-authenticate"] == "Bearer"
+
+
+def test_signup_ignores_role_sent_by_client(client):
+    uid = f"u{uuid.uuid4().hex[:10]}"
+    res = client.post("/api/auth/signup", json={"아이디": uid, "패스워드": PW, "닉네임": "n", "권한": "운영자"})
+    assert res.status_code == 201 and res.json()["권한"] == "사용자"
+
+
+@pytest.mark.parametrize("role", ["관리자", "운영자"])
+def test_role_set_in_database_is_reported_on_login_and_me(client, user, db, role):
+    db.execute('UPDATE "계정" SET "권한" = %s WHERE "번호" = %s', (role, user["번호"]))
+    body = login(client, user).json()
+    assert body["계정"]["권한"] == role
+    assert client.get("/api/auth/me", headers=auth(body["토큰"])).json()["권한"] == role
+
+
+def test_database_rejects_unknown_role(user, db):
+    with pytest.raises(psycopg.errors.CheckViolation):
+        db.execute('UPDATE "계정" SET "권한" = %s WHERE "번호" = %s', ("왕", user["번호"]))

@@ -14,8 +14,8 @@
 
 ## 1. 결과 요약
 
-- 명세서의 **30개 테이블, 204개 컬럼**을 한글 이름 그대로 생성했다. (목차의 컬럼 수 합계와 일치)
-- 빈 PostgreSQL 16 DB 에 마이그레이션 6개가 순서대로 정상 적용되고, 재실행하면 아무것도 적용하지 않는다.
+- 명세서의 **30개 테이블, 205개 컬럼**을 한글 이름 그대로 생성했다. (목차의 컬럼 수 합계와 일치. 205개 중 1개 `계정.권한`은 최초 명세서 이후 사용자 결정으로 추가한 것이다 — 마이그레이션 0007)
+- 빈 PostgreSQL 16 DB 에 마이그레이션 7개가 순서대로 정상 적용되고, 재실행하면 아무것도 적용하지 않는다.
 - 테스트 **66개 모두 통과**.
 - 제약: PK 30, UNIQUE 23, FK 61(복합 22), CHECK 27, 추가 인덱스 37, 트리거 3.
 - JSONB 컬럼 9개는 내부 형식 검사 없이 생성했다.
@@ -105,7 +105,7 @@ docs/                                 이 문서들
 export PGHOST=127.0.0.1 PGPORT=5432 PGUSER=postgres PGPASSWORD=...
 
 createdb murder_mystery
-python3 db/scripts/migrate.py --dbname murder_mystery       # 6개 파일을 순서대로 적용
+python3 db/scripts/migrate.py --dbname murder_mystery       # 7개 파일을 순서대로 적용
 python3 db/scripts/dump_schema_md.py --dbname murder_mystery > docs/SCHEMA_REFERENCE.md
 ```
 
@@ -116,7 +116,7 @@ python3 db/scripts/dump_schema_md.py --dbname murder_mystery > docs/SCHEMA_REFER
 ## 6. 테스트 결과
 
 실행: `cd db/tests && python3 -m unittest discover -s . -p 'test_*.py'`
-환경: PostgreSQL 16.15, Python 3.13 (표준 `unittest`, pytest 로도 실행 가능한 형식). 전체 약 98초, **66개 통과 / 실패 0**.
+환경: PostgreSQL 16.15, Python 3.13 (표준 `unittest`, pytest 로도 실행 가능한 형식). 전체 약 98~128초, **66개 통과 / 실패 0** (0007 반영 후에도 동일).
 테스트마다 임시 DB 를 만들어 마이그레이션을 처음부터 적용하고 끝나면 삭제한다 (`CREATEDB` 권한 필요).
 
 | 모듈 | 테스트 수 | 검증 내용 |

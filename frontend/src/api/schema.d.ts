@@ -173,6 +173,11 @@ export interface components {
             "\uC544\uC774\uB514": string;
             /** 닉네임 */
             "\uB2C9\uB124\uC784": string;
+            /**
+             * 권한
+             * @enum {string}
+             */
+            "\uAD8C\uD55C": "사용자" | "관리자" | "운영자";
         };
         /** CharacterIn */
         CharacterIn: {

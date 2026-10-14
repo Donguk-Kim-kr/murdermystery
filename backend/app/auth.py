@@ -36,6 +36,7 @@ class AccountOut(BaseModel):
     번호: int
     아이디: str
     닉네임: str
+    권한: Literal["사용자", "관리자", "운영자"]
 
 
 class LoginOut(BaseModel):
@@ -64,7 +65,7 @@ def current_session(conn: Conn, token: Annotated[str, Depends(_bearer_token)]) -
     """B1·B4: 폐기·만료된 세션과 상태가 `정상`이 아닌 계정은 거부한다."""
     row = conn.execute(
         """
-        SELECT s."번호" AS 세션_번호, a."번호", a."아이디", a."닉네임"
+        SELECT s."번호" AS 세션_번호, a."번호", a."아이디", a."닉네임", a."권한"
         FROM "로그인세션" s JOIN "계정" a ON a."번호" = s."계정_번호"
         WHERE s."토큰" = %s AND s."폐기일시" IS NULL
           AND s."만료일시" > CURRENT_TIMESTAMP AND a."상태" = '정상'
@@ -75,7 +76,7 @@ def current_session(conn: Conn, token: Annotated[str, Depends(_bearer_token)]) -
         raise _unauthorized("세션이 없거나 만료되었습니다")
     return CurrentSession(
         세션_번호=row["세션_번호"],
-        계정=AccountOut(번호=row["번호"], 아이디=row["아이디"], 닉네임=row["닉네임"]),
+        계정=AccountOut(번호=row["번호"], 아이디=row["아이디"], 닉네임=row["닉네임"], 권한=row["권한"]),
     )
 
 
@@ -87,7 +88,7 @@ def signup(body: SignupIn, conn: Conn) -> AccountOut:
     try:
         row = conn.execute(
             'INSERT INTO "계정" ("아이디", "패스워드", "닉네임") VALUES (%s, %s, %s) '
-            'RETURNING "번호", "아이디", "닉네임"',
+            'RETURNING "번호", "아이디", "닉네임", "권한"',
             (body.아이디, hash_password(body.패스워드), body.닉네임),
         ).fetchone()
     except UniqueViolation:
@@ -98,7 +99,7 @@ def signup(body: SignupIn, conn: Conn) -> AccountOut:
 @router.post("/login", response_model=LoginOut)
 def login(body: LoginIn, conn: Conn) -> LoginOut:
     acct = conn.execute(
-        'SELECT "번호", "아이디", "패스워드", "닉네임", "상태" FROM "계정" WHERE "아이디" = %s',
+        'SELECT "번호", "아이디", "패스워드", "닉네임", "권한", "상태" FROM "계정" WHERE "아이디" = %s',
         (body.아이디,),
     ).fetchone()
     # 아이디가 없어도 해시 검증을 수행하고, 아이디·비밀번호 오류는 같은 응답으로 돌려준다.
@@ -121,7 +122,7 @@ def login(body: LoginIn, conn: Conn) -> LoginOut:
     return LoginOut(
         토큰=token,
         만료일시=row["만료일시"].isoformat(),
-        계정=AccountOut(번호=acct["번호"], 아이디=acct["아이디"], 닉네임=acct["닉네임"]),
+        계정=AccountOut(번호=acct["번호"], 아이디=acct["아이디"], 닉네임=acct["닉네임"], 권한=acct["권한"]),
     )
 
 
