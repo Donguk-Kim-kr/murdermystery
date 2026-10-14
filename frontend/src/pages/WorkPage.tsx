@@ -99,6 +99,7 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
   const [genre, setGenre] = useState(work.장르);
   const [time, setTime] = useState(work.예상시간);
   const [minPlayers, setMinPlayers] = useState(String(work.최소인원));
+  const [isPublic, setIsPublic] = useState(work.공개여부);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -110,7 +111,7 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
     setSaved(false);
     const { error } = await api.PATCH("/api/works/{work_id}", {
       params: { path: { work_id: work.번호 } },
-      body: { 제목: title, 시놉시스: synopsis, 장르: genre, 예상시간: time, 최소인원: Number(minPlayers) },
+      body: { 제목: title, 시놉시스: synopsis, 장르: genre, 예상시간: time, 최소인원: Number(minPlayers), 공개여부: isPublic },
     });
     setBusy(false);
     if (error) setError(errorMessage(error, "저장하지 못했습니다"));
@@ -142,6 +143,10 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
       <label>
         최소 인원
         <input type="number" min={1} value={minPlayers} onChange={(e) => setMinPlayers(e.target.value)} required />
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
+        공개
       </label>
       <p className="muted">
         최대 인원: <strong>{work.최대인원}명</strong> (NPC가 아닌 인물 수로 자동 계산, 인물이 없으면 임시로 1명)

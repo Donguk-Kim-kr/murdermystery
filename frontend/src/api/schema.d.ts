@@ -356,6 +356,8 @@ export interface components {
             "\uC608\uC0C1\uC2DC\uAC04": string;
             /** 상태 */
             "\uC0C1\uD0DC": string;
+            /** 공개여부 */
+            "\uACF5\uAC1C\uC5EC\uBD80": boolean;
             /**
              * 생성일시
              * Format: date-time
@@ -376,6 +378,8 @@ export interface components {
             "\uC608\uC0C1\uC2DC\uAC04"?: string | null;
             /** 최소인원 */
             "\uCD5C\uC18C\uC778\uC6D0"?: number | null;
+            /** 공개여부 */
+            "\uACF5\uAC1C\uC5EC\uBD80"?: boolean | null;
         };
     };
     responses: never;

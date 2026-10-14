@@ -2,7 +2,8 @@
 
 * 로그인한 계정의 작품만 다룬다. 남의 작품은 존재 여부를 알리지 않도록 404 로 응답한다.
 * `최대인원` 은 직접 받지 않는다. NPC 가 아닌 인물 수로 자동 갱신된다 (인물이 0명이면 임시로 1).
-* `상태`·`최신버전`·`공개여부` 는 확정·버전 기능(B6~B10)에서 다루므로 여기서 받지 않는다.
+* `상태`·`최신버전` 은 확정·버전 기능(B6~B8)에서 다루므로 여기서 받지 않는다.
+* `공개여부` 는 소유자가 바꿀 수 있다. 공개 가능 조건(B10)은 미결정이라 지금은 제한이 없고, `ensure_can_publish()` 한 곳에서 검사한다.
 """
 from datetime import datetime
 from typing import Annotated
@@ -16,7 +17,7 @@ from .db import Conn
 
 router = APIRouter(prefix="/api/works", tags=["works"])
 
-WORK_COLUMNS = '"번호", "제목", "시놉시스", "장르", "최소인원", "최대인원", "예상시간", "상태", "생성일시", "수정일시"'
+WORK_COLUMNS = '"번호", "제목", "시놉시스", "장르", "최소인원", "최대인원", "예상시간", "상태", "공개여부", "생성일시", "수정일시"'
 
 
 class WorkIn(BaseModel):
@@ -32,6 +33,7 @@ class WorkPatch(BaseModel):
     장르: Annotated[str, Field(max_length=50)] | None = None
     예상시간: Annotated[str, Field(min_length=1, max_length=50)] | None = None
     최소인원: Annotated[int, Field(ge=1, le=100)] | None = None
+    공개여부: bool | None = None
 
 
 class WorkOut(BaseModel):
@@ -43,6 +45,7 @@ class WorkOut(BaseModel):
     최대인원: int
     예상시간: str
     상태: str
+    공개여부: bool
     생성일시: datetime
     수정일시: datetime | None
 
@@ -60,6 +63,13 @@ def lock_work(conn: Connection, work_id: int, account_id: int) -> dict:
     if row is None:
         raise not_found()
     return row
+
+
+def ensure_can_publish(work: dict) -> None:
+    """B10: 작품을 공개할 수 있는 조건. 아직 정해지지 않아 제한하지 않는다.
+
+    조건이 정해지면(예: 상태 `완료` + 확정 버전 존재) 여기서 HTTPException 으로 거부한다.
+    """
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=WorkOut)
@@ -105,6 +115,8 @@ def update_work(work_id: int, body: WorkPatch, conn: Conn, me: CurrentUser) -> d
             status.HTTP_409_CONFLICT,
             f"최소인원은 현재 인원({work['최대인원']}명)보다 클 수 없습니다. 인물을 먼저 추가해 주세요",
         )
+    if changes.get("공개여부") is True:
+        ensure_can_publish(work)
     assignments = ", ".join(f'"{col}" = %s' for col in changes)
     return conn.execute(
         f'UPDATE "작품" SET {assignments}, "수정일시" = CURRENT_TIMESTAMP WHERE "번호" = %s RETURNING {WORK_COLUMNS}',

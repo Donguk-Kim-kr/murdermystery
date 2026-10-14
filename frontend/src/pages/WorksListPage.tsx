@@ -37,7 +37,7 @@ export function WorksListPage() {
             <Link to={`/works/${w.번호}`}>
               <strong>{w.제목}</strong>
               <span className="muted">
-                {w.장르 || "장르 미정"} · {w.상태} · 인원 {w.최소인원}~{w.최대인원}명
+                {w.장르 || "장르 미정"} · {w.상태} · {w.공개여부 ? "공개" : "비공개"} · 인원 {w.최소인원}~{w.최대인원}명
               </span>
             </Link>
           </li>

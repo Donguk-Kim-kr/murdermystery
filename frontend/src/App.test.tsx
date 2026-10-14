@@ -129,7 +129,7 @@ describe("저장된 토큰", () => {
 
 const work = {
   번호: 7, 제목: "저택의 비밀", 시놉시스: "폭풍우 치는 밤", 장르: "추리", 최소인원: 1, 최대인원: 1,
-  예상시간: "3시간", 상태: "개발", 생성일시: "2026-10-14T00:00:00Z", 수정일시: null,
+  예상시간: "3시간", 상태: "개발", 공개여부: false, 생성일시: "2026-10-14T00:00:00Z", 수정일시: null,
 };
 const person = { 순서: 1, 이름: "홍길동", 직업: "의사", 나이: null, 성별: null, 서사: "", 타임라인: null, 능력: null, 비밀: null, 목표: null, 범인: false, NPC: false };
 
@@ -143,7 +143,7 @@ describe("작품", () => {
     routes["GET /api/works"] = () => json([work]);
     renderApp();
     expect(await screen.findByText("저택의 비밀")).toBeInTheDocument();
-    expect(screen.getByText(/추리 · 개발 · 인원 1~1명/)).toBeInTheDocument();
+    expect(screen.getByText(/추리 · 개발 · 비공개 · 인원 1~1명/)).toBeInTheDocument();
   });
 
   it("작품이 없으면 안내 문구를 보여 준다", async () => {
@@ -200,6 +200,20 @@ describe("작품", () => {
     await userEvent.click(within(form).getByRole("button", { name: "저장" }));
     expect(await within(form).findByRole("status")).toHaveTextContent("저장했습니다");
     expect(within(form).getByLabelText("장르")).toHaveValue("추리!");
+  });
+
+  it("공개를 켜고 저장하면 공개여부를 서버에 보낸다", async () => {
+    routes["GET /api/works/7"] = () => json(work);
+    routes["GET /api/works/7/characters"] = () => json([]);
+    routes["PATCH /api/works/7"] = () => json({ ...work, 공개여부: true });
+    renderApp("/works/7");
+    const form = await screen.findByRole("form", { name: "기본정보" });
+    expect(within(form).getByLabelText("공개")).not.toBeChecked();
+    await userEvent.click(within(form).getByLabelText("공개"));
+    await userEvent.click(within(form).getByRole("button", { name: "저장" }));
+    await within(form).findByRole("status");
+    const patch = calls.find((c) => c.key === "PATCH /api/works/7")!;
+    expect(await patch.req.json()).toMatchObject({ 공개여부: true });
   });
 
   it("서버가 거부하면 기본정보 저장 오류를 보여 준다", async () => {
