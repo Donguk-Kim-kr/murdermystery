@@ -54,7 +54,7 @@ export function WorksListPage() {
       </ul>
       {others.length > 0 && (
         <>
-          <h2>테스트할 수 있는 작품</h2>
+          <h2>방을 만들 수 있는 비공개 작품</h2>
           <ul className="list">
             {others.map((w) => (
               <li key={w.번호}>
