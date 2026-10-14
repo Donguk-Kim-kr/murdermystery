@@ -89,6 +89,8 @@ body {
   font-size: 16px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  /* Pretendard ss05: 괄호·따옴표 등 부호를 한글 글자 높이에 맞는 모양으로 쓴다 */
+  font-feature-settings: "ss05";
   word-break: keep-all; /* 한글은 단어 중간에서 줄바꿈하지 않는다 */
   overflow-wrap: break-word;
 }
@@ -149,6 +151,7 @@ textarea,
 select {
   width: 100%;
   font: inherit;
+  font-feature-settings: inherit;
   font-weight: 400;
   color: var(--text);
   background: var(--surface);
@@ -183,6 +186,7 @@ input[type="checkbox"] {
 /* 버튼: 기본이 주 버튼, .secondary 는 보조, .small 은 작은 크기 */
 button,
 .button {
+  font-feature-settings: inherit;
   display: inline-flex;
   align-items: center;
   justify-content: center;
