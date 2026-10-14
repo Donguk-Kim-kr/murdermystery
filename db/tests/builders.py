@@ -80,13 +80,13 @@ class Builders(PgTestCase):
         return self.ins("사건", 작품_번호=w, 순서=n, **kw)
 
     def phase(self, **kw):
-        kw.setdefault("이름", "토론")
+        kw.setdefault("이름", f"토론{self.db.n()}")   # ("계정_번호","이름","버전") UNIQUE 라서 매번 다른 이름
         kw.setdefault("규칙", {"any": "value"})
         kw.setdefault("설명", "설명")
         return self.ins("진행단계", **kw)
 
     def gimmick(self, **kw):
-        kw.setdefault("이름", "기믹")
+        kw.setdefault("이름", f"기믹{self.db.n()}")   # ("계정_번호","이름","버전") UNIQUE 라서 매번 다른 이름
         kw.setdefault("조건", {"any": "value"})
         kw.setdefault("결과", {"any": "value"})
         return self.ins("기믹", **kw)

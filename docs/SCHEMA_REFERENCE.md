@@ -151,17 +151,26 @@
 | 3 | 규칙 | jsonb | 불가 |  |
 | 4 | 설명 | text | 불가 |  |
 | 5 | 계정_번호 | integer | 가능 |  |
+| 6 | 버전 | integer | 불가 | 1 |
+| 7 | 변경내역 | text | 가능 |  |
+| 8 | 삭제일시 | timestamp with time zone | 가능 |  |
 
 **제약조건**
 
 | 종류 | 이름 | 정의 |
 |---|---|---|
 | PK | `pk_진행단계` | `PRIMARY KEY ("번호")` |
+| UNIQUE | `uq_진행단계_계정_이름_버전` | `UNIQUE NULLS NOT DISTINCT ("계정_번호", "이름", "버전")` |
 | FK | `fk_진행단계_계정` | `FOREIGN KEY ("계정_번호") REFERENCES "계정"("번호") ON DELETE RESTRICT` |
+| CHECK | `ck_진행단계_버전` | `CHECK (("버전" >= 1))` |
 
 **추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
 
 - `ix_진행단계_계정`: `CREATE INDEX "ix_진행단계_계정" ON public."진행단계" USING btree ("계정_번호")`
+
+**트리거**
+
+- `tg_진행단계_불변`: `CREATE TRIGGER "tg_진행단계_불변" BEFORE UPDATE ON public."진행단계" FOR EACH ROW EXECUTE FUNCTION "fn_라이브러리_불변"()`
 
 ## 기믹
 
@@ -173,17 +182,26 @@
 | 4 | 설명 | text | 가능 |  |
 | 5 | 조건 | jsonb | 불가 |  |
 | 6 | 결과 | jsonb | 불가 |  |
+| 7 | 버전 | integer | 불가 | 1 |
+| 8 | 변경내역 | text | 가능 |  |
+| 9 | 삭제일시 | timestamp with time zone | 가능 |  |
 
 **제약조건**
 
 | 종류 | 이름 | 정의 |
 |---|---|---|
 | PK | `pk_기믹` | `PRIMARY KEY ("번호")` |
+| UNIQUE | `uq_기믹_계정_이름_버전` | `UNIQUE NULLS NOT DISTINCT ("계정_번호", "이름", "버전")` |
 | FK | `fk_기믹_계정` | `FOREIGN KEY ("계정_번호") REFERENCES "계정"("번호") ON DELETE RESTRICT` |
+| CHECK | `ck_기믹_버전` | `CHECK (("버전" >= 1))` |
 
 **추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
 
 - `ix_기믹_계정`: `CREATE INDEX "ix_기믹_계정" ON public."기믹" USING btree ("계정_번호")`
+
+**트리거**
+
+- `tg_기믹_불변`: `CREATE TRIGGER "tg_기믹_불변" BEFORE UPDATE ON public."기믹" FOR EACH ROW EXECUTE FUNCTION "fn_라이브러리_불변"()`
 
 ## 진행순서
 
