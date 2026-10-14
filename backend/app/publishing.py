@@ -14,11 +14,14 @@ router = APIRouter(prefix="/api/works", tags=["publishing"])
 
 
 def ensure_can_publish(work: dict) -> None:
-    """B10: 공개 가능 조건 — 확정 버전이 있고 상태가 `완료`일 것.
+    """B10: 공개 가능 조건.
 
-    확정·상태 전이(B6~B9) 기능이 아직 없어 지금은 검사하지 않는다. 그 기능을 만들 때 여기서
-    HTTPException 으로 거부한다. (지금 검사하면 상태를 `완료`로 바꿀 방법이 없어 아무도 공개할 수 없다.)
+    * 확정된 버전이 있어야 한다 (사용자 결정). 확정 버전이 없으면 게임을 시작할 수도 없다.
+    * 상태 `완료` 검사는 상태 전이(B6) 기능과 함께 넣는다. 아직 상태를 바꿀 방법이 없다.
+    * 확정 전 논리·스토리 검증 툴은 미확정이다 (docs/BACKLOG.md).
     """
+    if not work["확정버전_있음"]:
+        raise HTTPException(status.HTTP_409_CONFLICT, "확정된 버전이 없는 작품은 공개할 수 없습니다")
 
 
 def _update(conn, work_id: int, **columns) -> dict:

@@ -9,6 +9,7 @@ def test_create_starts_with_temporary_capacity_of_one(client, headers):
     assert (work["최소인원"], work["최대인원"]) == (1, 1)
     assert work["상태"] == "개발" and work["수정일시"] is None
     assert work["공개여부"] is False and work["공개권한"] == "제작자"
+    assert work["확정버전_있음"] is False
     assert work["예상시간"] == "3시간"
 
 

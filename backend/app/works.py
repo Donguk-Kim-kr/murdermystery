@@ -18,7 +18,10 @@ from .visibility import Level, actor_level
 
 router = APIRouter(prefix="/api/works", tags=["works"])
 
-WORK_COLUMNS = '"번호", "제목", "시놉시스", "장르", "최소인원", "최대인원", "예상시간", "상태", "공개여부", "공개권한", "생성일시", "수정일시"'
+WORK_COLUMNS = (
+    '"번호", "제목", "시놉시스", "장르", "최소인원", "최대인원", "예상시간", "상태", "공개여부", "공개권한", "생성일시", "수정일시", '
+    'EXISTS (SELECT 1 FROM "버전" v WHERE v."작품_번호" = "작품"."번호") AS "확정버전_있음"'
+)
 
 
 class WorkIn(BaseModel):
@@ -49,6 +52,7 @@ class WorkOut(BaseModel):
     공개권한: Literal["제작자", "관리자", "운영자"]
     생성일시: datetime
     수정일시: datetime | None
+    확정버전_있음: bool
 
 
 def not_found() -> HTTPException:

@@ -129,7 +129,7 @@ describe("저장된 토큰", () => {
 
 const work = {
   번호: 7, 제목: "저택의 비밀", 시놉시스: "폭풍우 치는 밤", 장르: "추리", 최소인원: 1, 최대인원: 1,
-  예상시간: "3시간", 상태: "개발", 공개여부: false, 공개권한: "제작자", 생성일시: "2026-10-14T00:00:00Z", 수정일시: null,
+  예상시간: "3시간", 상태: "개발", 공개여부: false, 공개권한: "제작자", 확정버전_있음: true, 생성일시: "2026-10-14T00:00:00Z", 수정일시: null,
 };
 const person = { 순서: 1, 이름: "홍길동", 직업: "의사", 나이: null, 성별: null, 서사: "", 타임라인: null, 능력: null, 비밀: null, 목표: null, 범인: false, NPC: false };
 
@@ -229,6 +229,15 @@ describe("작품", () => {
     await userEvent.click(within(panel).getByRole("button", { name: "공개하기" }));
     expect(await within(panel).findByText("공개 중")).toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: "비공개로 전환" })).toBeInTheDocument();
+  });
+
+  it("확정된 버전이 없으면 공개하기 버튼을 쓸 수 없고 이유를 보여 준다", async () => {
+    routes["GET /api/works/7"] = () => json({ ...work, 확정버전_있음: false });
+    routes["GET /api/works/7/characters"] = () => json([]);
+    renderApp("/works/7");
+    const panel = await screen.findByRole("region", { name: "공개 상태" });
+    expect(within(panel).getByRole("button", { name: "공개하기" })).toBeDisabled();
+    expect(within(panel).getByText("확정된 버전이 없어 공개할 수 없습니다.")).toBeInTheDocument();
   });
 
   it("관리자가 비공개한 작품은 제작자에게 공개 버튼이 없다", async () => {

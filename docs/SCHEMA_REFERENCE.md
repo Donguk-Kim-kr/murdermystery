@@ -36,7 +36,7 @@
 | 28 | 투표결과 |
 | 29 | 엔딩 |
 | 30 | 획득 |
-| 31 | 작품테스터 |
+| 31 | 테스터 |
 
 ## 계정
 
@@ -811,7 +811,7 @@
 - `ix_획득_진행`: `CREATE INDEX "ix_획득_진행" ON public."획득" USING btree ("진행_번호")`
 - `ix_획득_참여`: `CREATE INDEX "ix_획득_참여" ON public."획득" USING btree ("참여_번호")`
 
-## 작품테스터
+## 테스터
 
 | 순번 | 컬럼 | 타입 | NULL | 기본값 / 특성 |
 |---|---|---|---|---|
@@ -824,12 +824,12 @@
 
 | 종류 | 이름 | 정의 |
 |---|---|---|
-| PK | `pk_작품테스터` | `PRIMARY KEY ("번호")` |
-| UNIQUE | `uq_작품테스터_작품_계정` | `UNIQUE ("작품_번호", "계정_번호")` |
-| FK | `fk_작품테스터_계정` | `FOREIGN KEY ("계정_번호") REFERENCES "계정"("번호") ON DELETE CASCADE` |
-| FK | `fk_작품테스터_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE CASCADE` |
+| PK | `pk_테스터` | `PRIMARY KEY ("번호")` |
+| UNIQUE | `uq_테스터_작품_계정` | `UNIQUE ("작품_번호", "계정_번호")` |
+| FK | `fk_테스터_계정` | `FOREIGN KEY ("계정_번호") REFERENCES "계정"("번호") ON DELETE CASCADE` |
+| FK | `fk_테스터_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE CASCADE` |
 
 **추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
 
-- `ix_작품테스터_계정`: `CREATE INDEX "ix_작품테스터_계정" ON public."작품테스터" USING btree ("계정_번호")`
+- `ix_테스터_계정`: `CREATE INDEX "ix_테스터_계정" ON public."테스터" USING btree ("계정_번호")`
 

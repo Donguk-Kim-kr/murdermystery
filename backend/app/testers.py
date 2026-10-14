@@ -21,7 +21,7 @@ router = APIRouter(tags=["testers"])
 
 # 테스트 플레이 가능 조건 (작품 별칭 w, 테스터 부여 행 별칭 t). 제작자 본인은 테스터 행 없이도 해당한다.
 _TESTABLE = 'NOT w."공개여부" AND w."공개권한" = \'제작자\' AND (w."계정_번호" = %(me)s OR t."계정_번호" IS NOT NULL)'
-_FROM = 'FROM "작품" w LEFT JOIN "작품테스터" t ON t."작품_번호" = w."번호" AND t."계정_번호" = %(me)s'
+_FROM = 'FROM "작품" w LEFT JOIN "테스터" t ON t."작품_번호" = w."번호" AND t."계정_번호" = %(me)s'
 
 
 class TesterIn(BaseModel):
@@ -68,7 +68,7 @@ def list_testers(work_id: int, conn: Conn, me: CurrentUser) -> list[dict]:
     load_work_for_actor(conn, work_id, me)
     return conn.execute(
         'SELECT a."번호" AS 계정_번호, a."아이디", a."닉네임", t."부여일시" '
-        'FROM "작품테스터" t JOIN "계정" a ON a."번호" = t."계정_번호" '
+        'FROM "테스터" t JOIN "계정" a ON a."번호" = t."계정_번호" '
         'WHERE t."작품_번호" = %s ORDER BY t."번호"',
         (work_id,),
     ).fetchall()
@@ -87,7 +87,7 @@ def add_tester(work_id: int, body: TesterIn, conn: Conn, me: CurrentUser) -> dic
     if target["번호"] == work["계정_번호"]:
         raise HTTPException(status.HTTP_409_CONFLICT, "제작자는 이미 테스트할 수 있습니다")
     row = conn.execute(
-        'INSERT INTO "작품테스터" ("작품_번호", "계정_번호") VALUES (%s, %s) '
+        'INSERT INTO "테스터" ("작품_번호", "계정_번호") VALUES (%s, %s) '
         'ON CONFLICT ("작품_번호", "계정_번호") DO NOTHING RETURNING "부여일시"',
         (work_id, target["번호"]),
     ).fetchone()
@@ -100,7 +100,7 @@ def add_tester(work_id: int, body: TesterIn, conn: Conn, me: CurrentUser) -> dic
 def remove_tester(work_id: int, account_id: int, conn: Conn, me: CurrentUser) -> None:
     load_work_for_actor(conn, work_id, me, lock=True)
     deleted = conn.execute(
-        'DELETE FROM "작품테스터" WHERE "작품_번호" = %s AND "계정_번호" = %s RETURNING 1', (work_id, account_id)
+        'DELETE FROM "테스터" WHERE "작품_번호" = %s AND "계정_번호" = %s RETURNING 1', (work_id, account_id)
     ).fetchone()
     if deleted is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "테스터가 아닙니다")

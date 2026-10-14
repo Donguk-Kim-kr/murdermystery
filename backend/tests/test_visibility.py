@@ -42,9 +42,13 @@ def test_publish_rule_matrix(right, role, owner, allowed):
 # ---- API ------------------------------------------------------------------------------
 
 @pytest.fixture
-def work_of(client):
+def work_of(client, confirm):
+    """확정 버전이 있는 작품을 만든다 (공개하려면 확정 버전이 필요하다)."""
+
     def make(owner):
-        return client.post("/api/works", headers=owner.headers, json={"제목": "저택의 비밀"}).json()["번호"]
+        wid = client.post("/api/works", headers=owner.headers, json={"제목": "저택의 비밀"}).json()["번호"]
+        confirm(wid)
+        return wid
     return make
 
 
@@ -167,9 +171,9 @@ def test_requires_login(client):
     assert client.post("/api/works/1/publish").status_code == 401
 
 
-def test_admin_who_owns_the_work_acts_as_owner(client, make_account):
+def test_admin_who_owns_the_work_acts_as_owner(client, make_account, work_of):
     admin, other_admin = make_account("관리자"), make_account("관리자")
-    wid = client.post("/api/works", headers=admin.headers, json={"제목": "관리자의 작품"}).json()["번호"]
+    wid = work_of(admin)
     assert post(client, admin, wid, "publish").status_code == 200
     res = post(client, admin, wid, "unpublish")
     assert res.json()["공개권한"] == "제작자"               # '관리자'가 아니라 제작자로 기록된다
@@ -177,9 +181,9 @@ def test_admin_who_owns_the_work_acts_as_owner(client, make_account):
     assert post(client, admin, wid, "publish").status_code == 200
 
 
-def test_admin_cannot_use_admin_power_on_own_work(client, make_account):
+def test_admin_cannot_use_admin_power_on_own_work(client, make_account, work_of):
     owner_admin, other_admin = make_account("관리자"), make_account("관리자")
-    wid = client.post("/api/works", headers=owner_admin.headers, json={"제목": "t"}).json()["번호"]
+    wid = work_of(owner_admin)
     post(client, owner_admin, wid, "publish")
     post(client, other_admin, wid, "unpublish")               # 다른 관리자가 비공개
     assert post(client, owner_admin, wid, "publish").status_code == 403         # 자기 작품이어도 제작자 자격뿐
@@ -187,10 +191,65 @@ def test_admin_cannot_use_admin_power_on_own_work(client, make_account):
     assert post(client, other_admin, wid, "return-to-owner").status_code == 200
 
 
-def test_operator_cannot_force_publish_work_the_owner_made_private(client, make_account):
+def test_operator_cannot_force_publish_work_the_owner_made_private(client, make_account, work_of):
     owner, operator = make_account(), make_account("운영자")
-    wid = client.post("/api/works", headers=owner.headers, json={"제목": "t"}).json()["번호"]
+    wid = work_of(owner)
     post(client, owner, wid, "publish")
     post(client, owner, wid, "unpublish")
     assert post(client, operator, wid, "publish").status_code == 403           # 저작권(제작자의 결정) 존중
     assert post(client, operator, wid, "return-to-owner").status_code == 409   # 이미 제작자에게 있음
+
+
+# ---- 공개 조건: 확정된 버전 (B10) ---------------------------------------------------------
+
+def test_work_without_confirmed_version_cannot_be_published(client, make_account):
+    owner = make_account()
+    wid = client.post("/api/works", headers=owner.headers, json={"제목": "미확정"}).json()["번호"]
+    res = post(client, owner, wid, "publish")
+    assert res.status_code == 409 and "확정된 버전" in res.json()["detail"]
+    assert state(client, owner, wid) == (False, "제작자")
+
+
+def test_confirmed_flag_is_reported_and_enables_publishing(client, make_account, confirm):
+    owner = make_account()
+    wid = client.post("/api/works", headers=owner.headers, json={"제목": "t"}).json()["번호"]
+    assert client.get(f"/api/works/{wid}", headers=owner.headers).json()["확정버전_있음"] is False
+    confirm(wid)
+    assert client.get(f"/api/works/{wid}", headers=owner.headers).json()["확정버전_있음"] is True
+    assert client.get("/api/works", headers=owner.headers).json()[0]["확정버전_있음"] is True
+    assert post(client, owner, wid, "publish").status_code == 200
+
+
+def test_permission_is_checked_before_the_confirmed_version_condition(client, make_account):
+    owner, admin, stranger = make_account(), make_account("관리자"), make_account()
+    wid = client.post("/api/works", headers=owner.headers, json={"제목": "미확정"}).json()["번호"]
+    assert post(client, stranger, wid, "publish").status_code == 404   # 남은 존재조차 모른다
+    assert post(client, admin, wid, "publish").status_code == 403      # 권한 없음이 먼저
+
+
+def test_staff_cannot_publish_unconfirmed_work_either(client, make_account, confirm, test_dbname):
+    # 관리자가 잠근 작품이라도 확정 버전이 없으면 공개할 수 없다 (조건은 누가 공개하든 같다)
+    import psycopg
+
+    owner, admin = make_account(), make_account("관리자")
+    wid = client.post("/api/works", headers=owner.headers, json={"제목": "t"}).json()["번호"]
+    confirm(wid)
+    post(client, owner, wid, "publish")
+    post(client, admin, wid, "unpublish")
+    with psycopg.connect(f"dbname={test_dbname}", autocommit=True) as c:
+        c.execute('DELETE FROM "버전" WHERE "작품_번호" = %s', (wid,))
+    res = post(client, admin, wid, "publish")
+    assert res.status_code == 409
+
+
+def test_unpublish_and_return_do_not_need_a_confirmed_version(client, make_account, confirm, test_dbname):
+    import psycopg
+
+    owner, admin = make_account(), make_account("관리자")
+    wid = client.post("/api/works", headers=owner.headers, json={"제목": "t"}).json()["번호"]
+    confirm(wid)
+    post(client, owner, wid, "publish")
+    with psycopg.connect(f"dbname={test_dbname}", autocommit=True) as c:
+        c.execute('DELETE FROM "버전" WHERE "작품_번호" = %s', (wid,))
+    assert post(client, admin, wid, "unpublish").status_code == 200     # 문제 작품은 언제든 비공개할 수 있다
+    assert post(client, admin, wid, "return-to-owner").status_code == 200

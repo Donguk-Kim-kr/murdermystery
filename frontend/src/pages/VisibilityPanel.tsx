@@ -43,7 +43,9 @@ export function VisibilityPanel({ work, role, onChanged }: Props) {
           </p>
           {canPublish(right, level) ? (
             <div className="row">
-              <button type="button" disabled={busy} onClick={() => void act("publish")}>공개하기</button>
+              <button type="button" disabled={busy || !work.확정버전_있음} onClick={() => void act("publish")}>
+                공개하기
+              </button>
               {right !== "제작자" && (
                 <button type="button" className="secondary" disabled={busy} onClick={() => void act("return-to-owner")}>
                   제작자에게 공개 권한 돌려주기
@@ -56,6 +58,9 @@ export function VisibilityPanel({ work, role, onChanged }: Props) {
             </p>
           )}
         </>
+      )}
+      {!work.공개여부 && !work.확정버전_있음 && canPublish(right, level) && (
+        <p className="muted">확정된 버전이 없어 공개할 수 없습니다.</p>
       )}
       {error && <p role="alert" className="error">{error}</p>}
     </section>

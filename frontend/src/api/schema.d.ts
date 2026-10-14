@@ -523,6 +523,8 @@ export interface components {
             "\uC0DD\uC131\uC77C\uC2DC": string;
             /** 수정일시 */
             "\uC218\uC815\uC77C\uC2DC": string | null;
+            /** 확정버전 있음 */
+            "\uD655\uC815\uBC84\uC804_\uC788\uC74C": boolean;
         };
         /** WorkPatch */
         WorkPatch: {

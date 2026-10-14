@@ -79,3 +79,17 @@ def new_user(make_account):
 @pytest.fixture
 def headers(new_user):
     return new_user()
+
+
+@pytest.fixture
+def confirm(test_dbname):
+    """작품에 확정 버전을 직접 만든다. 확정 기능이 아직 없어 DB 에 바로 넣는다 (시나리오 내용은 테스트와 무관)."""
+
+    def make(work_id: int, version: str = "1.0") -> None:
+        with psycopg.connect(f"dbname={test_dbname}", autocommit=True) as conn:
+            conn.execute(
+                'INSERT INTO "버전" ("작품_번호", "버전", "시나리오") VALUES (%s, %s, %s::jsonb)',
+                (work_id, version, "{}"),
+            )
+
+    return make

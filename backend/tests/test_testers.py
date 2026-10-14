@@ -6,8 +6,12 @@ from app.testers import can_test_play
 
 
 @pytest.fixture
-def work_of(client):
-    return lambda owner: client.post("/api/works", headers=owner.headers, json={"제목": "저택의 비밀"}).json()["번호"]
+def work_of(client, confirm):
+    def make(owner):
+        wid = client.post("/api/works", headers=owner.headers, json={"제목": "저택의 비밀"}).json()["번호"]
+        confirm(wid)  # 공개하려면 확정 버전이 필요하다
+        return wid
+    return make
 
 
 def add(client, who, wid, target):
@@ -130,4 +134,4 @@ def test_grants_disappear_with_the_work_and_do_not_block_account_rules(client, m
     add(client, owner, wid, tester)
     with psycopg.connect(f"dbname={test_dbname}", autocommit=True) as c:
         c.execute('DELETE FROM "작품" WHERE "번호" = %s', (wid,))
-        assert c.execute('SELECT count(*) FROM "작품테스터" WHERE "작품_번호" = %s', (wid,)).fetchone()[0] == 0
+        assert c.execute('SELECT count(*) FROM "테스터" WHERE "작품_번호" = %s', (wid,)).fetchone()[0] == 0
