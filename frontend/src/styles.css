@@ -24,3 +24,22 @@ button:disabled { cursor: wait; opacity: 0.6; }
 button.link { margin-top: 0.75rem; background: none; border: 0; text-decoration: underline; padding: 0.25rem; }
 .error { margin: 0; color: #c0392b; font-size: 0.9rem; }
 .center { text-align: center; }
+
+/* 로그인 이후 화면 */
+body { display: block; }
+.card { margin: 2rem auto; }
+.topbar { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; border-bottom: 1px solid #8884; }
+.topbar .brand { font-weight: 700; margin-right: auto; text-decoration: none; color: inherit; }
+.page { box-sizing: border-box; max-width: 40rem; margin: 0 auto; padding: 1rem; }
+.page.narrow { max-width: 24rem; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.list { list-style: none; margin: 0 0 1rem; padding: 0; display: grid; gap: 0.5rem; }
+.list > li { border: 1px solid #8884; border-radius: 0.5rem; padding: 0.7rem; }
+.list a { display: grid; gap: 0.15rem; text-decoration: none; color: inherit; }
+.muted { color: #888; font-size: 0.85rem; }
+.ok { color: #2e8b57; margin: 0; }
+.subform { padding: 0.25rem 0; }
+textarea { font-size: 1rem; padding: 0.6rem; font-family: inherit; }
+.button, button.small { font-size: 0.9rem; padding: 0.45rem 0.8rem; }
+.button { border: 1px solid; border-radius: 0.3rem; text-decoration: none; color: inherit; }
+button.secondary { background: none; border: 1px solid #8886; }

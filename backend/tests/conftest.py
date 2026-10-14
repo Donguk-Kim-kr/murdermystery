@@ -43,3 +43,21 @@ def client(test_dbname):
     finally:
         mp.undo()
         get_settings.cache_clear()
+
+
+@pytest.fixture
+def new_user(client):
+    """가입·로그인한 새 사용자의 Authorization 헤더를 돌려주는 팩토리."""
+
+    def make() -> dict:
+        uid = f"u{uuid.uuid4().hex[:10]}"
+        assert client.post("/api/auth/signup", json={"아이디": uid, "패스워드": "password123", "닉네임": "제작자"}).status_code == 201
+        res = client.post("/api/auth/login", json={"아이디": uid, "패스워드": "password123", "접속환경": "PC"})
+        return {"Authorization": f"Bearer {res.json()['토큰']}"}
+
+    return make
+
+
+@pytest.fixture
+def headers(new_user):
+    return new_user()

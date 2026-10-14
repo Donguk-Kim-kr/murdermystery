@@ -4,8 +4,10 @@ from fastapi import FastAPI, HTTPException
 from psycopg import Error
 
 from .auth import router as auth_router
+from .characters import router as characters_router
 from .config import get_settings
 from .db import Conn, create_pool
+from .works import router as works_router
 
 
 @asynccontextmanager
@@ -21,6 +23,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="머더미스터리 플랫폼", lifespan=lifespan)
 app.include_router(auth_router)
+app.include_router(works_router)
+app.include_router(characters_router)
 
 
 @app.get("/api/health")

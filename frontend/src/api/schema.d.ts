@@ -72,6 +72,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/works": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Works */
+        get: operations["list_works_api_works_get"];
+        put?: never;
+        /** Create Work */
+        post: operations["create_work_api_works_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/works/{work_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Work */
+        get: operations["get_work_api_works__work_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Work */
+        patch: operations["update_work_api_works__work_id__patch"];
+        trace?: never;
+    };
+    "/api/works/{work_id}/characters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Characters */
+        get: operations["list_characters_api_works__work_id__characters_get"];
+        put?: never;
+        /** Create Character */
+        post: operations["create_character_api_works__work_id__characters_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/works/{work_id}/characters/{order}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Character */
+        get: operations["get_character_api_works__work_id__characters__order__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Character */
+        patch: operations["update_character_api_works__work_id__characters__order__patch"];
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -102,6 +174,98 @@ export interface components {
             /** 닉네임 */
             "\uB2C9\uB124\uC784": string;
         };
+        /** CharacterIn */
+        CharacterIn: {
+            /** 이름 */
+            "\uC774\uB984": string;
+            /** 직업 */
+            "\uC9C1\uC5C5"?: string | null;
+            /** 나이 */
+            "\uB098\uC774"?: number | null;
+            /** 성별 */
+            "\uC131\uBCC4"?: string | null;
+            /**
+             * 서사
+             * @default
+             */
+            "\uC11C\uC0AC"?: string;
+            /** 타임라인 */
+            "\uD0C0\uC784\uB77C\uC778"?: string | null;
+            /** 능력 */
+            "\uB2A5\uB825"?: string | null;
+            /** 비밀 */
+            "\uBE44\uBC00"?: string | null;
+            /** 목표 */
+            "\uBAA9\uD45C"?: string | null;
+            /**
+             * 범인
+             * @default false
+             */
+            "\uBC94\uC778"?: boolean;
+            /**
+             * Npc
+             * @default false
+             */
+            NPC?: boolean;
+        };
+        /** CharacterOut */
+        CharacterOut: {
+            /** 이름 */
+            "\uC774\uB984": string;
+            /** 직업 */
+            "\uC9C1\uC5C5"?: string | null;
+            /** 나이 */
+            "\uB098\uC774"?: number | null;
+            /** 성별 */
+            "\uC131\uBCC4"?: string | null;
+            /** 서사 */
+            "\uC11C\uC0AC": string;
+            /** 타임라인 */
+            "\uD0C0\uC784\uB77C\uC778"?: string | null;
+            /** 능력 */
+            "\uB2A5\uB825"?: string | null;
+            /** 비밀 */
+            "\uBE44\uBC00"?: string | null;
+            /** 목표 */
+            "\uBAA9\uD45C"?: string | null;
+            /**
+             * 범인
+             * @default false
+             */
+            "\uBC94\uC778"?: boolean;
+            /**
+             * Npc
+             * @default false
+             */
+            NPC?: boolean;
+            /** 순서 */
+            "\uC21C\uC11C": number;
+        };
+        /** CharacterPatch */
+        CharacterPatch: {
+            /** 이름 */
+            "\uC774\uB984"?: string | null;
+            /** 직업 */
+            "\uC9C1\uC5C5"?: string | null;
+            /** 나이 */
+            "\uB098\uC774"?: number | null;
+            /** 성별 */
+            "\uC131\uBCC4"?: string | null;
+            /** 서사 */
+            "\uC11C\uC0AC"?: string | null;
+            /** 타임라인 */
+            "\uD0C0\uC784\uB77C\uC778"?: string | null;
+            /** 능력 */
+            "\uB2A5\uB825"?: string | null;
+            /** 비밀 */
+            "\uBE44\uBC00"?: string | null;
+            /** 목표 */
+            "\uBAA9\uD45C"?: string | null;
+            /** 범인 */
+            "\uBC94\uC778"?: boolean | null;
+            /** Npc */
+            NPC?: boolean | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -122,7 +286,7 @@ export interface components {
              * 자동로그인
              * @default false
              */
-            "\uC790\uB3D9\uB85C\uADF8\uC778": boolean;
+            "\uC790\uB3D9\uB85C\uADF8\uC778"?: boolean;
         };
         /** LoginOut */
         LoginOut: {
@@ -153,6 +317,65 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WorkIn */
+        WorkIn: {
+            /** 제목 */
+            "\uC81C\uBAA9": string;
+            /**
+             * 시놉시스
+             * @default
+             */
+            "\uC2DC\uB189\uC2DC\uC2A4"?: string;
+            /**
+             * 장르
+             * @default
+             */
+            "\uC7A5\uB974"?: string;
+            /**
+             * 예상시간
+             * @default 3시간
+             */
+            "\uC608\uC0C1\uC2DC\uAC04"?: string;
+        };
+        /** WorkOut */
+        WorkOut: {
+            /** 번호 */
+            "\uBC88\uD638": number;
+            /** 제목 */
+            "\uC81C\uBAA9": string;
+            /** 시놉시스 */
+            "\uC2DC\uB189\uC2DC\uC2A4": string;
+            /** 장르 */
+            "\uC7A5\uB974": string;
+            /** 최소인원 */
+            "\uCD5C\uC18C\uC778\uC6D0": number;
+            /** 최대인원 */
+            "\uCD5C\uB300\uC778\uC6D0": number;
+            /** 예상시간 */
+            "\uC608\uC0C1\uC2DC\uAC04": string;
+            /** 상태 */
+            "\uC0C1\uD0DC": string;
+            /**
+             * 생성일시
+             * Format: date-time
+             */
+            "\uC0DD\uC131\uC77C\uC2DC": string;
+            /** 수정일시 */
+            "\uC218\uC815\uC77C\uC2DC": string | null;
+        };
+        /** WorkPatch */
+        WorkPatch: {
+            /** 제목 */
+            "\uC81C\uBAA9"?: string | null;
+            /** 시놉시스 */
+            "\uC2DC\uB189\uC2DC\uC2A4"?: string | null;
+            /** 장르 */
+            "\uC7A5\uB974"?: string | null;
+            /** 예상시간 */
+            "\uC608\uC0C1\uC2DC\uAC04"?: string | null;
+            /** 최소인원 */
+            "\uCD5C\uC18C\uC778\uC6D0"?: number | null;
         };
     };
     responses: never;
@@ -276,6 +499,284 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_works_api_works_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_work_api_works_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_work_api_works__work_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_work_api_works__work_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_characters_api_works__work_id__characters_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CharacterOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_character_api_works__work_id__characters_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CharacterIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CharacterOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_character_api_works__work_id__characters__order__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+                order: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CharacterOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_character_api_works__work_id__characters__order__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+                order: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CharacterPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CharacterOut"];
                 };
             };
             /** @description Validation Error */

@@ -9,12 +9,13 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "gen:api": "python3 -I ../backend/scripts/export_openapi.py > openapi.json && openapi-typescript openapi.json -o src/api/schema.d.ts"
+    "gen:api": "python3 -I ../backend/scripts/export_openapi.py > openapi.json && openapi-typescript openapi.json --default-non-nullable false -o src/api/schema.d.ts"
   },
   "dependencies": {
     "openapi-fetch": "^0.17.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",
