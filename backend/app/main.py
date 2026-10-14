@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException
-from psycopg import Connection, Error
+from fastapi import FastAPI, HTTPException
+from psycopg import Error
 
+from .auth import router as auth_router
 from .config import get_settings
-from .db import create_pool, get_conn
+from .db import Conn, create_pool
 
 
 @asynccontextmanager
@@ -19,10 +20,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="머더미스터리 플랫폼", lifespan=lifespan)
+app.include_router(auth_router)
 
 
 @app.get("/api/health")
-def health(conn: Connection = Depends(get_conn)) -> dict[str, str]:
+def health(conn: Conn) -> dict[str, str]:
     try:
         conn.execute("SELECT 1")
     except Error as exc:

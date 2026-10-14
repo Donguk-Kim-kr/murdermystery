@@ -1,7 +1,8 @@
 """PostgreSQL 연결 풀 (psycopg 3, SQL 직접 작성)."""
 from collections.abc import Iterator
+from typing import Annotated
 
-from fastapi import Request
+from fastapi import Depends, Request
 from psycopg import Connection
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
@@ -24,3 +25,8 @@ def get_conn(request: Request) -> Iterator[Connection]:
     """요청마다 풀에서 연결을 빌린다. 예외 없이 끝나면 커밋, 예외가 나면 롤백된다."""
     with request.app.state.pool.connection() as conn:
         yield conn
+
+
+# scope="function": 엔드포인트가 끝나면 응답을 보내기 전에 커밋/롤백한다.
+# (기본값은 응답 전송 후 종료라서, 클라이언트가 커밋 전에 다음 요청을 보낼 수 있다.)
+Conn = Annotated[Connection, Depends(get_conn, scope="function")]

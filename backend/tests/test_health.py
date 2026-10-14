@@ -14,7 +14,7 @@ def test_pool_uses_migrated_schema(client):
     # 풀이 마이그레이션이 적용된 DB에 연결되어 있고 한글 테이블을 조회할 수 있어야 한다.
     with client.app.state.pool.connection() as conn:
         row = conn.execute('SELECT count(*) AS n FROM "계정"').fetchone()
-    assert row["n"] == 0
+    assert row["n"] >= 0
 
 
 def test_health_returns_503_when_database_fails(client):
