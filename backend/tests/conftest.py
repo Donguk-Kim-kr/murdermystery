@@ -45,17 +45,35 @@ def client(test_dbname):
         get_settings.cache_clear()
 
 
-@pytest.fixture
-def new_user(client):
-    """가입·로그인한 새 사용자의 Authorization 헤더를 돌려주는 팩토리."""
+class Account:
+    """테스트용 계정. headers 로 API 를 호출하고, 번호·아이디는 테스터 지정 등에 쓴다."""
 
-    def make() -> dict:
+    def __init__(self, headers: dict, number: int, login_id: str):
+        self.headers, self.number, self.login_id = headers, number, login_id
+
+
+@pytest.fixture
+def make_account(client, test_dbname):
+    """가입·로그인한 계정을 만든다. role 은 DB 에 직접 지정한다 (API 로는 올릴 수 없다)."""
+
+    def make(role: str = "사용자") -> Account:
         uid = f"u{uuid.uuid4().hex[:10]}"
-        assert client.post("/api/auth/signup", json={"아이디": uid, "패스워드": "password123", "닉네임": "제작자"}).status_code == 201
-        res = client.post("/api/auth/login", json={"아이디": uid, "패스워드": "password123", "접속환경": "PC"})
-        return {"Authorization": f"Bearer {res.json()['토큰']}"}
+        res = client.post("/api/auth/signup", json={"아이디": uid, "패스워드": "password123", "닉네임": "제작자"})
+        assert res.status_code == 201
+        number = res.json()["번호"]
+        if role != "사용자":
+            with psycopg.connect(f"dbname={test_dbname}", autocommit=True) as conn:
+                conn.execute('UPDATE "계정" SET "권한" = %s WHERE "번호" = %s', (role, number))
+        token = client.post("/api/auth/login", json={"아이디": uid, "패스워드": "password123", "접속환경": "PC"}).json()["토큰"]
+        return Account({"Authorization": f"Bearer {token}"}, number, uid)
 
     return make
+
+
+@pytest.fixture
+def new_user(make_account):
+    """Authorization 헤더만 돌려주는 팩토리 (일반 사용자)."""
+    return lambda: make_account().headers
 
 
 @pytest.fixture

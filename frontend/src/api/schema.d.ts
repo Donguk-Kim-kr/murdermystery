@@ -144,6 +144,115 @@ export interface paths {
         patch: operations["update_character_api_works__work_id__characters__order__patch"];
         trace?: never;
     };
+    "/api/works/{work_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish */
+        post: operations["publish_api_works__work_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/works/{work_id}/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unpublish */
+        post: operations["unpublish_api_works__work_id__unpublish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/works/{work_id}/return-to-owner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Return Publish Right To Owner
+         * @description 관리자·운영자가 비공개한 작품의 공개권한을 제작자에게 돌려준다.
+         */
+        post: operations["return_publish_right_to_owner_api_works__work_id__return_to_owner_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/test-works": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Test Works
+         * @description 내가 지금 테스트 플레이할 수 있는 작품 (내가 제작자인 작품 포함).
+         */
+        get: operations["my_test_works_api_test_works_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/works/{work_id}/testers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Testers */
+        get: operations["list_testers_api_works__work_id__testers_get"];
+        put?: never;
+        /** Add Tester */
+        post: operations["add_tester_api_works__work_id__testers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/works/{work_id}/testers/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Tester */
+        delete: operations["remove_tester_api_works__work_id__testers__account_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -310,6 +419,45 @@ export interface components {
             /** 닉네임 */
             "\uB2C9\uB124\uC784": string;
         };
+        /**
+         * TestableWorkOut
+         * @description 테스터에게 보여 주는 작품 요약. 인물·단서 같은 내용(범인·비밀 포함)은 포함하지 않는다.
+         */
+        TestableWorkOut: {
+            /** 번호 */
+            "\uBC88\uD638": number;
+            /** 제목 */
+            "\uC81C\uBAA9": string;
+            /** 시놉시스 */
+            "\uC2DC\uB189\uC2DC\uC2A4": string;
+            /** 장르 */
+            "\uC7A5\uB974": string;
+            /** 최소인원 */
+            "\uCD5C\uC18C\uC778\uC6D0": number;
+            /** 최대인원 */
+            "\uCD5C\uB300\uC778\uC6D0": number;
+            /** 예상시간 */
+            "\uC608\uC0C1\uC2DC\uAC04": string;
+        };
+        /** TesterIn */
+        TesterIn: {
+            /** 아이디 */
+            "\uC544\uC774\uB514": string;
+        };
+        /** TesterOut */
+        TesterOut: {
+            /** 계정 번호 */
+            "\uACC4\uC815_\uBC88\uD638": number;
+            /** 아이디 */
+            "\uC544\uC774\uB514": string;
+            /** 닉네임 */
+            "\uB2C9\uB124\uC784": string;
+            /**
+             * 부여일시
+             * Format: date-time
+             */
+            "\uBD80\uC5EC\uC77C\uC2DC": string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -364,6 +512,11 @@ export interface components {
             /** 공개여부 */
             "\uACF5\uAC1C\uC5EC\uBD80": boolean;
             /**
+             * 공개권한
+             * @enum {string}
+             */
+            "\uACF5\uAC1C\uAD8C\uD55C": "제작자" | "관리자" | "운영자";
+            /**
              * 생성일시
              * Format: date-time
              */
@@ -383,8 +536,6 @@ export interface components {
             "\uC608\uC0C1\uC2DC\uAC04"?: string | null;
             /** 최소인원 */
             "\uCD5C\uC18C\uC778\uC6D0"?: number | null;
-            /** 공개여부 */
-            "\uACF5\uAC1C\uC5EC\uBD80"?: boolean | null;
         };
     };
     responses: never;
@@ -787,6 +938,238 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CharacterOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_api_works__work_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unpublish_api_works__work_id__unpublish_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    return_publish_right_to_owner_api_works__work_id__return_to_owner_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_test_works_api_test_works_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestableWorkOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_testers_api_works__work_id__testers_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TesterOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_tester_api_works__work_id__testers_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TesterIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TesterOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_tester_api_works__work_id__testers__account_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+                account_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

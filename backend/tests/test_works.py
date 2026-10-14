@@ -8,7 +8,7 @@ def test_create_starts_with_temporary_capacity_of_one(client, headers):
     work = create(client, headers, 시놉시스="폭풍우 치는 밤", 장르="추리")
     assert (work["최소인원"], work["최대인원"]) == (1, 1)
     assert work["상태"] == "개발" and work["수정일시"] is None
-    assert work["공개여부"] is False
+    assert work["공개여부"] is False and work["공개권한"] == "제작자"
     assert work["예상시간"] == "3시간"
 
 
@@ -68,26 +68,10 @@ def test_validation(client, headers):
     assert client.post("/api/works", headers=headers, json={}).status_code == 422
 
 
-def test_owner_can_publish_and_unpublish(client, headers):
+def test_patch_cannot_change_visibility(client, headers):
     wid = create(client, headers)["번호"]
-    res = client.patch(f"/api/works/{wid}", headers=headers, json={"공개여부": True})
-    assert res.status_code == 200 and res.json()["공개여부"] is True
-    assert client.get(f"/api/works/{wid}", headers=headers).json()["공개여부"] is True
-    assert client.get("/api/works", headers=headers).json()[0]["공개여부"] is True
-    res = client.patch(f"/api/works/{wid}", headers=headers, json={"공개여부": False})
-    assert res.json()["공개여부"] is False
+    res = client.patch(f"/api/works/{wid}", headers=headers, json={"제목": "새 제목", "공개여부": True, "공개권한": "운영자"})
+    assert res.status_code == 200
+    body = client.get(f"/api/works/{wid}", headers=headers).json()
+    assert (body["제목"], body["공개여부"], body["공개권한"]) == ("새 제목", False, "제작자")
 
-
-def test_publish_flag_cannot_be_blanked_and_leaves_other_fields_alone(client, headers):
-    work = create(client, headers, 장르="추리")
-    wid = work["번호"]
-    assert client.patch(f"/api/works/{wid}", headers=headers, json={"공개여부": None}).status_code == 422
-    body = client.patch(f"/api/works/{wid}", headers=headers, json={"공개여부": True}).json()
-    assert (body["제목"], body["장르"], body["최소인원"]) == (work["제목"], "추리", 1)
-
-
-def test_other_user_cannot_publish(client, new_user):
-    owner, other = new_user(), new_user()
-    wid = create(client, owner)["번호"]
-    assert client.patch(f"/api/works/{wid}", headers=other, json={"공개여부": True}).status_code == 404
-    assert client.get(f"/api/works/{wid}", headers=owner).json()["공개여부"] is False

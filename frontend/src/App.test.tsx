@@ -14,7 +14,7 @@ let routes: Record<string, Handler>;
 const calls: { key: string; req: Request }[] = [];
 
 beforeEach(() => {
-  routes = { "GET /api/works": () => json([]) };
+  routes = { "GET /api/works": () => json([]), "GET /api/test-works": () => json([]) };
   calls.length = 0;
   localStorage.clear();
   vi.stubGlobal("fetch", async (input: Request) => {
@@ -36,7 +36,7 @@ const renderApp = (path = "/") =>
     </MemoryRouter>,
   );
 
-const account = { 번호: 1, 아이디: "alice", 닉네임: "탐정" };
+const account = { 번호: 1, 아이디: "alice", 닉네임: "탐정", 권한: "사용자" };
 
 describe("로그인 화면", () => {
   it("토큰이 없으면 서버 확인 없이 로그인 화면을 보여 준다", async () => {
@@ -129,7 +129,7 @@ describe("저장된 토큰", () => {
 
 const work = {
   번호: 7, 제목: "저택의 비밀", 시놉시스: "폭풍우 치는 밤", 장르: "추리", 최소인원: 1, 최대인원: 1,
-  예상시간: "3시간", 상태: "개발", 공개여부: false, 생성일시: "2026-10-14T00:00:00Z", 수정일시: null,
+  예상시간: "3시간", 상태: "개발", 공개여부: false, 공개권한: "제작자", 생성일시: "2026-10-14T00:00:00Z", 수정일시: null,
 };
 const person = { 순서: 1, 이름: "홍길동", 직업: "의사", 나이: null, 성별: null, 서사: "", 타임라인: null, 능력: null, 비밀: null, 목표: null, 범인: false, NPC: false };
 
@@ -137,6 +137,7 @@ describe("작품", () => {
   beforeEach(() => {
     localStorage.setItem("mm.token", "saved");
     routes["GET /api/auth/me"] = () => json(account);
+    routes["GET /api/works/7/testers"] = () => json([]);
   });
 
   it("작품 목록에 인원 범위와 상태를 보여 준다", async () => {
@@ -202,18 +203,109 @@ describe("작품", () => {
     expect(within(form).getByLabelText("장르")).toHaveValue("추리!");
   });
 
-  it("공개를 켜고 저장하면 공개여부를 서버에 보낸다", async () => {
+  it("기본정보 저장은 공개여부를 보내지 않는다", async () => {
     routes["GET /api/works/7"] = () => json(work);
     routes["GET /api/works/7/characters"] = () => json([]);
-    routes["PATCH /api/works/7"] = () => json({ ...work, 공개여부: true });
+    routes["PATCH /api/works/7"] = () => json(work);
     renderApp("/works/7");
     const form = await screen.findByRole("form", { name: "기본정보" });
-    expect(within(form).getByLabelText("공개")).not.toBeChecked();
-    await userEvent.click(within(form).getByLabelText("공개"));
     await userEvent.click(within(form).getByRole("button", { name: "저장" }));
     await within(form).findByRole("status");
-    const patch = calls.find((c) => c.key === "PATCH /api/works/7")!;
-    expect(await patch.req.json()).toMatchObject({ 공개여부: true });
+    const sent = await calls.find((c) => c.key === "PATCH /api/works/7")!.req.json();
+    expect(sent).not.toHaveProperty("공개여부");
+    expect(sent).not.toHaveProperty("공개권한");
+  });
+
+  it("비공개 작품은 공개하기로 공개하고 공개 중으로 바뀐다", async () => {
+    let current: Record<string, unknown> = work;
+    routes["GET /api/works/7"] = () => json(current);
+    routes["GET /api/works/7/characters"] = () => json([]);
+    routes["POST /api/works/7/publish"] = () => {
+      current = { ...work, 공개여부: true };
+      return json(current);
+    };
+    renderApp("/works/7");
+    const panel = await screen.findByRole("region", { name: "공개 상태" });
+    await userEvent.click(within(panel).getByRole("button", { name: "공개하기" }));
+    expect(await within(panel).findByText("공개 중")).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "비공개로 전환" })).toBeInTheDocument();
+  });
+
+  it("관리자가 비공개한 작품은 제작자에게 공개 버튼이 없다", async () => {
+    routes["GET /api/works/7"] = () => json({ ...work, 공개권한: "관리자" });
+    routes["GET /api/works/7/characters"] = () => json([]);
+    renderApp("/works/7");
+    const panel = await screen.findByRole("region", { name: "공개 상태" });
+    expect(within(panel).getByText(/관리자가 비공개 처리했습니다/)).toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: "공개하기" })).not.toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: /돌려주기/ })).not.toBeInTheDocument();
+  });
+
+  it("관리자 권한이 있으면 관리자가 비공개한 작품을 공개하거나 제작자에게 돌려줄 수 있다", async () => {
+    routes["GET /api/auth/me"] = () => json({ ...account, 권한: "관리자" });
+    routes["GET /api/works/7"] = () => json({ ...work, 공개권한: "관리자" });
+    routes["GET /api/works/7/characters"] = () => json([]);
+    renderApp("/works/7");
+    const panel = await screen.findByRole("region", { name: "공개 상태" });
+    expect(within(panel).getByRole("button", { name: "공개하기" })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "제작자에게 공개 권한 돌려주기" })).toBeInTheDocument();
+  });
+
+  it("서버가 공개를 거부하면 사유를 보여 준다", async () => {
+    routes["GET /api/works/7"] = () => json(work);
+    routes["GET /api/works/7/characters"] = () => json([]);
+    routes["POST /api/works/7/publish"] = () => json({ detail: "이 작품에 대한 권한이 없습니다" }, 403);
+    renderApp("/works/7");
+    const panel = await screen.findByRole("region", { name: "공개 상태" });
+    await userEvent.click(within(panel).getByRole("button", { name: "공개하기" }));
+    expect(await within(panel).findByRole("alert")).toHaveTextContent("이 작품에 대한 권한이 없습니다");
+  });
+
+  it("테스터를 아이디로 추가하고 삭제한다", async () => {
+    let testers: unknown[] = [];
+    routes["GET /api/works/7"] = () => json(work);
+    routes["GET /api/works/7/characters"] = () => json([]);
+    routes["GET /api/works/7/testers"] = () => json(testers);
+    routes["POST /api/works/7/testers"] = () => {
+      const t = { 계정_번호: 5, 아이디: "bob", 닉네임: "밥", 부여일시: "2026-10-14T00:00:00Z" };
+      testers = [t];
+      return json(t, 201);
+    };
+    routes["DELETE /api/works/7/testers/5"] = () => {
+      testers = [];
+      return new Response(null, { status: 204 });
+    };
+    renderApp("/works/7");
+    const panel = await screen.findByRole("region", { name: "테스터" });
+    await userEvent.type(within(panel).getByLabelText("테스터 아이디"), "bob");
+    await userEvent.click(within(panel).getByRole("button", { name: "추가" }));
+    expect(await within(panel).findByText("밥")).toBeInTheDocument();
+    expect(await calls.find((c) => c.key === "POST /api/works/7/testers")!.req.json()).toEqual({ 아이디: "bob" });
+    await userEvent.click(within(panel).getByRole("button", { name: "삭제" }));
+    await waitFor(() => expect(within(panel).queryByText("밥")).not.toBeInTheDocument());
+  });
+
+  it("없는 아이디를 테스터로 추가하면 오류를 보여 준다", async () => {
+    routes["GET /api/works/7"] = () => json(work);
+    routes["GET /api/works/7/characters"] = () => json([]);
+    routes["POST /api/works/7/testers"] = () => json({ detail: "해당 아이디의 계정이 없습니다" }, 404);
+    renderApp("/works/7");
+    const panel = await screen.findByRole("region", { name: "테스터" });
+    await userEvent.type(within(panel).getByLabelText("테스터 아이디"), "nobody");
+    await userEvent.click(within(panel).getByRole("button", { name: "추가" }));
+    expect(await within(panel).findByRole("alert")).toHaveTextContent("해당 아이디의 계정이 없습니다");
+  });
+
+  it("남이 테스터로 지정해 준 작품을 목록 아래에 보여 준다 (내 작품은 중복 표시하지 않는다)", async () => {
+    routes["GET /api/works"] = () => json([work]);
+    routes["GET /api/test-works"] = () => json([
+      { 번호: 7, 제목: "저택의 비밀", 시놉시스: "", 장르: "추리", 최소인원: 1, 최대인원: 1, 예상시간: "3시간" },
+      { 번호: 8, 제목: "남의 작품", 시놉시스: "", 장르: "", 최소인원: 2, 최대인원: 4, 예상시간: "2시간" },
+    ]);
+    renderApp();
+    expect(await screen.findByText("테스트할 수 있는 작품")).toBeInTheDocument();
+    expect(screen.getByText("남의 작품")).toBeInTheDocument();
+    expect(screen.getAllByText("저택의 비밀")).toHaveLength(1);
   });
 
   it("서버가 거부하면 기본정보 저장 오류를 보여 준다", async () => {

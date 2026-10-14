@@ -2,7 +2,7 @@
 
 > `db/scripts/dump_schema_md.py` 가 마이그레이션이 적용된 실제 DB 에서 추출한 문서입니다. 직접 수정하지 마세요.
 
-테이블 30개 (생성 순서)
+테이블 31개 (생성 순서)
 
 | 번호 | 테이블 |
 |---|---|
@@ -36,6 +36,7 @@
 | 28 | 투표결과 |
 | 29 | 엔딩 |
 | 30 | 획득 |
+| 31 | 작품테스터 |
 
 ## 계정
 
@@ -101,6 +102,7 @@
 | 11 | 최신버전 | text | 불가 | '1.0'::text |
 | 12 | 계정_번호 | integer | 불가 |  |
 | 13 | 공개여부 | boolean | 불가 | false |
+| 14 | 공개권한 | text | 불가 | '제작자'::text |
 
 **제약조건**
 
@@ -108,6 +110,7 @@
 |---|---|---|
 | PK | `pk_작품` | `PRIMARY KEY ("번호")` |
 | FK | `fk_작품_계정` | `FOREIGN KEY ("계정_번호") REFERENCES "계정"("번호") ON DELETE RESTRICT` |
+| CHECK | `ck_작품_공개권한` | `CHECK (("공개권한" = ANY (ARRAY['제작자'::text, '관리자'::text, '운영자'::text])))` |
 | CHECK | `ck_작품_상태` | `CHECK (("상태" = ANY (ARRAY['수정'::text, '개발'::text, '완료'::text])))` |
 | CHECK | `ck_작품_최대인원` | `CHECK (("최대인원" >= "최소인원"))` |
 | CHECK | `ck_작품_최소인원` | `CHECK (("최소인원" >= 1))` |
@@ -798,4 +801,26 @@
 - `ix_획득_작품`: `CREATE INDEX "ix_획득_작품" ON public."획득" USING btree ("작품_번호")`
 - `ix_획득_진행`: `CREATE INDEX "ix_획득_진행" ON public."획득" USING btree ("진행_번호")`
 - `ix_획득_참여`: `CREATE INDEX "ix_획득_참여" ON public."획득" USING btree ("참여_번호")`
+
+## 작품테스터
+
+| 순번 | 컬럼 | 타입 | NULL | 기본값 / 특성 |
+|---|---|---|---|---|
+| 1 | 번호 | integer | 불가 | IDENTITY (GENERATED ALWAYS) |
+| 2 | 작품_번호 | integer | 불가 |  |
+| 3 | 계정_번호 | integer | 불가 |  |
+| 4 | 부여일시 | timestamp with time zone | 불가 | CURRENT_TIMESTAMP |
+
+**제약조건**
+
+| 종류 | 이름 | 정의 |
+|---|---|---|
+| PK | `pk_작품테스터` | `PRIMARY KEY ("번호")` |
+| UNIQUE | `uq_작품테스터_작품_계정` | `UNIQUE ("작품_번호", "계정_번호")` |
+| FK | `fk_작품테스터_계정` | `FOREIGN KEY ("계정_번호") REFERENCES "계정"("번호") ON DELETE CASCADE` |
+| FK | `fk_작품테스터_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE CASCADE` |
+
+**추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
+
+- `ix_작품테스터_계정`: `CREATE INDEX "ix_작품테스터_계정" ON public."작품테스터" USING btree ("계정_번호")`
 

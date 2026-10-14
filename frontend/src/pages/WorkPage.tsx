@@ -3,12 +3,17 @@ import { Link, useParams } from "react-router-dom";
 
 import { api, errorMessage } from "../api/client";
 import type { components } from "../api/schema";
+import { useAuth } from "../auth/AuthContext";
 import { CharacterForm, type Character } from "./CharacterForm";
+import { TestersPanel } from "./TestersPanel";
+import { VisibilityPanel } from "./VisibilityPanel";
 
 type Work = components["schemas"]["WorkOut"];
 
 export function WorkPage() {
   const workId = Number(useParams().id);
+  const { state } = useAuth();
+  const role = state.status === "authenticated" ? state.account.권한 : "사용자";
   const [work, setWork] = useState<Work | null>(null);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -45,6 +50,8 @@ export function WorkPage() {
     <main className="page">
       <p><Link to="/">← 내 작품</Link></p>
       <WorkInfoForm work={work} onSaved={load} />
+      <VisibilityPanel work={work} role={role} onChanged={load} />
+      <TestersPanel workId={workId} />
 
       <h2>인물 <span className="muted">({characters.length})</span></h2>
       <ul className="list">
@@ -99,7 +106,6 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
   const [genre, setGenre] = useState(work.장르);
   const [time, setTime] = useState(work.예상시간);
   const [minPlayers, setMinPlayers] = useState(String(work.최소인원));
-  const [isPublic, setIsPublic] = useState(work.공개여부);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -111,7 +117,7 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
     setSaved(false);
     const { error } = await api.PATCH("/api/works/{work_id}", {
       params: { path: { work_id: work.번호 } },
-      body: { 제목: title, 시놉시스: synopsis, 장르: genre, 예상시간: time, 최소인원: Number(minPlayers), 공개여부: isPublic },
+      body: { 제목: title, 시놉시스: synopsis, 장르: genre, 예상시간: time, 최소인원: Number(minPlayers) },
     });
     setBusy(false);
     if (error) setError(errorMessage(error, "저장하지 못했습니다"));
@@ -143,10 +149,6 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
       <label>
         최소 인원
         <input type="number" min={1} value={minPlayers} onChange={(e) => setMinPlayers(e.target.value)} required />
-      </label>
-      <label className="check">
-        <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
-        공개
       </label>
       <p className="muted">
         최대 인원: <strong>{work.최대인원}명</strong> (NPC가 아닌 인물 수로 자동 계산, 인물이 없으면 임시로 1명)
