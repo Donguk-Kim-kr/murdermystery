@@ -111,10 +111,14 @@ class Builders(PgTestCase):
         scenario = {"snapshot": True} if scenario is None else scenario
         return self.ins("버전", 작품_번호=w, 버전=ver, 시나리오=scenario, **kw)
 
-    def room(self, account=None, code=None, **kw):
+    def room(self, w=None, ver="1.0", account=None, code=None, **kw):
+        """방은 작품과 확정 버전을 가진다 (1방 1게임). w 를 생략하면 작품과 버전을 새로 만든다."""
+        if w is None:
+            w = self.work()
+            self.version(w, ver)
         account = account or self.account()
         code = code or f"CODE{self.db.n()}"
-        return self.ins("방", 계정_번호=account, 입장코드=code, **kw)
+        return self.ins("방", 계정_번호=account, 입장코드=code, 작품_번호=w, 버전_버전=ver, **kw)
 
     def game(self, room, w, ver="1.0", **kw):
         return self.ins("진행", 방_번호=room, 작품_번호=w, 버전_버전=ver, **kw)
@@ -127,5 +131,5 @@ class Builders(PgTestCase):
         """작품 + 확정 버전 + 방 + 진행을 한 번에 만든다. (work, game) 반환"""
         w = self.work()
         self.version(w, ver)
-        g = self.game(self.room(), w, ver)
+        g = self.game(self.room(w, ver), w, ver)
         return w, g

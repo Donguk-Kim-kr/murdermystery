@@ -241,9 +241,18 @@ describe("작품", () => {
     expect(within(panel).queryByRole("button", { name: /돌려주기/ })).not.toBeInTheDocument();
   });
 
-  it("관리자 권한이 있으면 관리자가 비공개한 작품을 공개하거나 제작자에게 돌려줄 수 있다", async () => {
+  it("관리자 권한이 있어도 자기 작품은 제작자 자격이라 관리자가 비공개한 작품을 공개할 수 없다", async () => {
     routes["GET /api/auth/me"] = () => json({ ...account, 권한: "관리자" });
     routes["GET /api/works/7"] = () => json({ ...work, 공개권한: "관리자" });
+    routes["GET /api/works/7/characters"] = () => json([]);
+    renderApp("/works/7");
+    const panel = await screen.findByRole("region", { name: "공개 상태" });
+    expect(within(panel).queryByRole("button", { name: "공개하기" })).not.toBeInTheDocument();
+  });
+
+  it("운영자는 자기 작품에서 운영자가 비공개한 작품을 공개하거나 제작자에게 돌려줄 수 있다", async () => {
+    routes["GET /api/auth/me"] = () => json({ ...account, 권한: "운영자" });
+    routes["GET /api/works/7"] = () => json({ ...work, 공개권한: "운영자" });
     routes["GET /api/works/7/characters"] = () => json([]);
     renderApp("/works/7");
     const panel = await screen.findByRole("region", { name: "공개 상태" });

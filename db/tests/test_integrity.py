@@ -297,38 +297,55 @@ class TestRuntimeConstraints(Builders):
     def test_room_checks_and_unique_code(self):
         r = self.room(code="ABC123")
         self.assertEqual(self.db.val(f'SELECT "상태" FROM "방" WHERE "번호"={r}'), "대기")
-        self.ins_fails("방", "uq_방_입장코드", 계정_번호=self.account(), 입장코드="ABC123")
-        self.ins_fails("방", "ck_방_상태", 계정_번호=self.account(), 입장코드="X1", 상태="폐쇄")
+        w = self.db.val(f'SELECT "작품_번호" FROM "방" WHERE "번호"={r}')
+        self.ins_fails("방", "uq_방_입장코드", 계정_번호=self.account(), 입장코드="ABC123", 작품_번호=w, 버전_버전="1.0")
+        self.ins_fails("방", "ck_방_상태", 계정_번호=self.account(), 입장코드="X1", 작품_번호=w, 버전_버전="1.0", 상태="폐쇄")
         for st in ("대기", "진행", "종료"):
             self.room(code=f"S_{st}", 상태=st)
 
-    def test_game_must_reference_existing_confirmed_version(self):
+    def test_room_must_reference_existing_confirmed_version(self):
         w = self.work()
-        room = self.room()
-        # 확정 버전이 없으면 게임을 만들 수 없다 (개발 중인 작품으로는 진행 불가)
-        self.ins_fails("진행", "fk_진행_버전", 방_번호=room, 작품_번호=w, 버전_버전="1.0")
+        acc = self.account()
+        # 확정 버전이 없으면 방을 만들 수 없다 (개발 중인 작품으로는 진행 불가)
+        self.ins_fails("방", "fk_방_버전", 계정_번호=acc, 입장코드="NOVER", 작품_번호=w, 버전_버전="1.0")
         self.version(w, "1.0")
-        self.ins_fails("진행", "fk_진행_버전", 방_번호=room, 작품_번호=w, 버전_버전="9.9")
-        g = self.game(room, w, "1.0")
-        self.assertEqual(self.db.val(f'SELECT "상태" FROM "진행" WHERE "번호"={g}'), "진행")
-        self.ins_fails("진행", "ck_진행_상태", 방_번호=room, 작품_번호=w, 버전_버전="1.0", 상태="일시정지")
+        self.ins_fails("방", "fk_방_버전", 계정_번호=acc, 입장코드="BADVER", 작품_번호=w, 버전_버전="9.9")
+        self.ins_fails("방", "fk_방_작품", 계정_번호=acc, 입장코드="NOWORK", 작품_번호=99999, 버전_버전="1.0")
+        self.room(w, "1.0")
 
-    def test_game_version_must_belong_to_same_work(self):
+    def test_game_must_match_the_room_work_and_version(self):
         w1, w2 = self.work(), self.work()
         self.version(w1, "1.0")
+        self.version(w1, "1.1")
         self.version(w2, "2.0")
-        room = self.room()
-        self.ins_fails("진행", "fk_진행_버전", 방_번호=room, 작품_번호=w1, 버전_버전="2.0")   # 다른 작품의 버전
-        self.game(room, w2, "2.0")
+        room = self.room(w1, "1.0")
+        # 방과 다른 작품·버전으로는 게임을 만들 수 없다
+        self.ins_fails("진행", "fk_진행_방_작품_버전", 방_번호=room, 작품_번호=w1, 버전_버전="1.1")   # 같은 작품의 다른 버전
+        self.ins_fails("진행", "fk_진행_방_작품_버전", 방_번호=room, 작품_번호=w2, 버전_버전="2.0")   # 다른 작품
+        g = self.game(room, w1, "1.0")
+        self.assertEqual(self.db.val(f'SELECT "상태" FROM "진행" WHERE "번호"={g}'), "진행")
 
-    def test_same_room_can_host_several_games_in_sequence(self):
+    def test_game_state_check(self):
         w = self.work()
         self.version(w)
-        room = self.room()
+        self.ins_fails("진행", "ck_진행_상태", 방_번호=self.room(w), 작품_번호=w, 버전_버전="1.0", 상태="일시정지")
+
+    def test_one_room_hosts_only_one_game(self):
+        w = self.work()
+        self.version(w)
+        room = self.room(w)
         g1 = self.game(room, w)
         self.db.ok(f'UPDATE "진행" SET "상태"=\'종료\' WHERE "번호"={g1}')
-        self.game(room, w)
-        self.assertEqual(self.count("진행", f'"방_번호"={room}'), 2)
+        # 게임이 끝난 방에서도 새 게임은 만들 수 없다 (한 번 더 하려면 새 방)
+        self.ins_fails("진행", "uq_진행_방", 방_번호=room, 작품_번호=w, 버전_버전="1.0")
+        self.assertEqual(self.count("진행", f'"방_번호"={room}'), 1)
+
+    def test_rooms_of_the_same_work_each_get_their_own_game(self):
+        w = self.work()
+        self.version(w)
+        self.game(self.room(w), w)
+        self.game(self.room(w), w)
+        self.assertEqual(self.count("진행", f'"작품_번호"={w}'), 2)
 
     def test_participation_uniqueness(self):
         w, g = self.playable_game()
@@ -339,7 +356,7 @@ class TestRuntimeConstraints(Builders):
         self.participant(w, g, a2, 인물_순서=None)                                                   # 배역 선택 전 NULL
         self.participant(w, g, self.account(), 인물_순서=None)                                        # NULL 은 여러 명 가능
         # 다른 판에서는 같은 계정·같은 배역이 가능
-        g2 = self.game(self.room(), w)
+        g2 = self.game(self.room(w), w)
         self.participant(w, g2, a1, 인물_순서=1)
         self.assertEqual(self.db.val('SELECT "비공개" FROM "참여" LIMIT 1'), "f")
 

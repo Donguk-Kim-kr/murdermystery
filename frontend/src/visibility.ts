@@ -5,9 +5,9 @@ export type Role = "사용자" | "관리자" | "운영자";
 
 const RANK: Record<Level, number> = { 제작자: 1, 관리자: 2, 운영자: 3 };
 
-/** 자기 작품을 볼 때의 단계. 관리자·운영자 권한이 있으면 그 단계로 본다. */
+/** 자기 작품을 볼 때의 단계. 항상 제작자 자격이고, 운영자만 예외로 운영자다. */
 export function levelOnOwnWork(role: Role): Level {
-  return role === "운영자" ? "운영자" : role === "관리자" ? "관리자" : "제작자";
+  return role === "운영자" ? "운영자" : "제작자";
 }
 
 /** 비공개 작품을 이 단계가 공개할 수 있는가. 자기 작품 화면만 있으므로 제작자 여부는 항상 참이다. */

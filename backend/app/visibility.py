@@ -1,7 +1,9 @@
 """작품 공개 규칙 (docs/DB_RULES.md B35). DB 접근 없는 순수 함수만 둔다.
 
-* 요청자의 단계(level)는 `운영자` > `관리자` > `제작자` 중 가장 높은 것이다.
+* 요청자의 단계(level)는 `운영자` > `관리자` > `제작자` 중 하나다.
   운영자·관리자는 서버 전체 권한(계정.권한)이고, 제작자는 해당 작품의 `계정_번호`와 같을 때만 성립한다.
+  **자기 작품에서는 항상 제작자 자격으로 행동한다** (관리자도 자기 작품을 관리자로서 공개·잠금 해제할 수 없다).
+  예외는 운영자 한 명뿐이며, 운영자는 어느 작품에서든 운영자다.
 * 공개 중인 작품은 제작자·관리자·운영자 누구나 비공개로 바꿀 수 있고, 그때 `공개권한`이 바꾼 사람의 단계가 된다.
 * 비공개 작품은 `공개권한`을 가진 쪽만 공개할 수 있다.
     - 제작자: 제작자만 (관리자·운영자도 공개할 수 없다)
@@ -19,9 +21,9 @@ def actor_level(role: str, is_owner: bool) -> Level | None:
     """서버 권한과 작품 소유 여부로 이 작품에 대한 요청자의 단계를 구한다. 관계가 없으면 None."""
     if role == "운영자":
         return "운영자"
-    if role == "관리자":
-        return "관리자"
-    return "제작자" if is_owner else None
+    if is_owner:
+        return "제작자"
+    return "관리자" if role == "관리자" else None
 
 
 def publish_denied_reason(right: str, level: Level | None, is_owner: bool) -> str | None:

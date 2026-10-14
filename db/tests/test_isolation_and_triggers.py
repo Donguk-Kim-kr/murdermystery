@@ -50,7 +50,7 @@ class TestRuntimeIsIndependentFromAuthoringContent(Scenario):
     def play_records(self, w):
         """확정 버전 + 게임 + 모든 종류의 실행 기록을 만든다."""
         self.version(w, "1.0", scenario={"인물": [{"순서": 1}, {"순서": 2}], "단서": [{"순서": 1}]})
-        room = self.room()
+        room = self.room(w, "1.0")
         g = self.game(room, w, "1.0", 진행순서_순서=1)
         pa, pb = self.participant(w, g, 인물_순서=1), self.participant(w, g, 인물_순서=2)
         self.ins("획득", 작품_번호=w, 진행_번호=g, 참여_번호=pa, 단서_순서=1, 진행순서_순서=1, 획득방법="조사")
@@ -107,7 +107,7 @@ class TestRuntimeIsIndependentFromAuthoringContent(Scenario):
     def test_new_version_does_not_change_games_on_old_version(self):
         w = self.work()
         self.version(w, "1.0", scenario={"v": 1})
-        g = self.game(self.room(), w, "1.0")
+        g = self.game(self.room(w, "1.0"), w, "1.0")
         self.version(w, "1.1", scenario={"v": 2}, 변경사항="수정")
         self.assertEqual(self.db.val(f'SELECT "버전_버전" FROM "진행" WHERE "번호"={g}'), "1.0")
         self.assertEqual(self.db.val(f'SELECT "시나리오"->>\'v\' FROM "버전" WHERE "작품_번호"={w} AND "버전"=\'1.0\''), "1")
@@ -195,8 +195,8 @@ class TestDeletePolicies(Scenario):
     def test_deleting_game_removes_its_records_only(self):
         w = self.work()
         self.version(w)
-        room = self.room()
-        g1, g2 = self.game(room, w), self.game(room, w)
+        room1, room2 = self.room(w), self.room(w)
+        g1, g2 = self.game(room1, w), self.game(room2, w)
         for g in (g1, g2):
             p = self.participant(w, g)
             self.ins("획득", 작품_번호=w, 진행_번호=g, 참여_번호=p, 단서_순서=1, 진행순서_순서=1, 획득방법="조사")
@@ -206,7 +206,8 @@ class TestDeletePolicies(Scenario):
         self.db.ok(f'DELETE FROM "진행" WHERE "번호"={g1}')
         for t in ("참여", "획득", "기믹실행", "투표결과", "엔딩"):
             self.assertEqual(self.count(t), 1, t)
-        self.db.fails(f'DELETE FROM "방" WHERE "번호"={room}', "foreign key constraint")   # 진행이 남아 있으면 방 삭제 불가
+        self.db.fails(f'DELETE FROM "방" WHERE "번호"={room2}', "foreign key constraint")   # 진행이 남아 있으면 방 삭제 불가
+        self.db.ok(f'DELETE FROM "방" WHERE "번호"={room1}')                                  # 판이 지워진 방은 삭제 가능
 
     def test_account_with_play_history_cannot_be_deleted(self):
         w, g = self.playable_game()
@@ -231,7 +232,7 @@ class TestTriggers(Builders):
     def test_version_with_games_cannot_be_deleted_but_unused_can(self):
         w = self.work()
         used, unused = self.version(w, "1.0"), self.version(w, "1.1")
-        self.game(self.room(), w, "1.0")
+        self.game(self.room(w, "1.0"), w, "1.0")
         self.db.fails(f'DELETE FROM "버전" WHERE "번호"={used}', "foreign key constraint")
         self.db.ok(f'DELETE FROM "버전" WHERE "번호"={unused}')
 
@@ -313,7 +314,7 @@ class TestJsonbColumnsAreFreeForm(Scenario):
             return f'INSERT INTO "투표"("작품_번호","순서","진행순서_순서","이름","내용","규칙") VALUES ({w},1,1,\'x\',\'y\',{value_sql})'
         if table == "기믹실행":
             self.version(w)
-            g = self.game(self.room(), w)
+            g = self.game(self.room(w), w)
             return f'INSERT INTO "기믹실행"("작품_번호","진행_번호","기믹적용_순서","결과") VALUES ({w},{g},1,{value_sql})'
         raise KeyError(table)
 

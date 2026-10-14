@@ -620,19 +620,25 @@
 | 5 | 생성일시 | timestamp with time zone | 불가 | CURRENT_TIMESTAMP |
 | 6 | 상태변경일시 | timestamp with time zone | 불가 | CURRENT_TIMESTAMP |
 | 7 | 종료일시 | timestamp with time zone | 가능 |  |
+| 8 | 작품_번호 | integer | 불가 |  |
+| 9 | 버전_버전 | text | 불가 |  |
 
 **제약조건**
 
 | 종류 | 이름 | 정의 |
 |---|---|---|
 | PK | `pk_방` | `PRIMARY KEY ("번호")` |
+| UNIQUE | `uq_방_번호_작품_버전` | `UNIQUE ("번호", "작품_번호", "버전_버전")` |
 | UNIQUE | `uq_방_입장코드` | `UNIQUE ("입장코드")` |
 | FK | `fk_방_계정` | `FOREIGN KEY ("계정_번호") REFERENCES "계정"("번호") ON DELETE RESTRICT` |
+| FK | `fk_방_버전` | `FOREIGN KEY ("작품_번호", "버전_버전") REFERENCES "버전"("작품_번호", "버전") ON DELETE RESTRICT` |
+| FK | `fk_방_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE RESTRICT` |
 | CHECK | `ck_방_상태` | `CHECK (("상태" = ANY (ARRAY['대기'::text, '진행'::text, '종료'::text])))` |
 
 **추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
 
 - `ix_방_계정`: `CREATE INDEX "ix_방_계정" ON public."방" USING btree ("계정_번호")`
+- `ix_방_버전`: `CREATE INDEX "ix_방_버전" ON public."방" USING btree ("작품_번호", "버전_버전")`
 
 **트리거**
 
@@ -656,7 +662,9 @@
 | 종류 | 이름 | 정의 |
 |---|---|---|
 | PK | `pk_진행` | `PRIMARY KEY ("번호")` |
+| UNIQUE | `uq_진행_방` | `UNIQUE ("방_번호")` |
 | FK | `fk_진행_방` | `FOREIGN KEY ("방_번호") REFERENCES "방"("번호") ON DELETE RESTRICT` |
+| FK | `fk_진행_방_작품_버전` | `FOREIGN KEY ("방_번호", "작품_번호", "버전_버전") REFERENCES "방"("번호", "작품_번호", "버전_버전") ON DELETE RESTRICT` |
 | FK | `fk_진행_버전` | `FOREIGN KEY ("작품_번호", "버전_버전") REFERENCES "버전"("작품_번호", "버전") ON DELETE RESTRICT` |
 | FK | `fk_진행_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE RESTRICT` |
 | CHECK | `ck_진행_상태` | `CHECK (("상태" = ANY (ARRAY['진행'::text, '종료'::text])))` |
@@ -664,6 +672,7 @@
 **추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
 
 - `ix_진행_방`: `CREATE INDEX "ix_진행_방" ON public."진행" USING btree ("방_번호")`
+- `ix_진행_방_작품_버전`: `CREATE INDEX "ix_진행_방_작품_버전" ON public."진행" USING btree ("방_번호", "작품_번호", "버전_버전")`
 - `ix_진행_버전`: `CREATE INDEX "ix_진행_버전" ON public."진행" USING btree ("작품_번호", "버전_버전")`
 
 **트리거**

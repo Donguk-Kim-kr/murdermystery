@@ -8,7 +8,7 @@ from app.visibility import actor_level, publish_denied_reason
 
 @pytest.mark.parametrize("role,owner,expected", [
     ("사용자", True, "제작자"), ("사용자", False, None),
-    ("관리자", False, "관리자"), ("관리자", True, "관리자"),
+    ("관리자", False, "관리자"), ("관리자", True, "제작자"),  # 자기 작품에서는 제작자 자격
     ("운영자", False, "운영자"), ("운영자", True, "운영자"),
 ])
 def test_actor_level(role, owner, expected):
@@ -20,7 +20,9 @@ PUBLISH_MATRIX = [
     ("제작자", "사용자", True, True),
     ("제작자", "관리자", False, False),   # 제작자가 비공개한 작품은 관리자도 공개할 수 없다
     ("제작자", "운영자", False, False),   # 운영자도 마찬가지
-    ("제작자", "관리자", True, True),     # 관리자 권한을 가진 제작자는 제작자로서 공개할 수 있다
+    ("제작자", "관리자", True, True),     # 관리자 권한을 가진 제작자도 자기 작품은 제작자로서 공개할 수 있다
+    ("관리자", "관리자", True, False),    # 하지만 다른 관리자가 비공개한 자기 작품을 관리자 권한으로 공개할 수는 없다
+    ("운영자", "운영자", True, True),     # 운영자는 어디서나 운영자
     ("관리자", "사용자", True, False),    # 관리자가 비공개한 작품은 제작자가 공개할 수 없다
     ("관리자", "관리자", False, True),
     ("관리자", "운영자", False, True),
@@ -163,3 +165,32 @@ def test_admin_gets_no_other_access_to_the_work(client, make_account, work_of):
 
 def test_requires_login(client):
     assert client.post("/api/works/1/publish").status_code == 401
+
+
+def test_admin_who_owns_the_work_acts_as_owner(client, make_account):
+    admin, other_admin = make_account("관리자"), make_account("관리자")
+    wid = client.post("/api/works", headers=admin.headers, json={"제목": "관리자의 작품"}).json()["번호"]
+    assert post(client, admin, wid, "publish").status_code == 200
+    res = post(client, admin, wid, "unpublish")
+    assert res.json()["공개권한"] == "제작자"               # '관리자'가 아니라 제작자로 기록된다
+    assert post(client, other_admin, wid, "publish").status_code == 403   # 다른 관리자는 공개할 수 없다
+    assert post(client, admin, wid, "publish").status_code == 200
+
+
+def test_admin_cannot_use_admin_power_on_own_work(client, make_account):
+    owner_admin, other_admin = make_account("관리자"), make_account("관리자")
+    wid = client.post("/api/works", headers=owner_admin.headers, json={"제목": "t"}).json()["번호"]
+    post(client, owner_admin, wid, "publish")
+    post(client, other_admin, wid, "unpublish")               # 다른 관리자가 비공개
+    assert post(client, owner_admin, wid, "publish").status_code == 403         # 자기 작품이어도 제작자 자격뿐
+    assert post(client, owner_admin, wid, "return-to-owner").status_code == 403
+    assert post(client, other_admin, wid, "return-to-owner").status_code == 200
+
+
+def test_operator_cannot_force_publish_work_the_owner_made_private(client, make_account):
+    owner, operator = make_account(), make_account("운영자")
+    wid = client.post("/api/works", headers=owner.headers, json={"제목": "t"}).json()["번호"]
+    post(client, owner, wid, "publish")
+    post(client, owner, wid, "unpublish")
+    assert post(client, operator, wid, "publish").status_code == 403           # 저작권(제작자의 결정) 존중
+    assert post(client, operator, wid, "return-to-owner").status_code == 409   # 이미 제작자에게 있음
