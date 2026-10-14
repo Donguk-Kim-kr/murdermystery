@@ -1,13 +1,13 @@
-"""테스터: 비공개 작품의 방 생성 권한 위임 (docs/DB_RULES.md B36).
+"""테스터: 비공개 작품을 비공개 플레이할 수 있는 권한 (docs/DB_RULES.md B36).
 
-* 제작자가 공개하지 않은 작품으로 지인끼리 플레이하거나 테스트할 수 있도록, 방을 만들 수 있는 권한을 계정에 준다.
-  방 입장은 입장코드를 아는 사람이면 되므로 입장 권한이 아니다.
+* 비공개 플레이: 공개하지 않은 작품으로 방을 만들어 지인끼리 플레이하거나 테스트하는 것. 테스터 권한은 그 방을 만들 수 있는
+  권한이다. 방 입장은 입장코드를 아는 사람이면 되므로 입장 권한이 아니다.
 * 테스터 권한은 서버 전체 권한이 아니라 작품 단위로 계정에 주는 권한이다.
 * 줄 수 있는 사람: 운영자·관리자(모든 작품), 제작자(자기 작품만). 회수도 같다.
-* 방을 만들 수 있는 때(비공개 작품): 작품이 **비공개**이고 **공개권한이 제작자**일 때
+* 비공개 플레이가 가능한 때: 작품이 **비공개**이고 **공개권한이 제작자**일 때
   (= 최초 공개 전이거나 제작자가 비공개한 경우). 관리자·운영자가 비공개한 작품은 제외한다.
   공개된 작품은 누구나 플레이할 수 있으므로 테스터 권한과 무관하다.
-* 방 기능이 생기면 `can_test_play()` 로 방 생성 가능 여부를 판단한다 (게임은 확정 버전이 있어야 시작된다).
+* 방 기능이 생기면 `can_private_play()` 로 비공개 작품의 방 생성 가능 여부를 판단한다 (게임은 확정 버전이 있어야 시작된다).
 """
 from datetime import datetime
 
@@ -21,7 +21,7 @@ from .works import load_work_for_actor
 
 router = APIRouter(tags=["testers"])
 
-# 테스트 플레이 가능 조건 (작품 별칭 w, 테스터 부여 행 별칭 t). 제작자 본인은 테스터 행 없이도 해당한다.
+# 비공개 플레이 가능 조건 (작품 별칭 w, 테스터 부여 행 별칭 t). 제작자 본인은 테스터 행 없이도 해당한다.
 _TESTABLE = 'NOT w."공개여부" AND w."공개권한" = \'제작자\' AND (w."계정_번호" = %(me)s OR t."계정_번호" IS NOT NULL)'
 _FROM = 'FROM "작품" w LEFT JOIN "테스터" t ON t."작품_번호" = w."번호" AND t."계정_번호" = %(me)s'
 
@@ -37,8 +37,8 @@ class TesterOut(BaseModel):
     부여일시: datetime
 
 
-class TestableWorkOut(BaseModel):
-    """테스터에게 보여 주는 작품 요약. 인물·단서 같은 내용(범인·비밀 포함)은 포함하지 않는다."""
+class PrivatePlayWorkOut(BaseModel):
+    """비공개 플레이 대상 작품 요약. 인물·단서 같은 내용(범인·비밀 포함)은 포함하지 않는다."""
 
     번호: int
     제목: str
@@ -49,15 +49,15 @@ class TestableWorkOut(BaseModel):
     예상시간: str
 
 
-def can_test_play(conn: Connection, account_id: int, work_id: int) -> bool:
+def can_private_play(conn: Connection, account_id: int, work_id: int) -> bool:
     return conn.execute(
         f'SELECT 1 {_FROM} WHERE w."번호" = %(work)s AND {_TESTABLE}', {"me": account_id, "work": work_id}
     ).fetchone() is not None
 
 
-@router.get("/api/test-works", response_model=list[TestableWorkOut])
-def my_test_works(conn: Conn, me: CurrentUser) -> list[dict]:
-    """내가 지금 방을 만들 수 있는 비공개 작품 (내가 제작자인 작품 포함)."""
+@router.get("/api/private-play-works", response_model=list[PrivatePlayWorkOut])
+def my_private_play_works(conn: Conn, me: CurrentUser) -> list[dict]:
+    """내가 지금 비공개 플레이할 수 있는 작품 (내가 제작자인 작품 포함)."""
     return conn.execute(
         f'SELECT w."번호", w."제목", w."시놉시스", w."장르", w."최소인원", w."최대인원", w."예상시간" '
         f'{_FROM} WHERE {_TESTABLE} ORDER BY w."번호" DESC',
@@ -87,7 +87,7 @@ def add_tester(work_id: int, body: TesterIn, conn: Conn, me: CurrentUser) -> dic
     if target["상태"] != "정상":
         raise HTTPException(status.HTTP_409_CONFLICT, "이용할 수 없는 계정입니다")
     if target["번호"] == work["계정_번호"]:
-        raise HTTPException(status.HTTP_409_CONFLICT, "제작자는 이미 방을 만들 수 있습니다")
+        raise HTTPException(status.HTTP_409_CONFLICT, "제작자는 이미 비공개 플레이를 할 수 있습니다")
     row = conn.execute(
         'INSERT INTO "테스터" ("작품_번호", "계정_번호") VALUES (%s, %s) '
         'ON CONFLICT ("작품_번호", "계정_번호") DO NOTHING RETURNING "부여일시"',

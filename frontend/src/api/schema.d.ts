@@ -198,7 +198,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/test-works": {
+    "/api/private-play-works": {
         parameters: {
             query?: never;
             header?: never;
@@ -206,10 +206,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * My Test Works
-         * @description 내가 지금 테스트 플레이할 수 있는 작품 (내가 제작자인 작품 포함).
+         * My Private Play Works
+         * @description 내가 지금 비공개 플레이할 수 있는 작품 (내가 제작자인 작품 포함).
          */
-        get: operations["my_test_works_api_test_works_get"];
+        get: operations["my_private_play_works_api_private_play_works_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -410,20 +410,11 @@ export interface components {
             "\uB9CC\uB8CC\uC77C\uC2DC": string;
             "\uACC4\uC815": components["schemas"]["AccountOut"];
         };
-        /** SignupIn */
-        SignupIn: {
-            /** 아이디 */
-            "\uC544\uC774\uB514": string;
-            /** 패스워드 */
-            "\uD328\uC2A4\uC6CC\uB4DC": string;
-            /** 닉네임 */
-            "\uB2C9\uB124\uC784": string;
-        };
         /**
-         * TestableWorkOut
-         * @description 테스터에게 보여 주는 작품 요약. 인물·단서 같은 내용(범인·비밀 포함)은 포함하지 않는다.
+         * PrivatePlayWorkOut
+         * @description 비공개 플레이 대상 작품 요약. 인물·단서 같은 내용(범인·비밀 포함)은 포함하지 않는다.
          */
-        TestableWorkOut: {
+        PrivatePlayWorkOut: {
             /** 번호 */
             "\uBC88\uD638": number;
             /** 제목 */
@@ -438,6 +429,15 @@ export interface components {
             "\uCD5C\uB300\uC778\uC6D0": number;
             /** 예상시간 */
             "\uC608\uC0C1\uC2DC\uAC04": string;
+        };
+        /** SignupIn */
+        SignupIn: {
+            /** 아이디 */
+            "\uC544\uC774\uB514": string;
+            /** 패스워드 */
+            "\uD328\uC2A4\uC6CC\uB4DC": string;
+            /** 닉네임 */
+            "\uB2C9\uB124\uC784": string;
         };
         /** TesterIn */
         TesterIn: {
@@ -1051,7 +1051,7 @@ export interface operations {
             };
         };
     };
-    my_test_works_api_test_works_get: {
+    my_private_play_works_api_private_play_works_get: {
         parameters: {
             query?: never;
             header?: {
@@ -1068,7 +1068,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TestableWorkOut"][];
+                    "application/json": components["schemas"]["PrivatePlayWorkOut"][];
                 };
             };
             /** @description Validation Error */

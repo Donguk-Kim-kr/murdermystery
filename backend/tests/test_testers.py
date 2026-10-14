@@ -2,7 +2,7 @@
 import psycopg
 import pytest
 
-from app.testers import can_test_play
+from app.testers import can_private_play
 
 
 @pytest.fixture
@@ -18,8 +18,8 @@ def add(client, who, wid, target):
     return client.post(f"/api/works/{wid}/testers", headers=who.headers, json={"아이디": target.login_id})
 
 
-def visible_test_ids(client, who):
-    return [w["번호"] for w in client.get("/api/test-works", headers=who.headers).json()]
+def private_play_ids(client, who):
+    return [w["번호"] for w in client.get("/api/private-play-works", headers=who.headers).json()]
 
 
 def pub(client, who, wid, action):
@@ -80,9 +80,9 @@ def test_tester_can_test_before_first_publish(client, make_account, work_of):
     owner, tester, outsider = make_account(), make_account(), make_account()
     wid = work_of(owner)
     add(client, owner, wid, tester)
-    assert wid in visible_test_ids(client, tester)
-    assert wid in visible_test_ids(client, owner)        # 제작자 본인도 테스트할 수 있다
-    assert wid not in visible_test_ids(client, outsider)
+    assert wid in private_play_ids(client, tester)
+    assert wid in private_play_ids(client, owner)        # 제작자 본인도 비공개 플레이할 수 있다
+    assert wid not in private_play_ids(client, outsider)
 
 
 def test_testable_summary_has_no_secrets(client, make_account, work_of):
@@ -90,7 +90,7 @@ def test_testable_summary_has_no_secrets(client, make_account, work_of):
     wid = work_of(owner)
     client.post(f"/api/works/{wid}/characters", headers=owner.headers, json={"이름": "A", "비밀": "범인은 나다", "범인": True})
     add(client, owner, wid, tester)
-    item = client.get("/api/test-works", headers=tester.headers).json()[0]
+    item = client.get("/api/private-play-works", headers=tester.headers).json()[0]
     assert set(item) == {"번호", "제목", "시놉시스", "장르", "최소인원", "최대인원", "예상시간"}
 
 
@@ -99,9 +99,9 @@ def test_testing_is_closed_while_public_and_reopens_when_owner_unpublishes(clien
     wid = work_of(owner)
     add(client, owner, wid, tester)
     pub(client, owner, wid, "publish")
-    assert wid not in visible_test_ids(client, tester)   # 공개 중에는 테스터 권한이 쓰이지 않는다
+    assert wid not in private_play_ids(client, tester)   # 공개 중에는 테스터 권한이 쓰이지 않는다
     pub(client, owner, wid, "unpublish")
-    assert wid in visible_test_ids(client, tester)       # 제작자가 비공개한 경우
+    assert wid in private_play_ids(client, tester)       # 제작자가 비공개한 경우
 
 
 @pytest.mark.parametrize("role", ["관리자", "운영자"])
@@ -111,21 +111,21 @@ def test_testing_is_closed_when_staff_unpublished_until_returned_to_owner(client
     add(client, owner, wid, tester)
     pub(client, owner, wid, "publish")
     pub(client, staff, wid, "unpublish")
-    assert wid not in visible_test_ids(client, tester)
-    assert wid not in visible_test_ids(client, owner)
+    assert wid not in private_play_ids(client, tester)
+    assert wid not in private_play_ids(client, owner)
     pub(client, staff, wid, "return-to-owner")       # "수정해서 다시 공개하세요"
-    assert wid in visible_test_ids(client, tester)
+    assert wid in private_play_ids(client, tester)
 
 
-def test_can_test_play_function(client, make_account, work_of, test_dbname):
+def test_can_private_play_function(client, make_account, work_of, test_dbname):
     owner, tester, outsider = make_account(), make_account(), make_account()
     wid = work_of(owner)
     add(client, owner, wid, tester)
     with psycopg.connect(f"dbname={test_dbname}", autocommit=True) as c:
-        assert can_test_play(c, tester.number, wid)
-        assert can_test_play(c, owner.number, wid)
-        assert not can_test_play(c, outsider.number, wid)
-        assert not can_test_play(c, tester.number, 999999)
+        assert can_private_play(c, tester.number, wid)
+        assert can_private_play(c, owner.number, wid)
+        assert not can_private_play(c, outsider.number, wid)
+        assert not can_private_play(c, tester.number, 999999)
 
 
 def test_grants_disappear_with_the_work_and_do_not_block_account_rules(client, make_account, work_of, test_dbname):

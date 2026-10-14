@@ -5,11 +5,11 @@ import { api, errorMessage } from "../api/client";
 import type { components } from "../api/schema";
 
 type Work = components["schemas"]["WorkOut"];
-type TestWork = components["schemas"]["TestableWorkOut"];
+type PrivatePlayWork = components["schemas"]["PrivatePlayWorkOut"];
 
 export function WorksListPage() {
   const [works, setWorks] = useState<Work[] | null>(null);
-  const [testWorks, setTestWorks] = useState<TestWork[]>([]);
+  const [privateWorks, setPrivatePlayWorks] = useState<PrivatePlayWork[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -19,8 +19,8 @@ export function WorksListPage() {
       if (data) setWorks(data);
       else setError(errorMessage(error, "작품 목록을 불러오지 못했습니다"));
     });
-    api.GET("/api/test-works").then(({ data }) => {
-      if (!cancelled && data) setTestWorks(data);
+    api.GET("/api/private-play-works").then(({ data }) => {
+      if (!cancelled && data) setPrivatePlayWorks(data);
     });
     return () => {
       cancelled = true;
@@ -29,7 +29,7 @@ export function WorksListPage() {
 
   // 내가 제작자인 작품은 위 목록에 있으므로, 남이 테스터로 지정해 준 작품만 따로 보여 준다.
   const mine = new Set((works ?? []).map((w) => w.번호));
-  const others = testWorks.filter((w) => !mine.has(w.번호));
+  const others = privateWorks.filter((w) => !mine.has(w.번호));
 
   return (
     <main className="page">
@@ -54,7 +54,7 @@ export function WorksListPage() {
       </ul>
       {others.length > 0 && (
         <>
-          <h2>방을 만들 수 있는 비공개 작품</h2>
+          <h2>비공개 플레이 작품</h2>
           <ul className="list">
             {others.map((w) => (
               <li key={w.번호}>

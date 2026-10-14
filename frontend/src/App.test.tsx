@@ -14,7 +14,7 @@ let routes: Record<string, Handler>;
 const calls: { key: string; req: Request }[] = [];
 
 beforeEach(() => {
-  routes = { "GET /api/works": () => json([]), "GET /api/test-works": () => json([]) };
+  routes = { "GET /api/works": () => json([]), "GET /api/private-play-works": () => json([]) };
   calls.length = 0;
   localStorage.clear();
   vi.stubGlobal("fetch", async (input: Request) => {
@@ -316,12 +316,12 @@ describe("작품", () => {
 
   it("남이 테스터로 지정해 준 비공개 작품을 목록 아래에 보여 준다 (내 작품은 중복 표시하지 않는다)", async () => {
     routes["GET /api/works"] = () => json([work]);
-    routes["GET /api/test-works"] = () => json([
+    routes["GET /api/private-play-works"] = () => json([
       { 번호: 7, 제목: "저택의 비밀", 시놉시스: "", 장르: "추리", 최소인원: 1, 최대인원: 1, 예상시간: "3시간" },
       { 번호: 8, 제목: "남의 작품", 시놉시스: "", 장르: "", 최소인원: 2, 최대인원: 4, 예상시간: "2시간" },
     ]);
     renderApp();
-    expect(await screen.findByText("방을 만들 수 있는 비공개 작품")).toBeInTheDocument();
+    expect(await screen.findByText("비공개 플레이 작품")).toBeInTheDocument();
     expect(screen.getByText("남의 작품")).toBeInTheDocument();
     expect(screen.getAllByText("저택의 비밀")).toHaveLength(1);
   });
