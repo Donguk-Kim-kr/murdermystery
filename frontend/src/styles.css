@@ -146,6 +146,13 @@ label {
   color: var(--text-2);
 }
 
+/* 필수 입력 표시: 글자 옆에 붉은 "(필수)". 화면 낭독기도 레이블 이름의 일부로 읽는다. */
+.req-label::after {
+  content: " (필수)";
+  color: var(--danger);
+  font-weight: 600;
+}
+
 input:not([type="checkbox"]),
 textarea,
 select {

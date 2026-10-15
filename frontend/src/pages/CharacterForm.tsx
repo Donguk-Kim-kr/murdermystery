@@ -64,7 +64,7 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
     <form onSubmit={onSubmit} className="subform" aria-label={character ? "인물 수정" : "인물 추가"}>
       <div className="field-grid two">
         <label>
-          이름
+          <span className="req-label">이름</span>
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={50} required />
         </label>
         <label>
