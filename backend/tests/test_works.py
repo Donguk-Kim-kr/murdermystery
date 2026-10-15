@@ -76,3 +76,17 @@ def test_patch_cannot_change_visibility(client, headers):
     body = client.get(f"/api/works/{wid}", headers=headers).json()
     assert (body["제목"], body["공개여부"], body["공개권한"]) == ("새 제목", False, "제작자")
 
+
+
+def test_common_story_is_optional_and_editable(client, headers):
+    work = create(client, headers)
+    assert work["공통스토리"] in (None, "")
+    with_story = create(client, headers, 제목="이야기가 있는 작품", 공통스토리="폭풍우 치는 밤, 저택에 여덟 명이 모였다.")
+    assert with_story["공통스토리"].startswith("폭풍우")
+    res = client.patch(f"/api/works/{work['번호']}", headers=headers, json={"공통스토리": "새 프롤로그"})
+    assert res.status_code == 200 and res.json()["공통스토리"] == "새 프롤로그"
+    res = client.patch(f"/api/works/{work['번호']}", headers=headers, json={"공통스토리": ""})
+    assert res.status_code == 200 and res.json()["공통스토리"] == ""
+    assert client.patch(f"/api/works/{work['번호']}", headers=headers, json={"공통스토리": None}).status_code == 422
+    too_long = "가" * 20001
+    assert client.patch(f"/api/works/{work['번호']}", headers=headers, json={"공통스토리": too_long}).status_code == 422

@@ -639,6 +639,11 @@ export interface components {
              * @default 3시간
              */
             "\uC608\uC0C1\uC2DC\uAC04"?: string;
+            /**
+             * 공통스토리
+             * @default
+             */
+            "\uACF5\uD1B5\uC2A4\uD1A0\uB9AC"?: string;
         };
         /** WorkOut */
         WorkOut: {
@@ -665,6 +670,8 @@ export interface components {
              * @enum {string}
              */
             "\uACF5\uAC1C\uAD8C\uD55C": "제작자" | "관리자" | "운영자";
+            /** 공통스토리 */
+            "\uACF5\uD1B5\uC2A4\uD1A0\uB9AC": string | null;
             /**
              * 생성일시
              * Format: date-time
@@ -687,6 +694,8 @@ export interface components {
             "\uC608\uC0C1\uC2DC\uAC04"?: string | null;
             /** 최소인원 */
             "\uCD5C\uC18C\uC778\uC6D0"?: number | null;
+            /** 공통스토리 */
+            "\uACF5\uD1B5\uC2A4\uD1A0\uB9AC"?: string | null;
         };
     };
     responses: never;

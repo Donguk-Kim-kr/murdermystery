@@ -3,6 +3,7 @@
 * 로그인한 계정의 작품만 다룬다. 남의 작품은 존재 여부를 알리지 않도록 404 로 응답한다.
 * `최대인원` 은 직접 받지 않는다. NPC 가 아닌 인물 수로 자동 갱신된다 (인물이 0명이면 임시로 1).
 * `상태`·`최신버전` 은 확정·버전 기능(B6~B8)에서 다루므로 여기서 받지 않는다.
+* `공통스토리` 는 게임 시작 때 모두가 읽는 글이다. 비어 있을 수 있다 (개인 서사는 인물의 `서사`).
 * `공개여부`·`공개권한` 은 여기서 바꾸지 않는다. 공개/비공개 전환은 `publishing.py` (B35)에서 한다.
 """
 from datetime import datetime
@@ -19,7 +20,7 @@ from .visibility import Level, actor_level
 router = APIRouter(prefix="/api/works", tags=["works"])
 
 WORK_COLUMNS = (
-    '"번호", "제목", "시놉시스", "장르", "최소인원", "최대인원", "예상시간", "상태", "공개여부", "공개권한", "생성일시", "수정일시", '
+    '"번호", "제목", "시놉시스", "장르", "최소인원", "최대인원", "예상시간", "상태", "공개여부", "공개권한", "공통스토리", "생성일시", "수정일시", '
     'EXISTS (SELECT 1 FROM "버전" v WHERE v."작품_번호" = "작품"."번호") AS "확정버전_있음"'
 )
 
@@ -29,6 +30,7 @@ class WorkIn(BaseModel):
     시놉시스: str = Field(default="", max_length=5000)
     장르: str = Field(default="", max_length=50)
     예상시간: str = Field(default="3시간", min_length=1, max_length=50)
+    공통스토리: str = Field(default="", max_length=20000)
 
 
 class WorkPatch(BaseModel):
@@ -37,6 +39,7 @@ class WorkPatch(BaseModel):
     장르: Annotated[str, Field(max_length=50)] | None = None
     예상시간: Annotated[str, Field(min_length=1, max_length=50)] | None = None
     최소인원: Annotated[int, Field(ge=1, le=100)] | None = None
+    공통스토리: Annotated[str, Field(max_length=20000)] | None = None
 
 
 class WorkOut(BaseModel):
@@ -50,6 +53,7 @@ class WorkOut(BaseModel):
     상태: str
     공개여부: bool
     공개권한: Literal["제작자", "관리자", "운영자"]
+    공통스토리: str | None
     생성일시: datetime
     수정일시: datetime | None
     확정버전_있음: bool
@@ -91,9 +95,9 @@ def load_work_for_actor(
 def create_work(body: WorkIn, conn: Conn, me: CurrentUser) -> dict:
     # 인물이 0명인 동안 최대인원은 임시로 1 이다. `최대 >= 최소` 제약 때문에 최소인원도 1 로 시작한다.
     return conn.execute(
-        f'INSERT INTO "작품" ("제목", "시놉시스", "장르", "예상시간", "최소인원", "최대인원", "계정_번호") '
-        f"VALUES (%s, %s, %s, %s, 1, 1, %s) RETURNING {WORK_COLUMNS}",
-        (body.제목, body.시놉시스, body.장르, body.예상시간, me.계정.번호),
+        f'INSERT INTO "작품" ("제목", "시놉시스", "장르", "예상시간", "공통스토리", "최소인원", "최대인원", "계정_번호") '
+        f"VALUES (%s, %s, %s, %s, %s, 1, 1, %s) RETURNING {WORK_COLUMNS}",
+        (body.제목, body.시놉시스, body.장르, body.예상시간, body.공통스토리, me.계정.번호),
     ).fetchone()
 
 
