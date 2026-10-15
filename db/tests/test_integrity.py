@@ -129,11 +129,13 @@ class TestOrderChecksAndUniqueness(Builders):
                 return dict(작품_번호=w, 순서=n, 진행순서_순서=1, 이름="a", 내용="b", 규칙={})
             if table == "미디어":
                 return dict(작품_번호=w, 순서=n, 유형="이미지", 경로="p")
+            if table == "자료":
+                return dict(작품_번호=w, 순서=n, 제목="a", 내용="b")
             raise KeyError(table)
         return mk
 
     TABLES = ["진행순서", "기믹적용", "인물", "장소", "단서", "증언", "조합", "사건",
-              "엔딩분기", "후일담", "타임라인", "투표", "미디어"]
+              "엔딩분기", "후일담", "타임라인", "투표", "미디어", "자료"]
 
     def test_order_must_be_positive_and_unique_per_work(self):
         for table in self.TABLES:
@@ -389,3 +391,21 @@ class TestRuntimeConstraints(Builders):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMaterials(Builders):
+    """자료: 기믹이 불러 쓰는 글. 제목과 내용은 필수이고 작품과 함께 삭제된다."""
+
+    def test_title_and_body_are_required(self):
+        w = self.work()
+        self.ins("자료", 작품_번호=w, 순서=1, 제목="프롤로그 이후", 내용="글")
+        self.ins_fails("자료", "null value", 작품_번호=w, 순서=2, 제목=None, 내용="글")
+        self.ins_fails("자료", "null value", 작품_번호=w, 순서=2, 제목="제목", 내용=None)
+
+    def test_materials_are_removed_with_their_work_only(self):
+        w, other = self.work(), self.work()
+        self.ins("자료", 작품_번호=w, 순서=1, 제목="a", 내용="b")
+        self.ins("자료", 작품_번호=other, 순서=1, 제목="c", 내용="d")
+        self.db.ok(f'DELETE FROM "작품" WHERE "번호"={w}')
+        self.assertEqual(self.count("자료", f'"작품_번호"={w}'), 0)
+        self.assertEqual(self.count("자료", f'"작품_번호"={other}'), 1)
