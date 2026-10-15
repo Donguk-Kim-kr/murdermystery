@@ -1,10 +1,10 @@
 """인물 API (작품 안의 인물). 인물은 `순서`(작품별 1부터)로 가리킨다.
 
-* 삭제는 아직 없다. 삭제 후 번호 처리(B13)와 참조 정리가 정해지지 않았다.
+* 삭제할 수 있다. 다른 항목(단서·증언·후일담 등)이 가리키는 인물은 지울 수 없다. 새 번호는 현재 마지막 번호 + 1 이다 (B13: 중간 결번은 채우지 않는다).
 * 인물을 만들거나 NPC 여부를 바꾸면 작품.최대인원을 `max(NPC 가 아닌 인물 수, 1)` 로 다시 계산한다 (B5).
 """
 from fastapi import APIRouter, HTTPException, status
-from psycopg import Connection
+from psycopg import Connection, errors
 from pydantic import BaseModel, Field
 
 from .auth import CurrentUser
@@ -134,3 +134,17 @@ def _get(conn: Connection, work_id: int, order: int) -> dict:
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "인물을 찾을 수 없습니다")
     return row
+
+
+@router.delete("/{order}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_character(work_id: int, order: int, conn: Conn, me: CurrentUser) -> None:
+    work = lock_work(conn, work_id, me.계정.번호)
+    _get(conn, work_id, order)
+    try:
+        conn.execute('DELETE FROM "인물" WHERE "작품_번호" = %s AND "순서" = %s', (work_id, order))
+    except errors.ForeignKeyViolation:
+        # 단서·증언·후일담 등이 이 인물을 가리키고 있으면 지울 수 없다 (조용히 연결을 끊으면 의미가 바뀐다)
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "다른 항목이 이 인물을 사용하고 있어 지울 수 없습니다. 먼저 연결을 끊어 주세요"
+        ) from None
+    sync_capacity(conn, work_id, work["최소인원"])

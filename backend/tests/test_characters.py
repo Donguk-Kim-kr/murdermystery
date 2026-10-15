@@ -123,3 +123,35 @@ def test_concurrent_creates_get_distinct_consecutive_orders(client, headers, wor
     assert [r.status_code for r in results] == [201] * 8
     assert sorted(r.json()["순서"] for r in results) == list(range(1, 9))
     assert capacity(client, headers, wid) == 8
+
+
+def test_delete_character_updates_capacity_and_is_blocked_while_referenced(client, headers):
+    wid = client.post("/api/works", headers=headers, json={"제목": "w"}).json()["번호"]
+    base = f"/api/works/{wid}/characters"
+    a = client.post(base, headers=headers, json={"이름": "A"}).json()["순서"]
+    b = client.post(base, headers=headers, json={"이름": "B"}).json()["순서"]
+    assert client.get(f"/api/works/{wid}", headers=headers).json()["최대인원"] == 2
+    # 단서가 가리키는 인물은 지울 수 없다
+    clue = client.post(f"/api/works/{wid}/content/clues", headers=headers, json={"이름": "c", "인물_순서": b})
+    assert clue.status_code == 201
+    assert client.delete(f"{base}/{b}", headers=headers).status_code == 409
+    assert client.delete(f"{base}/{a}", headers=headers).status_code == 204
+    assert client.get(f"/api/works/{wid}", headers=headers).json()["최대인원"] == 1
+    assert client.delete(f"{base}/{a}", headers=headers).status_code == 404
+
+
+def test_delete_character_cannot_drop_below_min_players(client, headers):
+    wid = client.post("/api/works", headers=headers, json={"제목": "w"}).json()["번호"]
+    base = f"/api/works/{wid}/characters"
+    for n in "ABC":
+        client.post(base, headers=headers, json={"이름": n})
+    assert client.patch(f"/api/works/{wid}", headers=headers, json={"최소인원": 3}).status_code == 200
+    assert client.delete(f"{base}/3", headers=headers).status_code == 409
+    assert len(client.get(base, headers=headers).json()) == 3
+
+
+def test_other_users_cannot_delete_a_character(client, new_user):
+    owner, other = new_user(), new_user()
+    wid = client.post("/api/works", headers=owner, json={"제목": "w"}).json()["번호"]
+    c = client.post(f"/api/works/{wid}/characters", headers=owner, json={"이름": "A"}).json()["순서"]
+    assert client.delete(f"/api/works/{wid}/characters/{c}", headers=other).status_code == 404

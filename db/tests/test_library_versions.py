@@ -73,7 +73,6 @@ class LibraryVersionCases:
         r = self.make(계정_번호=a, 변경내역="처음")
         for assignment in (
             f"\"{self.content}\"='{{\"v\": 2}}'::jsonb",
-            "\"이름\"='바뀐 이름'",
             "\"버전\"=9",
             "\"변경내역\"='고침'",
             "\"계정_번호\"=NULL",
@@ -84,6 +83,29 @@ class LibraryVersionCases:
     def test_update_that_changes_nothing_is_harmless(self):
         r = self.make()
         self.assertEqual(self.update(r, '"이름"="이름"').returncode, 0)
+
+    # ---- 이름 변경 (0015) --------------------------------------------------
+    def test_rename_is_allowed_and_keeps_every_other_column(self):
+        a = self.account()
+        r = self.make(이름="옛 이름", 계정_번호=a, 변경내역="처음")
+        self.db.ok(f'UPDATE "{self.table}" SET "이름"=\'새 이름\' WHERE "번호"={r}')
+        self.assertEqual(self.db.val(f'SELECT "이름", "버전", "변경내역" FROM "{self.table}" WHERE "번호"={r}'),
+                         "새 이름|1|처음")
+        self.update_fails(r, '"이름"=\'또 바뀜\', "버전"=5')
+
+    def test_renaming_a_whole_lineage_in_one_statement_works(self):
+        a = self.account()
+        for v in (1, 2, 3):
+            self.make(이름="계열", 계정_번호=a, 버전=v)
+        self.db.ok(f'UPDATE "{self.table}" SET "이름"=\'바뀐 계열\' WHERE "계정_번호"={a} AND "이름"=\'계열\'')
+        self.assertEqual(self.db.val(f'SELECT string_agg("버전"::text, \',\' ORDER BY "버전") FROM "{self.table}" '
+                                     f'WHERE "계정_번호"={a} AND "이름"=\'바뀐 계열\''), "1,2,3")
+
+    def test_rename_cannot_collide_with_an_existing_lineage(self):
+        a = self.account()
+        r = self.make(이름="하나", 계정_번호=a)
+        self.make(이름="둘", 계정_번호=a)
+        self.db.fails(f'UPDATE "{self.table}" SET "이름"=\'둘\' WHERE "번호"={r}', f"uq_{self.table}_계정_이름_버전")
 
     # ---- 공개 여부 (0012) --------------------------------------------------
     def test_share_flag_defaults_to_false_for_owned_and_common_items(self):
@@ -104,7 +126,7 @@ class LibraryVersionCases:
 
     def test_share_flag_change_cannot_carry_other_changes(self):
         r = self.make()
-        self.update_fails(r, '"공개여부"=TRUE, "이름"=\'바뀜\'')
+        self.update_fails(r, '"공개여부"=TRUE, "버전"=9')
         self.update_fails(r, f'"공개여부"=TRUE, "{self.content}"=\'{{"v": 9}}\'::jsonb')
         self.assertEqual(self.db.val(f'SELECT "공개여부" FROM "{self.table}" WHERE "번호"={r}'), "f")
 
@@ -128,7 +150,7 @@ class LibraryVersionCases:
 
     def test_delete_mark_cannot_be_combined_with_other_changes(self):
         r = self.make()
-        self.update_fails(r, '"삭제일시"=CURRENT_TIMESTAMP, "이름"=\'바뀜\'')
+        self.update_fails(r, '"삭제일시"=CURRENT_TIMESTAMP, "버전"=9')
         self.assertEqual(self.db.val(f'SELECT "삭제일시" IS NULL FROM "{self.table}" WHERE "번호"={r}'), "t")
 
     def test_deleted_name_and_version_stay_reserved(self):
@@ -165,6 +187,24 @@ def _make_class(table: str, spec: dict):
 
 for _t, _s in TABLES.items():
     globals()[f"TestLibrary_{_t}"] = _make_class(_t, _s)
+
+
+class TestCommonPhaseSeed(unittest.TestCase):
+    """0015 가 공통 진행단계 11개를 등록한다 (시험용 기본값)."""
+
+    def test_seed_rows_exist_after_migrations(self):
+        name = "mm_seed_" + uuid.uuid4().hex[:12]
+        admin_sql(f'CREATE DATABASE "{name}"')
+        try:
+            migrate.run(name, MIGRATIONS_DIR)
+            db = Db(name)
+            rows = db.rows('SELECT "이름", "버전", "계정_번호" IS NULL FROM "진행단계" ORDER BY "번호"')
+            self.assertEqual([r[0] for r in rows], [
+                "프롤로그", "캐릭터 선택", "프로필 숙지", "자기소개", "조사", "토론", "밀담",
+                "추리발표(개인)", "투표", "에필로그", "후일담"])
+            self.assertTrue(all(r[1] == "1" and r[2] == "t" for r in rows))
+        finally:
+            admin_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
 
 
 class TestBackfillOfExistingRows(unittest.TestCase):
