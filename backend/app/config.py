@@ -9,6 +9,8 @@ class Settings(BaseSettings):
 
     # MM_DATABASE_URL 로 바꿀 수 있다. 호스트·계정 등 생략된 값은 PG* 환경변수에서 채워진다.
     database_url: str = "dbname=murder_mystery"
+    # 빌드된 프론트엔드 폴더. 지정하면 백엔드가 화면도 함께 서비스한다 (Docker 실행용). 비어 있으면 서비스하지 않는다.
+    static_dir: str = ""
     db_pool_min: int = 1
     db_pool_max: int = 10
 

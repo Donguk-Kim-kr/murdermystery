@@ -12,6 +12,7 @@ from .db import Conn, create_pool
 from .publishing import router as publishing_router
 from .roomstate import JoinLimiter, RoomRegistry
 from .rooms import expire_rooms, router as rooms_router
+from .static import mount_frontend
 from .testers import router as testers_router
 from .works import router as works_router
 
@@ -75,3 +76,8 @@ def health(conn: Conn) -> dict[str, str]:
     except Error as exc:
         raise HTTPException(status_code=503, detail="데이터베이스에 연결할 수 없습니다") from exc
     return {"status": "ok", "database": "ok"}
+
+
+# 화면 서비스는 모든 API 경로를 등록한 뒤 마지막에 붙인다. (먼저 붙이면 "/" 아래의 모든 경로를 가로챈다)
+if get_settings().static_dir:
+    mount_frontend(app, get_settings().static_dir)

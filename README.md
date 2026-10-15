@@ -11,7 +11,30 @@
 | `frontend/` | React + Vite + TypeScript |
 | `docs/` | 스키마·규칙 문서 |
 
-## 실행
+## Docker 로 한 번에 실행 (Windows 포함)
+
+Docker Desktop 이 실행 중이어야 한다. 프로젝트 폴더에서 PowerShell 또는 터미널로:
+
+```
+docker compose up --build
+```
+
+처음에는 이미지를 만드느라 몇 분 걸린다. `데이터베이스 ... 마이그레이션 적용 ...  Uvicorn running` 이 보이면 브라우저에서 **http://localhost:8000** 을 연다. (화면과 API 가 같은 주소에서 나온다. API 명세는 `/docs`.)
+
+| 하려는 일 | 명령 |
+|---|---|
+| 끄기 | `Ctrl+C`, 또는 다른 터미널에서 `docker compose down` (데이터는 남는다) |
+| 다시 켜기 | `docker compose up` |
+| 코드를 새로 받은 뒤(`git pull`) | `docker compose up --build` |
+| 데이터까지 모두 지우고 처음부터 | `docker compose down -v` |
+| 내 계정을 운영자로 만들기 | `docker compose exec db psql -U postgres -d murder_mystery -c "UPDATE 계정 SET 권한 = '운영자' WHERE 아이디 = '내아이디'"` |
+
+* 내 컴퓨터(`127.0.0.1`)에서만 열린다. 8000 번 포트가 이미 쓰이고 있으면 `docker-compose.yml` 의 `127.0.0.1:8000:8000` 앞 숫자를 바꾼다.
+* 비밀번호(`devpassword`)는 개발용이다. 이 설정 그대로 인터넷에 공개하지 않는다.
+* 이 방식은 서버 컨테이너가 하나(프로세스 하나)여야 대기실이 동작한다. 컨테이너 수를 늘리지 않는다.
+* 개발자용 실행(아래)과 같은 PostgreSQL 이 이미 설치되어 있어도 충돌하지 않는다(DB 포트를 바깥에 열지 않는다).
+
+## 실행 (개발자용: 백엔드·프론트엔드를 따로)
 
 접속 정보는 libpq 표준 환경변수를 따른다.
 
