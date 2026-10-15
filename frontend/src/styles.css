@@ -264,20 +264,15 @@ button.link:hover:not(:disabled) { background: none; text-decoration: underline;
   background: var(--accent);
   color: var(--accent-contrast);
 }
-.who { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--text-2); }
-.avatar {
-  display: grid;
-  place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent-soft-text);
-  font-size: 0.8rem;
-  font-weight: 700;
+.who {
+  font-size: 0.875rem;
+  color: var(--text-2);
+  max-width: 7rem;           /* 좁은 화면에서도 로그아웃 버튼이 밀려나지 않게 긴 닉네임은 말줄임 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.who-name { display: none; }
-@media (min-width: 480px) { .who-name { display: inline; } }
+@media (min-width: 560px) { .who { max-width: 16rem; } }
 
 .page {
   max-width: 62rem;

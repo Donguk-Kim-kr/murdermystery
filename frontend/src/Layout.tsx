@@ -36,10 +36,7 @@ export function Layout({ account }: { account: Account }) {
           머더미스터리
         </Link>
         <RoomChip />
-        <span className="who">
-          <span className="avatar" aria-hidden="true">{account.닉네임.slice(0, 1)}</span>
-          <span className="who-name">{account.닉네임}</span>
-        </span>
+        <span className="who">{account.닉네임}</span>
         <button type="button" className="small secondary" onClick={() => void logout()}>
           로그아웃
         </button>
