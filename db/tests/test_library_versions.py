@@ -1,4 +1,4 @@
-"""라이브러리(진행단계 / 기믹)의 버전·변경내역·삭제 표시 테스트 (0011)."""
+"""라이브러리(진행단계 / 기믹)의 버전·변경내역·삭제 표시·공개 여부 테스트 (0011, 0012)."""
 from __future__ import annotations
 
 import shutil
@@ -84,6 +84,35 @@ class LibraryVersionCases:
     def test_update_that_changes_nothing_is_harmless(self):
         r = self.make()
         self.assertEqual(self.update(r, '"이름"="이름"').returncode, 0)
+
+    # ---- 공개 여부 (0012) --------------------------------------------------
+    def test_share_flag_defaults_to_false_for_owned_and_common_items(self):
+        a = self.account()
+        for owner in (a, None):
+            r = self.make(계정_번호=owner)
+            self.assertEqual(self.db.val(f'SELECT "공개여부" FROM "{self.table}" WHERE "번호"={r}'), "f")
+
+    def test_share_flag_can_be_toggled_both_ways_and_per_version(self):
+        a = self.account()
+        v1 = self.make(이름="공유 후보", 계정_번호=a)
+        v2 = self.make(이름="공유 후보", 계정_번호=a, 버전=2)
+        self.db.ok(f'UPDATE "{self.table}" SET "공개여부"=TRUE WHERE "번호"={v1}')
+        self.assertEqual(self.db.val(f'SELECT "공개여부" FROM "{self.table}" WHERE "번호" IN ({v1},{v2}) ORDER BY "번호"'),
+                         "t\nf")
+        self.db.ok(f'UPDATE "{self.table}" SET "공개여부"=FALSE WHERE "번호"={v1}')
+        self.assertEqual(self.db.val(f'SELECT "공개여부" FROM "{self.table}" WHERE "번호"={v1}'), "f")
+
+    def test_share_flag_change_cannot_carry_other_changes(self):
+        r = self.make()
+        self.update_fails(r, '"공개여부"=TRUE, "이름"=\'바뀜\'')
+        self.update_fails(r, f'"공개여부"=TRUE, "{self.content}"=\'{{"v": 9}}\'::jsonb')
+        self.assertEqual(self.db.val(f'SELECT "공개여부" FROM "{self.table}" WHERE "번호"={r}'), "f")
+
+    def test_share_flag_can_change_after_delete_mark_but_delete_stays_one_way(self):
+        r = self.make()
+        self.db.ok(f'UPDATE "{self.table}" SET "삭제일시"=CURRENT_TIMESTAMP, "공개여부"=TRUE WHERE "번호"={r}')
+        self.db.ok(f'UPDATE "{self.table}" SET "공개여부"=FALSE WHERE "번호"={r}')
+        self.update_fails(r, '"삭제일시"=NULL', "되돌릴 수 없습니다")
 
     # ---- 삭제 표시 ---------------------------------------------------------
     def test_delete_mark_is_allowed_once_and_keeps_the_row(self):

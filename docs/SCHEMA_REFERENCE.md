@@ -154,6 +154,7 @@
 | 6 | 버전 | integer | 불가 | 1 |
 | 7 | 변경내역 | text | 가능 |  |
 | 8 | 삭제일시 | timestamp with time zone | 가능 |  |
+| 9 | 공개여부 | boolean | 불가 | false |
 
 **제약조건**
 
@@ -185,6 +186,7 @@
 | 7 | 버전 | integer | 불가 | 1 |
 | 8 | 변경내역 | text | 가능 |  |
 | 9 | 삭제일시 | timestamp with time zone | 가능 |  |
+| 10 | 공개여부 | boolean | 불가 | false |
 
 **제약조건**
 
