@@ -4,6 +4,7 @@ import { useAuth } from "./auth/AuthContext";
 import { Layout } from "./Layout";
 import { AuthPage } from "./pages/AuthPage";
 import { CreateRoomPage } from "./pages/CreateRoomPage";
+import { LibraryPage } from "./pages/LibraryPage";
 import { JoinRoomPage } from "./pages/JoinRoomPage";
 import { RoomPage } from "./pages/RoomPage";
 import { WorkNewPage } from "./pages/WorkNewPage";
@@ -20,6 +21,7 @@ export function App() {
         <Route path="/" element={<WorksListPage />} />
         <Route path="/works/new" element={<WorkNewPage />} />
         <Route path="/works/:id" element={<WorkPage />} />
+        <Route path="/library" element={<LibraryPage />} />
         <Route path="/rooms/join" element={<JoinRoomPage />} />
         <Route path="/rooms/new/:workId" element={<CreateRoomPage />} />
         <Route path="/room" element={<RoomPage />} />

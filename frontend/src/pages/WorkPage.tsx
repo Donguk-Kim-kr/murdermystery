@@ -1,15 +1,30 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
-import { api, errorMessage } from "../api/client";
+import { api, errorMessage, http } from "../api/client";
 import type { components } from "../api/schema";
 import { useAuth } from "../auth/AuthContext";
+import { ConfirmPanel } from "../workspace/ConfirmPanel";
+import { ContentPanel } from "../workspace/ContentPanel";
+import { PhasesPanel } from "../workspace/PhasesPanel";
 import { CharacterForm, type Character } from "./CharacterForm";
 import { RoomPanel } from "./RoomPanel";
 import { TestersPanel } from "./TestersPanel";
 import { VisibilityPanel } from "./VisibilityPanel";
 
 type Work = components["schemas"]["WorkOut"];
+
+/** 작업공간의 탭. 어느 탭부터 채워도 되고, 확정할 때만 검사한다. */
+const TABS = [
+  { id: "overview", label: "개요" },
+  { id: "places", label: "장소·단서" },
+  { id: "incidents", label: "사건" },
+  { id: "relations", label: "관계·자료" },
+  { id: "phases", label: "진행" },
+  { id: "endings", label: "결말" },
+  { id: "confirm", label: "확정" },
+] as const;
+type TabId = (typeof TABS)[number]["id"];
 
 export function WorkPage() {
   const workId = Number(useParams().id);
@@ -20,6 +35,9 @@ export function WorkPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   // null: 폼 닫힘, "new": 새 인물, 숫자: 그 순서의 인물 수정
   const [editing, setEditing] = useState<null | "new" | number>(null);
+  const [params, setParams] = useSearchParams();
+  const tab: TabId = TABS.find((t) => t.id === params.get("tab"))?.id ?? "overview";
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [w, c] = await Promise.all([
@@ -47,6 +65,14 @@ export function WorkPage() {
     );
   if (!work) return <p className="center">불러오는 중…</p>;
 
+  async function removeCharacter(c: Character) {
+    if (!window.confirm(`'${c.이름}' 인물을 삭제할까요?`)) return;
+    setDeleteError(null);
+    const res = await http("DELETE", `/api/works/${workId}/characters/${c.순서}`);
+    if (res.error) setDeleteError(errorMessage(res.error, "삭제하지 못했습니다"));
+    else void load();
+  }
+
   const closeForm = () => setEditing(null);
   const savedForm = () => {
     setEditing(null);
@@ -60,6 +86,27 @@ export function WorkPage() {
         <h1>{work.제목}</h1>
         <span className={work.공개여부 ? "chip success" : "chip"}>{work.공개여부 ? "공개" : "비공개"}</span>
       </div>
+      <nav className="tabs" role="tablist" aria-label="작업공간">
+        {TABS.map((t) => (
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
+            className={tab === t.id ? "tab active" : "tab"}
+            onClick={() => setParams(t.id === "overview" ? {} : { tab: t.id }, { replace: true })}>
+            {t.label}
+          </button>
+        ))}
+      </nav>
+      {tab === "places" && <ContentPanel workId={workId} keys={["places", "clues", "testimonies", "combos", "combo-parts"]} />}
+      {tab === "incidents" && <ContentPanel workId={workId} keys={["incidents", "incident-details", "timelines"]} />}
+      {tab === "relations" && <ContentPanel workId={workId} keys={["relations", "materials"]} />}
+      {tab === "phases" && (
+        <div className="stack">
+          <PhasesPanel workId={workId} />
+          <ContentPanel workId={workId} keys={["votes"]} />
+        </div>
+      )}
+      {tab === "endings" && <ContentPanel workId={workId} keys={["endings", "epilogues"]} />}
+      {tab === "confirm" && <ConfirmPanel workId={workId} onConfirmed={load} />}
+      {tab === "overview" && (
       <div className="work-layout">
         <div className="col">
           <WorkInfoForm work={work} onSaved={load} />
@@ -90,11 +137,15 @@ export function WorkPage() {
                       <button type="button" className="small secondary" onClick={() => setEditing(c.순서)}>
                         편집
                       </button>
+                      <button type="button" className="small secondary" onClick={() => void removeCharacter(c)}>
+                        삭제
+                      </button>
                     </div>
                   )}
                 </li>
               ))}
             </ul>
+            {deleteError && <p role="alert" className="error">{deleteError}</p>}
             {editing === "new" && <CharacterForm workId={workId} onCancel={closeForm} onSaved={savedForm} />}
           </section>
         </div>
@@ -104,6 +155,7 @@ export function WorkPage() {
           <TestersPanel workId={workId} />
         </div>
       </div>
+      )}
     </main>
   );
 }
@@ -138,6 +190,7 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
   return (
     <form onSubmit={onSubmit} aria-label="기본정보" className="card info">
       <h2>기본정보</h2>
+      <p className="muted">제목은 임시로 정해도 됩니다. 나중에 언제든 바꿀 수 있습니다.</p>
       <label>
         제목
         <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} required />

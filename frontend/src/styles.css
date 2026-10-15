@@ -484,3 +484,40 @@ a.work-card:hover {
 .code-box { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 0.9rem 1rem; background: var(--surface-2); border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); }
 .code { font-size: 1.6rem; letter-spacing: 0.18em; font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; margin-right: auto; }
 .code-input { font-size: 1.3rem; letter-spacing: 0.18em; text-align: center; text-transform: uppercase; }
+
+/* 작업공간 */
+.navlink { font-size: 0.875rem; color: var(--text-2); }
+.tabs { display: flex; gap: 0.25rem; overflow-x: auto; border-bottom: 1px solid var(--border); margin: 0.75rem 0 1rem; }
+button.tab {
+  background: none; color: var(--text-2); border-radius: 0.5rem 0.5rem 0 0; border-bottom: 2px solid transparent;
+  padding: 0.55rem 0.9rem; white-space: nowrap; font-weight: 550;
+}
+button.tab:hover:not(:disabled) { background: var(--surface-2); }
+button.tab.active { color: var(--accent); border-bottom-color: var(--accent); background: none; }
+.stack { display: grid; gap: 1.25rem; }
+.item-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.item { display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 0.6rem; }
+.item .order {
+  min-width: 1.6rem; text-align: center; font-size: 0.8rem; font-weight: 650; color: var(--accent);
+  background: var(--accent-soft); border-radius: 0.4rem; padding: 0.1rem 0.35rem;
+}
+.item .body { flex: 1; min-width: 0; display: grid; gap: 0.1rem; }
+.item .name { font-weight: 600; overflow-wrap: anywhere; }
+.hint { font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+label.inline { display: inline-flex; align-items: center; gap: 0.5rem; }
+label.inline input { width: 6rem; }
+.phase { border: 1px solid var(--border); border-radius: 0.7rem; padding: 0.8rem; display: grid; gap: 0.7rem; }
+.linked { display: grid; gap: 0.4rem; }
+.linked-title { font-size: 0.85rem; font-weight: 600; color: var(--text-2); }
+ul.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+ul.chips .chip { display: inline-flex; align-items: center; gap: 0.35rem; }
+ul.chips .chip button.link { padding: 0; line-height: 1; }
+.warn-box { background: var(--warning-soft); color: var(--warning); border-radius: 0.6rem; padding: 0.7rem 0.9rem; }
+.warn-box ul, [role="alert"].error ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+.lineage { border: 1px solid var(--border); border-radius: 0.7rem; padding: 0.8rem; display: grid; gap: 0.5rem; }
+ul.versions { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.version { display: flex; align-items: flex-start; gap: 0.6rem; flex-wrap: wrap; }
+.version .body { flex: 1; min-width: 12rem; display: grid; gap: 0.15rem; }
+.version.deleted { opacity: 0.6; }
+.version pre { margin: 0.3rem 0 0; font-size: 0.8rem; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); padding: 0.5rem; border-radius: 0.4rem; }
+.field { display: grid; gap: 0.3rem; align-content: start; }

@@ -62,6 +62,7 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
 
   return (
     <form onSubmit={onSubmit} className="subform" aria-label={character ? "인물 수정" : "인물 추가"}>
+      <p className="muted">이름은 임시로 정해도 됩니다. 나중에 바꿀 수 있습니다.</p>
       <div className="field-grid two">
         <label>
           <span className="req-label">이름</span>

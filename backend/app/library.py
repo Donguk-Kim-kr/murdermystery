@@ -111,7 +111,7 @@ def create_item(kind: str, conn: Conn, me: CurrentUser, body: dict[str, Any] = B
     if extra:
         raise _invalid(f"알 수 없는 항목: {', '.join(sorted(extra))}")
     name = _text(body, "이름", required=True, max_len=100)
-    description = _text(body, "설명", required=k.description_required, max_len=2000)
+    description = _text(body, "설명", required=False, max_len=2000)
     change = _text(body, "변경내역", required=False, max_len=2000)
     contents = {}
     for col in k.content:
@@ -133,6 +133,7 @@ def create_item(kind: str, conn: Conn, me: CurrentUser, body: dict[str, Any] = B
         (owner, name),
     ).fetchone()["v"]
     cols = ["계정_번호", "이름", "설명", "버전", "변경내역", *k.content]
+    # 진행단계의 설명 칸은 NULL 을 받지 않지만 빈 글자는 받는다 (비워 두어도 만들 수 있게).
     values = [owner, name, description if description is not None else ("" if k.description_required else None),
               last + 1, change, *contents.values()]
     try:

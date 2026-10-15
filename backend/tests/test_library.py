@@ -53,6 +53,9 @@ def test_validation(client, headers):
         ("phases", {"이름": " ", "설명": "d"}),
     ):
         assert client.post(url(kind), headers=headers, json=body).status_code == 422, body
+    # 설명은 비워도 된다 (진행단계는 빈 글자로 저장)
+    blank = client.post(url("phases"), headers=headers, json={"이름": "설명 없음"})
+    assert blank.status_code == 201 and blank.json()["설명"] == ""
     # 기믹은 설명이 없어도 된다
     ok = client.post(url("gimmicks"), headers=headers, json={"이름": "독 발견", "조건": {}, "결과": {}})
     assert ok.status_code == 201 and ok.json()["설명"] is None

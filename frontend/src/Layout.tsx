@@ -35,6 +35,7 @@ export function Layout({ account }: { account: Account }) {
           <BrandMark />
           머더미스터리
         </Link>
+        <Link to="/library" className="navlink">라이브러리</Link>
         <RoomChip />
         <span className="who">{account.닉네임}</span>
         <button type="button" className="small secondary" onClick={() => void logout()}>

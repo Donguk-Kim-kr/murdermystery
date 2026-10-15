@@ -24,3 +24,30 @@ export function errorMessage(error: unknown, fallback = "요청에 실패했습�
   if (Array.isArray(detail)) return "입력값을 확인해 주세요";
   return fallback;
 }
+
+export interface HttpResult<T> {
+  data?: T;
+  error?: unknown;
+  status: number;
+}
+
+/**
+ * 스키마 타입이 없는 범용 호출 (작업공간 콘텐츠·라이브러리·확정 API).
+ * 응답이 2xx 이면 `data`(본문이 없으면 undefined), 아니면 `error`(FastAPI 오류 본문)를 돌려준다.
+ */
+export async function http<T = unknown>(method: string, path: string, body?: unknown): Promise<HttpResult<T>> {
+  const headers = new Headers();
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (body !== undefined) headers.set("Content-Type", "application/json");
+  const res = await fetch(
+    new Request(new URL(path, window.location.origin), {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+  );
+  const text = await res.text();
+  const parsed = text ? (JSON.parse(text) as unknown) : undefined;
+  return res.ok ? { data: parsed as T, status: res.status } : { error: parsed ?? {}, status: res.status };
+}

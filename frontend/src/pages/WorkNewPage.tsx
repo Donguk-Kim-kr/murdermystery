@@ -30,7 +30,7 @@ export function WorkNewPage() {
         </label>
         {error && <p role="alert" className="error">{error}</p>}
         <button type="submit" disabled={busy}>만들기</button>
-        <p className="muted">시놉시스·장르·인물은 만든 뒤에 입력합니다.</p>
+        <p className="muted">제목은 임시로 정해도 되고 나중에 바꿀 수 있습니다. 나머지는 만든 뒤 원하는 것부터 채우면 됩니다.</p>
       </form>
     </main>
   );
