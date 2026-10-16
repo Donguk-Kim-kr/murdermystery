@@ -69,15 +69,24 @@ def test_validation(client, headers):
 
 
 def test_title_can_be_left_for_later(client, headers):
-    """제목을 비워도(또는 빼도) 만들 수 있고, 제목 없는 작품으로 시작한다. 제목 칸 자체는 비울 수 없는 칸 그대로다."""
+    """제목을 비워도(또는 빼도) 만들 수 있고, 제목없음으로 시작한다. 제목 칸 자체는 비울 수 없는 칸 그대로다."""
     for body in ({}, {"제목": ""}, {"제목": "   "}):
         res = client.post("/api/works", headers=headers, json=body)
         assert res.status_code == 201, res.text
-        assert res.json()["제목"] == "제목 없는 작품"
+        assert res.json()["제목"] == "제목없음"
     assert client.post("/api/works", headers=headers, json={"제목": "  저택의 비밀  "}).json()["제목"] == "저택의 비밀"
     wid = client.post("/api/works", headers=headers, json={}).json()["번호"]
     assert client.patch(f"/api/works/{wid}", headers=headers, json={"제목": "새 제목"}).json()["제목"] == "새 제목"
     assert client.patch(f"/api/works/{wid}", headers=headers, json={"제목": ""}).status_code == 422     # 고칠 때는 비울 수 없다
+
+
+def test_untitled_is_an_ordinary_editable_title(client, headers):
+    """임시 이름 '제목없음'은 특별하지 않다: 같은 이름이 여러 개여도 되고, 직접 그렇게 지어도 되며, 언제든 고칠 수 있다."""
+    a = client.post("/api/works", headers=headers, json={}).json()
+    b = client.post("/api/works", headers=headers, json={}).json()
+    c = client.post("/api/works", headers=headers, json={"제목": "제목없음"}).json()
+    assert {a["제목"], b["제목"], c["제목"]} == {"제목없음"} and len({a["번호"], b["번호"], c["번호"]}) == 3
+    assert client.patch(f"/api/works/{c['번호']}", headers=headers, json={"제목": "저택의 비밀"}).json()["제목"] == "저택의 비밀"
 
 
 def test_patch_cannot_change_visibility(client, headers):

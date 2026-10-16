@@ -26,7 +26,7 @@ export function WorkNewPage() {
         <h1>새 작품</h1>
         <label>
           제목
-          <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} autoFocus placeholder="비워 두면 '제목 없는 작품'으로 만들어집니다" />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} autoFocus placeholder="비워 두면 '제목없음'으로 만들어집니다" />
         </label>
         {error && <p role="alert" className="error">{error}</p>}
         <button type="submit" disabled={busy}>만들기</button>
