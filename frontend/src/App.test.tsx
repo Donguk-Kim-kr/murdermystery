@@ -49,7 +49,7 @@ const account = { 번호: 1, 아이디: "alice", 닉네임: "탐정", 권한: "�
 describe("로그인 화면", () => {
   it("토큰이 없으면 서버 확인 없이 로그인 화면을 보여 준다", async () => {
     renderApp();
-    expect(await screen.findByRole("heading", { name: "로그인" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "로그인" })).toBeInTheDocument();
     expect(calls).toHaveLength(0);
   });
 
@@ -76,6 +76,35 @@ describe("로그인 화면", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("아이디 또는 패스워드가 올바르지 않습니다");
     expect(localStorage.getItem("mm.token")).toBeNull();
+  });
+});
+
+describe("로그인 화면 구성과 다크 모드", () => {
+  afterEach(() => {
+    delete document.documentElement.dataset.theme;
+    localStorage.removeItem("theme");
+  });
+
+  it("제목·로고·안내 문구 없이 입력칸만 보여 준다", async () => {
+    renderApp();
+    await screen.findByRole("button", { name: "로그인" });
+    expect(screen.queryByRole("heading", { name: "로그인" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/함께 추리하세요/)).not.toBeInTheDocument();
+    expect(document.querySelector(".brand-mark")).toBeNull();
+  });
+
+  it("다크 모드 버튼으로 켜고 끄며 고른 값을 기억한다", async () => {
+    document.documentElement.dataset.theme = "light";
+    renderApp();
+    const toggle = await screen.findByRole("button", { name: "다크 모드" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(toggle);
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(localStorage.getItem("theme")).toBe("dark");
+    await userEvent.click(toggle);
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(localStorage.getItem("theme")).toBe("light");
   });
 });
 
@@ -119,7 +148,7 @@ describe("저장된 토큰", () => {
     localStorage.setItem("mm.token", "expired");
     routes["GET /api/auth/me"] = () => json({ detail: "세션이 없거나 만료되었습니다" }, 401);
     renderApp();
-    expect(await screen.findByRole("heading", { name: "로그인" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "로그인" })).toBeInTheDocument();
     expect(localStorage.getItem("mm.token")).toBeNull();
   });
 
@@ -130,7 +159,7 @@ describe("저장된 토큰", () => {
     renderApp();
     await userEvent.click(await screen.findByRole("button", { name: "로그아웃" }));
     await waitFor(() => expect(localStorage.getItem("mm.token")).toBeNull());
-    expect(await screen.findByRole("heading", { name: "로그인" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "로그인" })).toBeInTheDocument();
     expect(calls.map((c) => c.key)).toContain("POST /api/auth/logout");
   });
 });

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 
 import { useAuth } from "../auth/AuthContext";
-import { BrandMark } from "../Layout";
+import { ThemeToggle } from "../ThemeToggle";
 
 export function AuthPage() {
   const { login, signup } = useAuth();
@@ -24,13 +24,11 @@ export function AuthPage() {
 
   return (
     <main className="auth">
+      <ThemeToggle />
       <div className="auth-card">
         <div className="auth-brand">
-          <BrandMark />
           <h1>머더미스터리</h1>
-          <p>시나리오를 만들고, 함께 추리하세요</p>
         </div>
-        <h2>{mode === "login" ? "로그인" : "회원가입"}</h2>
         <form onSubmit={onSubmit}>
           <label>
             아이디

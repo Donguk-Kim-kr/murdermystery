@@ -2,6 +2,7 @@ import { Link, Outlet } from "react-router-dom";
 
 import type { Account } from "./auth/AuthContext";
 import { useAuth } from "./auth/AuthContext";
+import { ThemeToggle } from "./ThemeToggle";
 import { RoomProvider, useRoom } from "./rooms/RoomContext";
 
 /** 앱 로고 마크 (돋보기). 외부 이미지 없이 SVG 로 그린다. */
@@ -37,6 +38,7 @@ export function Layout({ account }: { account: Account }) {
         </Link>
         <Link to="/library" className="navlink">라이브러리</Link>
         <RoomChip />
+        <ThemeToggle />
         <span className="who">{account.닉네임}</span>
         <button type="button" className="small secondary" onClick={() => void logout()}>
           로그아웃

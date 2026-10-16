@@ -38,8 +38,9 @@
   --gap: 1rem;
 }
 
+/* 다크 모드: 사용자가 고른 값(html 의 data-theme)이 우선이고, 고르기 전(스크립트가 돌기 전)에는 기기 설정을 따른다. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     --bg: #0c0e14;
     --surface: #151922;
     --surface-2: #1a1f2b;
@@ -66,6 +67,32 @@
     --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.4);
   }
 }
+:root[data-theme="dark"] {
+  --bg: #0c0e14;
+  --surface: #151922;
+  --surface-2: #1a1f2b;
+  --border: #272d3b;
+  --border-strong: #353d4f;
+  --text: #f1f3f8;
+  --text-2: #cdd3e0;
+  --muted: #98a1b3;
+
+  --accent: #6366f1;
+  --accent-hover: #7a7df5;
+  --accent-soft: #1f2347;
+  --accent-soft-text: #c7c9ff;
+
+  --danger: #f97066;
+  --danger-soft: #2b1614;
+  --success: #47cd89;
+  --success-soft: #11271d;
+  --warning: #fdb022;
+  --warning-soft: #2a2010;
+
+  --ring: 0 0 0 3px rgba(129, 140, 248, 0.4);
+  --shadow-sm: none;
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
 
 /* ==========================================================================
    기본
@@ -79,6 +106,8 @@
 html {
   color-scheme: light dark;
 }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
 
 body {
   margin: 0;
@@ -343,9 +372,20 @@ form.row input { flex: 1; min-width: 0; }
 .auth-brand { display: grid; justify-items: center; gap: 0.6rem; text-align: center; }
 .auth-brand .brand-mark { width: 2.8rem; height: 2.8rem; border-radius: 0.85rem; }
 .auth-brand h1 { font-size: 1.45rem; }
-.auth-brand p { color: var(--muted); font-size: 0.9rem; }
-.auth-card h2 { font-size: 1.05rem; }
 .auth-card button[type="submit"] { padding: 0.75rem 1rem; }
+.theme-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  border: 1px solid var(--border);
+}
+.theme-toggle:hover { background: var(--surface-2); }
+.auth > .theme-toggle { position: fixed; top: 1rem; right: 1rem; }
 .auth-switch { text-align: center; font-size: 0.875rem; color: var(--muted); }
 
 /* ==========================================================================
