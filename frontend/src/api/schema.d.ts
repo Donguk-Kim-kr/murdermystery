@@ -934,8 +934,11 @@ export interface components {
         };
         /** WorkIn */
         WorkIn: {
-            /** 제목 */
-            "\uC81C\uBAA9": string;
+            /**
+             * 제목
+             * @default
+             */
+            "\uC81C\uBAA9"?: string;
             /**
              * 시놉시스
              * @default

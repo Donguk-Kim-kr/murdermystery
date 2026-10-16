@@ -65,8 +65,19 @@ def test_requires_login(client):
 
 
 def test_validation(client, headers):
-    assert client.post("/api/works", headers=headers, json={"제목": ""}).status_code == 422
-    assert client.post("/api/works", headers=headers, json={}).status_code == 422
+    assert client.post("/api/works", headers=headers, json={"제목": "가" * 101}).status_code == 422
+
+
+def test_title_can_be_left_for_later(client, headers):
+    """제목을 비워도(또는 빼도) 만들 수 있고, 제목 없는 작품으로 시작한다. 제목 칸 자체는 비울 수 없는 칸 그대로다."""
+    for body in ({}, {"제목": ""}, {"제목": "   "}):
+        res = client.post("/api/works", headers=headers, json=body)
+        assert res.status_code == 201, res.text
+        assert res.json()["제목"] == "제목 없는 작품"
+    assert client.post("/api/works", headers=headers, json={"제목": "  저택의 비밀  "}).json()["제목"] == "저택의 비밀"
+    wid = client.post("/api/works", headers=headers, json={}).json()["번호"]
+    assert client.patch(f"/api/works/{wid}", headers=headers, json={"제목": "새 제목"}).json()["제목"] == "새 제목"
+    assert client.patch(f"/api/works/{wid}", headers=headers, json={"제목": ""}).status_code == 422     # 고칠 때는 비울 수 없다
 
 
 def test_patch_cannot_change_visibility(client, headers):

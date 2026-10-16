@@ -237,6 +237,18 @@ describe("작품", () => {
     expect(await calls.find((c) => c.key === "POST /api/works")!.req.json()).toEqual({ 제목: "저택의 비밀" });
   });
 
+  it("제목을 비워도 작품을 만들 수 있다(입력칸은 필수가 아니다)", async () => {
+    routes["POST /api/works"] = () => json({ ...work, 제목: "제목 없는 작품" }, 201);
+    routes["GET /api/works/7"] = () => json(work);
+    routes["GET /api/works/7/characters"] = () => json([]);
+    renderApp("/works/new");
+    const title = await screen.findByLabelText("제목");
+    expect(title).not.toBeRequired();
+    await userEvent.click(screen.getByRole("button", { name: "만들기" }));
+    expect(await screen.findByRole("tab", { name: "흐름", selected: true })).toBeInTheDocument();
+    expect(await calls.find((c) => c.key === "POST /api/works")!.req.json()).toEqual({ 제목: "" });
+  });
+
   it("인물을 추가하면 목록과 최대 인원이 갱신된다", async () => {
     let people: unknown[] = [];
     let current: Record<string, unknown> = work;

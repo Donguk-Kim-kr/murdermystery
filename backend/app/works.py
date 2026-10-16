@@ -25,8 +25,11 @@ WORK_COLUMNS = (
 )
 
 
+UNTITLED = "제목 없는 작품"   # 제목을 나중에 정할 수 있게, 비워서 만들면 이 이름으로 시작한다(제목 칸은 비울 수 없는 칸 그대로)
+
+
 class WorkIn(BaseModel):
-    제목: str = Field(min_length=1, max_length=100)
+    제목: str = Field(default="", max_length=100)
     시놉시스: str = Field(default="", max_length=5000)
     장르: str = Field(default="", max_length=50)
     예상시간: str = Field(default="3시간", min_length=1, max_length=50)
@@ -97,7 +100,7 @@ def create_work(body: WorkIn, conn: Conn, me: CurrentUser) -> dict:
     return conn.execute(
         f'INSERT INTO "작품" ("제목", "시놉시스", "장르", "예상시간", "공통스토리", "최소인원", "최대인원", "계정_번호") '
         f"VALUES (%s, %s, %s, %s, %s, 1, 1, %s) RETURNING {WORK_COLUMNS}",
-        (body.제목, body.시놉시스, body.장르, body.예상시간, body.공통스토리, me.계정.번호),
+        (body.제목.strip() or UNTITLED, body.시놉시스, body.장르, body.예상시간, body.공통스토리, me.계정.번호),
     ).fetchone()
 
 
