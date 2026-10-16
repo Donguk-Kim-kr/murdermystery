@@ -289,6 +289,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/play-works": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Play Works */
+        get: operations["play_works_api_play_works_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/library/{kind}": {
         parameters: {
             query?: never;
@@ -768,6 +785,27 @@ export interface components {
         ParticipationIn: {
             /** 플레이 */
             "\uD50C\uB808\uC774": boolean;
+        };
+        /** PlayWorkOut */
+        PlayWorkOut: {
+            /** 번호 */
+            "\uBC88\uD638": number;
+            /** 제목 */
+            "\uC81C\uBAA9": string;
+            /** 시놉시스 */
+            "\uC2DC\uB189\uC2DC\uC2A4": string;
+            /** 장르 */
+            "\uC7A5\uB974": string;
+            /** 최소인원 */
+            "\uCD5C\uC18C\uC778\uC6D0": number;
+            /** 최대인원 */
+            "\uCD5C\uB300\uC778\uC6D0": number;
+            /** 예상시간 */
+            "\uC608\uC0C1\uC2DC\uAC04": string;
+            /** 제작자 */
+            "\uC81C\uC791\uC790": string;
+            /** 비공개플레이 */
+            "\uBE44\uACF5\uAC1C\uD50C\uB808\uC774": boolean;
         };
         /**
          * PrivatePlayWorkOut
@@ -1771,6 +1809,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    play_works_api_play_works_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayWorkOut"][];
                 };
             };
             /** @description Validation Error */

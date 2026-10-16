@@ -1,7 +1,8 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 
 import type { Account } from "./auth/AuthContext";
 import { useAuth } from "./auth/AuthContext";
+import { SPACES } from "./spaces";
 import { ThemeToggle } from "./ThemeToggle";
 import { RoomProvider, useRoom } from "./rooms/RoomContext";
 
@@ -36,7 +37,11 @@ export function Layout({ account }: { account: Account }) {
           <BrandMark />
           머더미스터리
         </Link>
-        <Link to="/library" className="navlink">라이브러리</Link>
+        <nav className="spaces" aria-label="공간">
+          <NavLink to="/" end className="navlink">{SPACES.play}</NavLink>
+          <NavLink to="/make" className="navlink">{SPACES.make}</NavLink>
+          <NavLink to="/records" className="navlink">{SPACES.records}</NavLink>
+        </nav>
         <RoomChip />
         <ThemeToggle />
         <span className="who">{account.닉네임}</span>

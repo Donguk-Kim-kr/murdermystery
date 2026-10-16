@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import { useAuth } from "./auth/AuthContext";
 import { Layout } from "./Layout";
@@ -6,6 +6,9 @@ import { AuthPage } from "./pages/AuthPage";
 import { CreateRoomPage } from "./pages/CreateRoomPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { JoinRoomPage } from "./pages/JoinRoomPage";
+import { MakeHubPage } from "./pages/MakeHubPage";
+import { PlayHomePage } from "./pages/PlayHomePage";
+import { RecordsPage } from "./pages/RecordsPage";
 import { RoomPage } from "./pages/RoomPage";
 import { WorkNewPage } from "./pages/WorkNewPage";
 import { WorkPage } from "./pages/WorkPage";
@@ -18,10 +21,14 @@ export function App() {
   return (
     <Routes>
       <Route element={<Layout account={state.account} />}>
-        <Route path="/" element={<WorksListPage />} />
+        <Route path="/" element={<PlayHomePage />} />
+        <Route path="/make" element={<MakeHubPage />} />
+        <Route path="/make/games" element={<WorksListPage />} />
+        <Route path="/make/library" element={<LibraryPage />} />
+        <Route path="/records" element={<RecordsPage />} />
         <Route path="/works/new" element={<WorkNewPage />} />
         <Route path="/works/:id" element={<WorkPage />} />
-        <Route path="/library" element={<LibraryPage />} />
+        <Route path="/library" element={<Navigate to="/make/library" replace />} />
         <Route path="/rooms/join" element={<JoinRoomPage />} />
         <Route path="/rooms/new/:workId" element={<CreateRoomPage />} />
         <Route path="/room" element={<RoomPage />} />

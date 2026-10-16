@@ -285,7 +285,7 @@ button.link:hover:not(:disabled) { background: none; text-decoration: underline;
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
-  margin-right: auto;
+  margin-right: 0.8rem;
   font-weight: 750;
   letter-spacing: -0.02em;
   color: var(--text);
@@ -427,6 +427,15 @@ a.work-card:hover {
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
+.spaces { display: flex; gap: 0.25rem; margin-right: auto; overflow-x: auto; }
+.spaces .navlink { padding: 0.35rem 0.7rem; border-radius: 999px; font-weight: 600; color: var(--text-2); }
+.spaces .navlink:hover { text-decoration: none; }
+.spaces .navlink.active { background: var(--accent-soft); color: var(--accent-soft-text); }
+.play-top { max-width: 26rem; margin-bottom: 1.2rem; }
+.hub { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.hub-card { display: grid; gap: 0.5rem; padding: 1.4rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+.hub-card:hover { border-color: var(--accent); text-decoration: none; }
+.hub-card p { color: var(--muted); }
 .work-item { position: relative; display: grid; }
 .work-item > .work-card { height: 100%; }
 .work-delete { position: absolute; top: 0.7rem; right: 0.7rem; }

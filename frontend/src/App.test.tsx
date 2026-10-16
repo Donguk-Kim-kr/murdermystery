@@ -20,6 +20,7 @@ beforeEach(() => {
     "GET /api/library/phases": () => json([]),
     "GET /api/library/gimmicks": () => json([]),
     "GET /api/works/7/content": () => json({ phases: [], "phase-steps": [], "gimmick-uses": [], library: { phases: {}, gimmicks: {} } }),
+    "GET /api/play-works": () => json([]),
     "GET /api/works": () => json([]),
     "GET /api/private-play-works": () => json([]),
     "GET /api/rooms/me": () => json(null),
@@ -196,24 +197,22 @@ describe("작품", () => {
 
   it("작품 목록에 인원 범위와 상태를 보여 준다", async () => {
     routes["GET /api/works"] = () => json([work]);
-    renderApp();
+    renderApp("/make/games");
     expect(await screen.findByText("저택의 비밀")).toBeInTheDocument();
     for (const chip of ["추리", "개발", "비공개", "인원 1~1명"]) expect(screen.getByText(chip)).toBeInTheDocument();
   });
 
   it("작품이 없으면 안내 문구를 보여 준다", async () => {
-    renderApp();
+    renderApp("/make/games");
     expect(await screen.findByText("아직 작품이 없습니다.")).toBeInTheDocument();
   });
 
   it("작품 목록에서 확인 후 삭제하고, 서버가 거부하면 사유를 보여 준다", async () => {
     routes["GET /api/works"] = () => json([work, { ...work, 번호: 8, 제목: "방이 있는 작품" }]);
-    // 내 작품은 비공개 플레이 목록에도 내려오지만, 위 목록에 없어지면 그쪽에 따로 나타나므로 함께 지워야 한다
-    routes["GET /api/private-play-works"] = () => json([{ ...work }]);
     routes["DELETE /api/works/7"] = () => new Response(null, { status: 204 });
     routes["DELETE /api/works/8"] = () => json({ detail: "이 작품으로 만든 방이나 플레이 기록이 있어 삭제할 수 없습니다" }, 409);
     const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValue(true);
-    renderApp();
+    renderApp("/make/games");
     await userEvent.click(await screen.findByRole("button", { name: "저택의 비밀 삭제" }));
     expect(calls.filter((c) => c.key === "DELETE /api/works/7")).toHaveLength(0);                         // 취소하면 보내지 않는다
     await userEvent.click(screen.getByRole("button", { name: "저택의 비밀 삭제" }));
@@ -386,16 +385,35 @@ describe("작품", () => {
     expect(await within(panel).findByRole("alert")).toHaveTextContent("해당 아이디의 계정이 없습니다");
   });
 
-  it("남이 테스터로 지정해 준 비공개 작품을 목록 아래에 보여 준다 (내 작품은 중복 표시하지 않는다)", async () => {
-    routes["GET /api/works"] = () => json([work]);
-    routes["GET /api/private-play-works"] = () => json([
-      { 번호: 7, 제목: "저택의 비밀", 시놉시스: "", 장르: "추리", 최소인원: 1, 최대인원: 1, 예상시간: "3시간" },
-      { 번호: 8, 제목: "남의 작품", 시놉시스: "", 장르: "", 최소인원: 2, 최대인원: 4, 예상시간: "2시간" },
+  it("플레이공간 첫 화면: 입장코드 칸과, 방을 만들 수 있는 작품(공개·비공개 플레이)을 보여 준다", async () => {
+    routes["GET /api/play-works"] = () => json([
+      { 번호: 8, 제목: "공개 작품", 시놉시스: "", 장르: "추리", 최소인원: 2, 최대인원: 4, 예상시간: "2시간", 제작자: "탐정", 비공개플레이: false },
+      { 번호: 9, 제목: "테스트 작품", 시놉시스: "", 장르: "", 최소인원: 1, 최대인원: 3, 예상시간: "1시간", 제작자: "나", 비공개플레이: true },
     ]);
     renderApp();
-    expect(await screen.findByText("비공개 플레이 작품")).toBeInTheDocument();
-    expect(screen.getByText("남의 작품")).toBeInTheDocument();
-    expect(screen.getAllByText("저택의 비밀")).toHaveLength(1);
+    expect(await screen.findByRole("heading", { name: "플레이" })).toBeInTheDocument();
+    expect(screen.getByRole("form", { name: "방 입장" })).toBeInTheDocument();
+    expect(await screen.findByText("공개 작품")).toBeInTheDocument();
+    expect(screen.getByText("제작 탐정")).toBeInTheDocument();
+    expect(screen.getAllByText("비공개 플레이")).toHaveLength(1);                       // 테스트 작품에만 붙는다
+    const links = screen.getAllByRole("link", { name: "방 만들기" });
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/rooms/new/8", "/rooms/new/9"]);
+  });
+
+  it("플레이할 작품이 없으면 안내한다", async () => {
+    renderApp();
+    expect(await screen.findByText("지금 플레이할 수 있는 작품이 없습니다.")).toBeInTheDocument();
+  });
+
+  it("상단에서 플레이공간·제작공간·기록공간으로 오가고, 제작공간에는 게임 만들기와 라이브러리 만들기가 있다", async () => {
+    renderApp();
+    const nav = within(await screen.findByRole("navigation", { name: "공간" }));
+    expect(nav.getAllByRole("link").map((l) => l.textContent)).toEqual(["플레이공간", "제작공간", "기록공간"]);
+    await userEvent.click(nav.getByRole("link", { name: "제작공간" }));
+    expect(await screen.findByRole("link", { name: /게임 만들기/ })).toHaveAttribute("href", "/make/games");
+    expect(screen.getByRole("link", { name: /라이브러리 만들기/ })).toHaveAttribute("href", "/make/library");
+    await userEvent.click(nav.getByRole("link", { name: "기록공간" }));
+    expect(await screen.findByText("아직 기록이 없습니다.")).toBeInTheDocument();
   });
 
   it("서버가 거부하면 기본정보 저장 오류를 보여 준다", async () => {
@@ -556,7 +574,7 @@ describe("방", () => {
     };
     renderApp("/room");
     await userEvent.click(await screen.findByRole("button", { name: "방 닫기" }));
-    expect(await screen.findByRole("heading", { name: "내 작품" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "플레이" })).toBeInTheDocument();     // 방을 닫으면 플레이공간으로
     expect(calls.map((c) => c.key)).toContain("POST /api/rooms/leave");
   });
 
@@ -583,12 +601,4 @@ describe("방", () => {
     expect(await screen.findByRole("link", { name: "내 방" })).toHaveTextContent("K7M2QX");
   });
 
-  it("테스터로 지정된 작품 카드에서 비공개 플레이 방을 만들 수 있다", async () => {
-    routes["GET /api/private-play-works"] = () => json([
-      { 번호: 8, 제목: "남의 작품", 시놉시스: "", 장르: "", 최소인원: 2, 최대인원: 4, 예상시간: "2시간" },
-    ]);
-    renderApp();
-    const link = await screen.findByRole("link", { name: "비공개 플레이 방 만들기" });
-    expect(link).toHaveAttribute("href", "/rooms/new/8");
-  });
 });

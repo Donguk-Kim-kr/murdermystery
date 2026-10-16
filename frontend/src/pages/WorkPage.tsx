@@ -81,7 +81,7 @@ export function WorkPage() {
 
   return (
     <main className="page">
-      <Link to="/" className="back">← 내 작품</Link>
+      <Link to="/make/games" className="back">← 내 작품</Link>
       <div className="work-title">
         <h1>{work.제목}</h1>
         <span className={work.공개여부 ? "chip success" : "chip"}>{work.공개여부 ? "공개" : "비공개"}</span>

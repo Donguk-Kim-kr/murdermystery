@@ -21,7 +21,7 @@ export function WorkNewPage() {
 
   return (
     <main className="page narrow">
-      <Link to="/" className="back">← 내 작품</Link>
+      <Link to="/make/games" className="back">← 내 작품</Link>
       <form onSubmit={onSubmit} className="card">
         <h1>새 작품</h1>
         <label>

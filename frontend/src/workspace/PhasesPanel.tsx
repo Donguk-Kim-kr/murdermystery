@@ -174,7 +174,7 @@ function PhasesBody({ workId, ws, phaseItems, gimmickItems }: {
       <p className="muted">
         왼쪽에서 오른쪽으로 게임이 진행됩니다. 아래 카드 상자의 카드를 끌어 페이즈 위에 놓으면 붙고,
         페이즈 사이 틈에 놓으면 새 페이즈로 끼워 넣어집니다. 페이즈를 누르면 아래에서 편집합니다.
-        카드와 기믹은 <Link to="/library">라이브러리</Link>에서 만듭니다.
+        카드와 기믹은 <Link to="/make/library">라이브러리</Link>에서 만듭니다.
       </p>
       <Palette phaseItems={phaseItems} gimmickItems={gimmickItems} dnd={dnd} />
       {empty && <p className="muted">아직 페이즈가 없습니다. 카드를 아래 칸에 놓거나 "페이즈 추가"로 시작하세요.</p>}

@@ -3,13 +3,12 @@ import { Link } from "react-router-dom";
 
 import { api, errorMessage, http } from "../api/client";
 import type { components } from "../api/schema";
+import { SPACES } from "../spaces";
 
 type Work = components["schemas"]["WorkOut"];
-type PrivatePlayWork = components["schemas"]["PrivatePlayWorkOut"];
 
 export function WorksListPage() {
   const [works, setWorks] = useState<Work[] | null>(null);
-  const [privateWorks, setPrivateWorks] = useState<PrivatePlayWork[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -18,9 +17,6 @@ export function WorksListPage() {
       if (cancelled) return;
       if (data) setWorks(data);
       else setError(errorMessage(error, "작품 목록을 불러오지 못했습니다"));
-    });
-    api.GET("/api/private-play-works").then(({ data }) => {
-      if (!cancelled && data) setPrivateWorks(data);
     });
     return () => {
       cancelled = true;
@@ -34,22 +30,15 @@ export function WorksListPage() {
     if (res.error) setError(errorMessage(res.error, "삭제하지 못했습니다"));
     else {
       setWorks((list) => (list ?? []).filter((x) => x.번호 !== w.번호));
-      setPrivateWorks((list) => list.filter((x) => x.번호 !== w.번호));   // 내 작품은 비공개 플레이 목록에도 있으므로 함께 뺀다
     }
   }
 
-  // 내가 제작자인 작품은 위 목록에 있으므로, 남이 테스터로 지정해 준 작품만 따로 보여 준다.
-  const mine = new Set((works ?? []).map((w) => w.번호));
-  const others = privateWorks.filter((w) => !mine.has(w.번호));
-
   return (
     <main className="page">
+      <Link to="/make" className="back">← {SPACES.make}</Link>
       <div className="page-head">
         <h1>내 작품</h1>
-        <div className="row start">
-          <Link to="/rooms/join" className="button secondary">방 입장</Link>
-          <Link to="/works/new" className="button">새 작품</Link>
-        </div>
+        <Link to="/works/new" className="button">새 작품</Link>
       </div>
       {error && <p role="alert" className="error">{error}</p>}
       {works === null && !error && <p className="muted">불러오는 중…</p>}
@@ -80,27 +69,6 @@ export function WorksListPage() {
             </div>
           ))}
         </div>
-      )}
-      {others.length > 0 && (
-        <>
-          <h2>비공개 플레이 작품</h2>
-          <div className="work-grid">
-            {others.map((w) => (
-              <div key={w.번호} className="work-card">
-                <h3>{w.제목}</h3>
-                <p className="synopsis">{w.시놉시스 || "시놉시스가 아직 없습니다."}</p>
-                <div className="work-meta">
-                  <span className="chip accent">테스터</span>
-                  <span className="chip">{w.장르 || "장르 미정"}</span>
-                  <span className="chip">인원 {w.최소인원}~{w.최대인원}명</span>
-                </div>
-                <Link to={`/rooms/new/${w.번호}`} state={{ title: w.제목 }} className="button small">
-                  비공개 플레이 방 만들기
-                </Link>
-              </div>
-            ))}
-          </div>
-        </>
       )}
     </main>
   );

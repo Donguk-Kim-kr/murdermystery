@@ -471,7 +471,7 @@ describe("라이브러리", () => {
   });
 
   it("계열별로 묶어 버전과 변경내역을 보여 준다", async () => {
-    renderApp("/library");
+    renderApp("/make/library");
     const lineage = await screen.findByRole("listitem", { name: "진행단계 나만의 조사" });
     expect(within(lineage).getByText("v2")).toBeInTheDocument();
     expect(within(lineage).getByText("변경: 시간 연장")).toBeInTheDocument();
@@ -480,7 +480,7 @@ describe("라이브러리", () => {
 
   it("일반 사용자에게는 공통 항목 버튼이 없고 이름 변경은 계열 전체로 보낸다", async () => {
     routes["PATCH /api/library/phases/2"] = () => json(item({ 이름: "새 이름" }));
-    renderApp("/library");
+    renderApp("/make/library");
     const lineage = await screen.findByRole("listitem", { name: "진행단계 나만의 조사" });
     expect(screen.queryByLabelText(/공통 항목으로 만들기/)).not.toBeInTheDocument();
     // 공통 항목은 변경 버튼이 없다
@@ -496,7 +496,7 @@ describe("라이브러리", () => {
 
   it("만들기: 같은 이름이면 새 버전, 내용은 JSON 으로 보낸다", async () => {
     routes["POST /api/library/phases"] = () => json(item({ 버전: 3 }), 201);
-    renderApp("/library");
+    renderApp("/make/library");
     const form = await screen.findByRole("form", { name: "진행단계 만들기" });
     await userEvent.type(within(form).getByLabelText("이름"), "나만의 조사");
     const rule = within(form).getByLabelText("규칙 (JSON)");
@@ -511,7 +511,7 @@ describe("라이브러리", () => {
 
   it("운영자에게는 '공통 항목으로 만들기' 선택이 보인다", async () => {
     routes["GET /api/auth/me"] = () => json({ ...account, 권한: "운영자" });
-    renderApp("/library");
+    renderApp("/make/library");
     expect((await screen.findAllByLabelText(/공통 항목으로 만들기/)).length).toBeGreaterThan(0);
   });
 });

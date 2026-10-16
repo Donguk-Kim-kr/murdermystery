@@ -25,7 +25,7 @@ const KINDS = [
 export function LibraryPage() {
   return (
     <main className="page">
-      <Link to="/" className="back">← 내 작품</Link>
+      <Link to="/make" className="back">← 제작공간</Link>
       <h1>라이브러리</h1>
       <p className="muted">
         진행단계와 기믹은 여기서 한 번 만들어 두고 여러 작품의 페이즈에 붙여 씁니다. 만든 내용은 고치지 않고,
