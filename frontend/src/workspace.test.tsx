@@ -515,6 +515,60 @@ describe("개요·인물 탭", () => {
   });
 });
 
+describe("작품 제목 바로 고치기", () => {
+  beforeEach(() => {
+    routes["GET /api/library/phases"] = () => json([]);
+    routes["GET /api/library/gimmicks"] = () => json([]);
+    routes["GET /api/works/7/content/votes"] = () => json([]);
+  });
+
+  it("머리글의 제목을 고치고 Enter 를 누르면 저장한다", async () => {
+    routes["PATCH /api/works/7"] = () => json({ ...work, 제목: "새 제목" });
+    renderApp("/works/7");
+    const title = await screen.findByRole("textbox", { name: "작품 제목" });
+    expect(title).toHaveValue("저택의 비밀");
+    await userEvent.clear(title);
+    await userEvent.type(title, "새 제목{Enter}");
+    await waitFor(() => expect(sent("PATCH /api/works/7")).toHaveLength(1));
+    expect(await sent("PATCH /api/works/7")[0].req.json()).toEqual({ 제목: "새 제목" });
+  });
+
+  it("다른 곳을 눌러 포커스가 벗어나도 저장하고, 바뀌지 않았으면 보내지 않는다", async () => {
+    routes["PATCH /api/works/7"] = () => json({ ...work, 제목: "바뀐 제목" });
+    renderApp("/works/7");
+    const title = await screen.findByRole("textbox", { name: "작품 제목" });
+    await userEvent.click(title);
+    await userEvent.tab();                                                   // 그대로 벗어남
+    expect(sent("PATCH /api/works/7")).toHaveLength(0);
+    await userEvent.clear(title);
+    await userEvent.type(title, "바뀐 제목");
+    await userEvent.tab();
+    await waitFor(() => expect(sent("PATCH /api/works/7")).toHaveLength(1));
+  });
+
+  it("Esc 는 취소하고, 비운 채로는 저장하지 않고 이전 제목으로 되돌린다", async () => {
+    renderApp("/works/7");
+    const title = await screen.findByRole("textbox", { name: "작품 제목" });
+    await userEvent.clear(title);
+    await userEvent.type(title, "취소할 제목{Escape}");
+    expect(title).toHaveValue("저택의 비밀");
+    await userEvent.clear(title);
+    await userEvent.tab();
+    expect(title).toHaveValue("저택의 비밀");
+    expect(sent("PATCH /api/works/7")).toHaveLength(0);
+  });
+
+  it("서버가 거부하면 사유를 보여 주고 이전 제목으로 되돌린다", async () => {
+    routes["PATCH /api/works/7"] = () => json({ detail: "제목을 저장하지 못했습니다" }, 409);
+    renderApp("/works/7");
+    const title = await screen.findByRole("textbox", { name: "작품 제목" });
+    await userEvent.clear(title);
+    await userEvent.type(title, "안 되는 제목{Enter}");
+    expect(await screen.findByRole("alert")).toHaveTextContent("제목을 저장하지 못했습니다");
+    expect(title).toHaveValue("저택의 비밀");
+  });
+});
+
 describe("라이브러리", () => {
   const item = (o: Record<string, unknown>) => ({
     번호: 1, 이름: "나만의 조사", 버전: 1, 설명: "d", 변경내역: null, 삭제일시: null, 공개여부: false, 공통: false, 규칙: {}, ...o,

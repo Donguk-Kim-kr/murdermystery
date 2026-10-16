@@ -229,28 +229,22 @@ describe("작품", () => {
     expect(screen.getByText("방이 있는 작품")).toBeInTheDocument();             // 목록에 그대로 남는다
   });
 
-  it("새 작품을 만들면 그 작품 화면으로 이동한다", async () => {
-    routes["POST /api/works"] = () => json(work, 201);
-    routes["GET /api/works/7"] = () => json(work);
-    routes["GET /api/works/7/characters"] = () => json([]);
-    renderApp("/works/new");
-    await userEvent.type(await screen.findByLabelText("제목"), "저택의 비밀");
-    await userEvent.click(screen.getByRole("button", { name: "만들기" }));
-    expect(await screen.findByRole("tab", { name: "흐름", selected: true })).toBeInTheDocument();   // 게임 흐름이 기본 탭
-    expect(calls.find((c) => c.key === "POST /api/works")).toBeDefined();
-    expect(await calls.find((c) => c.key === "POST /api/works")!.req.json()).toEqual({ 제목: "저택의 비밀" });
-  });
-
-  it("제목을 비워도 작품을 만들 수 있다(입력칸은 필수가 아니다)", async () => {
+  it("새 작품을 누르면 입력을 받지 않고 바로 만들어 그 작품 화면(흐름)으로 이동한다", async () => {
     routes["POST /api/works"] = () => json({ ...work, 제목: "제목없음" }, 201);
     routes["GET /api/works/7"] = () => json(work);
     routes["GET /api/works/7/characters"] = () => json([]);
-    renderApp("/works/new");
-    const title = await screen.findByLabelText("제목");
-    expect(title).not.toBeRequired();
-    await userEvent.click(screen.getByRole("button", { name: "만들기" }));
+    renderApp("/make/games");
+    await userEvent.click(await screen.findByRole("button", { name: "새 작품" }));
     expect(await screen.findByRole("tab", { name: "흐름", selected: true })).toBeInTheDocument();
-    expect(await calls.find((c) => c.key === "POST /api/works")!.req.json()).toEqual({ 제목: "" });
+    expect(await calls.find((c) => c.key === "POST /api/works")!.req.json()).toEqual({});     // 제목을 미리 받지 않는다
+    expect(screen.queryByLabelText("제목")).not.toBeInTheDocument();
+  });
+
+  it("작품을 만들지 못하면 사유를 보여 주고 화면에 머문다", async () => {
+    routes["POST /api/works"] = () => json({ detail: "작품을 만들지 못했습니다" }, 500);
+    renderApp("/make/games");
+    await userEvent.click(await screen.findByRole("button", { name: "새 작품" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("작품을 만들지 못했습니다");
   });
 
   it("인물을 추가하면 목록과 최대 인원이 갱신된다", async () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { api, errorMessage, http } from "../api/client";
@@ -96,7 +96,7 @@ export function WorkPage() {
     <main className="page">
       <Link to="/make/games" className="back">← 내 작품</Link>
       <div className="work-title">
-        <h1>{work.제목}</h1>
+        <TitleEditor work={work} onSaved={load} />
         <span className={work.공개여부 ? "chip success" : "chip"}>{work.공개여부 ? "공개" : "비공개"}</span>
       </div>
       <nav className="tabs" role="tablist" aria-label="작업공간">
@@ -184,8 +184,55 @@ export function WorkPage() {
   );
 }
 
+/**
+ * 작품 제목: 머리글을 눌러 바로 고친다. Enter 나 다른 곳을 누르면 저장하고, Esc 는 취소한다.
+ * 비운 채로 저장하지는 않는다(제목 칸은 비울 수 없다) — 이전 제목으로 되돌린다.
+ */
+function TitleEditor({ work, onSaved }: { work: Work; onSaved: () => Promise<void> }) {
+  const [value, setValue] = useState(work.제목);
+  const [error, setError] = useState<string | null>(null);
+  const cancelled = useRef(false);   // Esc 로 취소했으면 이어지는 blur 에서 저장하지 않는다
+  useEffect(() => setValue(work.제목), [work.제목]);   // 다른 곳(정리 탭의 기본정보)에서 바뀌면 따라간다
+
+  async function save() {
+    if (cancelled.current) {
+      cancelled.current = false;
+      setValue(work.제목);
+      return;
+    }
+    const next = value.trim();
+    if (next === "" || next === work.제목) {
+      setValue(work.제목);
+      return;
+    }
+    setError(null);
+    const { error } = await api.PATCH("/api/works/{work_id}", { params: { path: { work_id: work.번호 } }, body: { 제목: next } });
+    if (error) {
+      setError(errorMessage(error, "제목을 저장하지 못했습니다"));
+      setValue(work.제목);
+    } else await onSaved();
+  }
+
+  function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") e.currentTarget.blur();          // 저장은 blur 에서 한 번만 한다
+    if (e.key === "Escape") {
+      cancelled.current = true;
+      e.currentTarget.blur();
+    }
+  }
+
+  return (
+    <h1 className="title-edit">
+      <input aria-label="작품 제목" value={value} maxLength={100} size={Math.max(value.length, 4)}
+        onChange={(e) => setValue(e.target.value)} onBlur={() => void save()} onKeyDown={onKeyDown} />
+      {error && <span role="alert" className="error title-error">{error}</span>}
+    </h1>
+  );
+}
+
 function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<void> }) {
   const [title, setTitle] = useState(work.제목);
+  useEffect(() => setTitle(work.제목), [work.제목]);   // 머리글에서 제목을 고치면 이 양식도 따라간다
   const [synopsis, setSynopsis] = useState(work.시놉시스);
   const [genre, setGenre] = useState(work.장르);
   const [time, setTime] = useState(work.예상시간);

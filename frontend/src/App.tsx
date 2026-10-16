@@ -10,7 +10,6 @@ import { MakeHubPage } from "./pages/MakeHubPage";
 import { PlayHomePage } from "./pages/PlayHomePage";
 import { RecordsPage } from "./pages/RecordsPage";
 import { RoomPage } from "./pages/RoomPage";
-import { WorkNewPage } from "./pages/WorkNewPage";
 import { WorkPage } from "./pages/WorkPage";
 import { WorksListPage } from "./pages/WorksListPage";
 
@@ -26,7 +25,6 @@ export function App() {
         <Route path="/make/games" element={<WorksListPage />} />
         <Route path="/make/library" element={<LibraryPage />} />
         <Route path="/records" element={<RecordsPage />} />
-        <Route path="/works/new" element={<WorkNewPage />} />
         <Route path="/works/:id" element={<WorkPage />} />
         <Route path="/library" element={<Navigate to="/make/library" replace />} />
         <Route path="/rooms/join" element={<JoinRoomPage />} />

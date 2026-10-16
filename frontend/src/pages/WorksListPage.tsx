@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { api, errorMessage, http } from "../api/client";
 import type { components } from "../api/schema";
@@ -10,6 +10,8 @@ type Work = components["schemas"]["WorkOut"];
 export function WorksListPage() {
   const [works, setWorks] = useState<Work[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
@@ -22,6 +24,16 @@ export function WorksListPage() {
       cancelled = true;
     };
   }, []);
+
+  /** 입력을 미리 받지 않고 바로 만든다. 제목은 "제목없음"으로 시작하고 나중에 고친다. */
+  async function create() {
+    setCreating(true);
+    setError(null);
+    const { data, error } = await api.POST("/api/works", { body: {} });
+    setCreating(false);
+    if (data) navigate(`/works/${data.번호}`);
+    else setError(errorMessage(error, "작품을 만들지 못했습니다"));
+  }
 
   async function remove(w: Work) {
     if (!window.confirm(`'${w.제목}' 작품을 삭제할까요?\n인물·장소·단서·흐름 등 만들어 둔 내용이 모두 지워지고 되돌릴 수 없습니다.`)) return;
@@ -38,7 +50,7 @@ export function WorksListPage() {
       <Link to="/make" className="back">← {SPACES.make}</Link>
       <div className="page-head">
         <h1>내 작품</h1>
-        <Link to="/works/new" className="button">새 작품</Link>
+        <button type="button" onClick={() => void create()} disabled={creating}>새 작품</button>
       </div>
       {error && <p role="alert" className="error">{error}</p>}
       {works === null && !error && <p className="muted">불러오는 중…</p>}
@@ -46,7 +58,7 @@ export function WorksListPage() {
         <div className="empty">
           <strong>아직 작품이 없습니다.</strong>
           <p>첫 작품을 만들어 시나리오를 쓰기 시작하세요.</p>
-          <Link to="/works/new" className="button">새 작품 만들기</Link>
+          <button type="button" onClick={() => void create()} disabled={creating}>새 작품 만들기</button>
         </div>
       )}
       {works && works.length > 0 && (
