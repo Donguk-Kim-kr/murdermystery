@@ -120,7 +120,7 @@ class TestOrderChecksAndUniqueness(Builders):
             if table == "사건":
                 return dict(작품_번호=w, 순서=n)
             if table == "엔딩분기":
-                return dict(작품_번호=w, 순서=n, 조건={}, 내용="a")
+                return dict(작품_번호=w, 순서=n, 이름="a", 조건={}, 내용="a")
             if table == "후일담":
                 return dict(작품_번호=w, 순서=n, 내용="a")
             if table == "타임라인":

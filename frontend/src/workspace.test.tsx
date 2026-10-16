@@ -41,8 +41,8 @@ const schema = {
     { key: "gimmick-uses", label: "페이즈에 붙은 기믹", key_col: "순서", title_fields: [], group_by: "진행순서_순서", help: null, fields: [
       field("기믹_번호", "libref", { ref: "gimmicks", required: true }), field("진행순서_순서", "ref", { ref: "phases", required: true }),
     ] },
-    { key: "endings", label: "엔딩 분기", key_col: "순서", title_fields: ["내용"], group_by: null, help: null, fields: [
-      field("조건", "json", { required: true, default: {} }), field("내용", "long", { required: true }),
+    { key: "endings", label: "엔딩 분기", key_col: "순서", title_fields: ["이름", "내용"], group_by: null, help: null, fields: [
+      field("이름", "text", { required: true }), field("조건", "json", { required: true, default: {} }), field("내용", "long", { required: true }),
     ] },
   ],
   external: [{ key: "characters", label: "인물", key_col: "순서", title_fields: ["이름"], external: true }],

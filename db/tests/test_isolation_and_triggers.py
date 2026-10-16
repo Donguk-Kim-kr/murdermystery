@@ -30,7 +30,7 @@ class Scenario(Builders):
         self.ins("조합재료", 작품_번호=w, 결과_조합_순서=2, 조합_순서=1)
         self.incident(w, 1, 설명="살인")
         self.ins("사건설명", 작품_번호=w, 사건_순서=1, 인물_순서=2, 상태="사망")
-        self.ins("엔딩분기", 작품_번호=w, 순서=1, 조건={}, 내용="엔딩")
+        self.ins("엔딩분기", 작품_번호=w, 순서=1, 이름="엔딩", 조건={}, 내용="엔딩")
         self.ins("후일담", 작품_번호=w, 순서=1, 인물_순서=1, 내용="후일담")
         self.ins("타임라인", 작품_번호=w, 순서=1, 설명="진상")
         self.ins("자료", 작품_번호=w, 순서=1, 제목="프롤로그 이후", 내용="기믹이 보여 줄 글")
@@ -302,7 +302,7 @@ class TestJsonbColumnsAreFreeForm(Scenario):
         if table == "미디어":
             return f'INSERT INTO "미디어"("작품_번호","순서","유형","경로","조건") VALUES ({w},1,\'이미지\',\'p\',{value_sql})'
         if table == "엔딩분기":
-            return f'INSERT INTO "엔딩분기"("작품_번호","순서","조건","내용") VALUES ({w},1,{value_sql},\'x\')'
+            return f'INSERT INTO "엔딩분기"("작품_번호","순서","이름","조건","내용") VALUES ({w},1,\'n\',{value_sql},\'x\')'
         if table == "후일담":
             return f'INSERT INTO "후일담"("작품_번호","순서","내용","조건") VALUES ({w},1,\'x\',{value_sql})'
         if table == "진행단계":

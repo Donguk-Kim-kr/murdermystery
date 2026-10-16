@@ -60,7 +60,8 @@ def test_required_fields_and_types_are_validated(client, headers):
         ("testimonies", {"화자": "집사"}),               # 내용 필수
         ("phases", {"진행시간": -5}),
         ("phases", {"진행시간": "많이"}),
-        ("endings", {"조건": [1], "내용": "x"}),         # JSON 객체여야 함
+        ("endings", {"이름": "엔딩", "조건": [1], "내용": "x"}),  # JSON 객체여야 함
+        ("endings", {"내용": "x"}),                      # 이름 필수
         ("clues", {"이름": "a", "없는칸": 1}),           # 알 수 없는 칸
         ("timelines", {"설명": "a", "시작시간": "어제"}),
     ):
@@ -72,7 +73,7 @@ def test_required_fields_and_types_are_validated(client, headers):
 def test_defaults_apply_when_a_field_is_omitted(client, headers):
     w = work(client, headers)
     assert add(client, headers, w, "phases")["진행시간"] == 30
-    ending = add(client, headers, w, "endings", 내용="범인이 잡혔다")
+    ending = add(client, headers, w, "endings", 이름="검거 엔딩", 내용="범인이 잡혔다")
     assert ending["조건"] == {}
 
 
