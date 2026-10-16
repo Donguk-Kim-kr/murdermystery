@@ -217,49 +217,92 @@ describe("진행 탭", () => {
       ];
     });
 
-    it("같은 카드가 둘 이상이면 서버가 정한 1차·2차 이름으로 보여 준다", async () => {
+    const editor = () => within(screen.getByRole("region", { name: "페이즈 편집" }));
+    const openPhase = async (n: number) => userEvent.click(await screen.findByRole("button", { name: `페이즈 ${n} 편집` }));
+
+    it("흐름의 카드는 이름만 압축해 보여 주고, 같은 카드가 둘 이상이면 서버가 정한 1차·2차 이름을 쓴다", async () => {
       renderApp("/works/7?tab=phases");
-      expect(await screen.findByText("1차 조사 v2")).toBeInTheDocument();
-      expect(screen.getByText("2차 조사 v2")).toHaveTextContent("설정 있음");
+      const second = await screen.findByRole("listitem", { name: "페이즈 2" });
+      expect(within(second).getByText(/2차 조사/)).toBeInTheDocument();
+      expect(within(second).getByLabelText("세부 설정 있음")).toBeInTheDocument();
+      expect(within(second).queryByLabelText("페이즈 이름")).not.toBeInTheDocument();      // 입력칸은 편집 패널에만
+      expect(editor().getByText("1차 조사 v2")).toBeInTheDocument();                        // 처음에는 첫 페이즈가 열려 있다
+    });
+
+    it("페이즈를 누르면 그 페이즈가 편집 패널에 열린다", async () => {
+      renderApp("/works/7?tab=phases");
+      expect(await screen.findByRole("heading", { name: "1번째 페이즈 편집" })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("listitem", { name: "페이즈 2" }));
+      expect(screen.getByRole("heading", { name: "2번째 페이즈 편집" })).toBeInTheDocument();
+      expect(editor().getByText("2차 조사 v2")).toBeInTheDocument();
     });
 
     it("앞으로·뒤로·끼워 넣기는 위치(1부터)로 서버에 요청한다", async () => {
       routes["POST /api/works/7/phases/2/move"] = () => json({ phases: bundle.phases });
       routes["POST /api/works/7/phases/insert"] = () => json({ phases: bundle.phases }, 201);
       renderApp("/works/7?tab=phases");
+      await openPhase(2);
       await userEvent.click(await screen.findByRole("button", { name: "페이즈 2 앞으로" }));
       expect(await sent("POST /api/works/7/phases/2/move")[0].req.json()).toEqual({ position: 1 });
-      expect(screen.getByRole("button", { name: "페이즈 1 앞으로" })).toBeDisabled();
       expect(screen.getByRole("button", { name: "페이즈 2 뒤로" })).toBeDisabled();
-      await userEvent.type(screen.getAllByLabelText("페이즈 이름").at(-1)!, "밀담");
-      await userEvent.selectOptions(screen.getByLabelText("넣을 위치"), "2");
-      await userEvent.click(screen.getByRole("button", { name: "페이즈 추가" }));
+      const form = within(screen.getByRole("form", { name: "페이즈 추가" }));
+      await userEvent.type(form.getByLabelText("페이즈 이름"), "밀담");
+      await userEvent.selectOptions(form.getByLabelText("넣을 위치"), "2");
+      await userEvent.click(form.getByRole("button", { name: "페이즈 추가" }));
       expect(await sent("POST /api/works/7/phases/insert")[0].req.json()).toEqual({ position: 2, 이름: "밀담", 진행시간: 30 });
     });
 
-    it("옮겨서 서버 값이 바뀌면 입력칸도 새 값으로 바뀐다", async () => {
+    it("옮겨서 서버 값이 바뀌면 편집 패널의 입력칸도 새 값으로 바뀐다", async () => {
       routes["POST /api/works/7/phases/2/move"] = () => {
         bundle.phases = [{ 순서: 1, 이름: null, 진행시간: 20 }, { 순서: 2, 이름: "도입", 진행시간: 10 }];
         return json({ phases: bundle.phases });
       };
       renderApp("/works/7?tab=phases");
+      await openPhase(2);
       await userEvent.click(await screen.findByRole("button", { name: "페이즈 2 앞으로" }));
-      const first = await screen.findByRole("listitem", { name: "페이즈 1" });
-      await waitFor(() => expect(within(first).getByLabelText("진행 시간(분)")).toHaveValue(20));
-      expect(within(screen.getByRole("listitem", { name: "페이즈 2" })).getByLabelText("페이즈 이름")).toHaveValue("도입");
+      await waitFor(() => expect(editor().getByLabelText("진행 시간(분)")).toHaveValue(10));
+      expect(editor().getByLabelText("페이즈 이름")).toHaveValue("도입");
     });
 
     it("페이즈 삭제와 이름·시간 저장", async () => {
-      routes["DELETE /api/works/7/phases/1"] = () => json({ phases: [] });
+      routes["DELETE /api/works/7/phases/2"] = () => json({ phases: [] });
       routes["PATCH /api/works/7/content/phases/2"] = () => json({});
       vi.spyOn(window, "confirm").mockReturnValue(true);
       renderApp("/works/7?tab=phases");
-      const second = (await screen.findByRole("listitem", { name: "페이즈 2" }));
-      await userEvent.type(within(second).getByLabelText("페이즈 이름"), "토론");
-      await userEvent.click(within(second).getByRole("button", { name: "이름·시간 저장" }));
+      await openPhase(2);
+      await userEvent.type(editor().getByLabelText("페이즈 이름"), "토론");
+      await userEvent.click(editor().getByRole("button", { name: "이름·시간 저장" }));
       expect(await sent("PATCH /api/works/7/content/phases/2")[0].req.json()).toEqual({ 이름: "토론", 진행시간: 20 });
-      await userEvent.click(screen.getByRole("button", { name: "페이즈 1 삭제" }));
-      await waitFor(() => expect(sent("DELETE /api/works/7/phases/1")).toHaveLength(1));
+      await userEvent.click(screen.getByRole("button", { name: "페이즈 2 삭제" }));
+      await waitFor(() => expect(sent("DELETE /api/works/7/phases/2")).toHaveLength(1));
+    });
+
+    it("세로로 보기는 읽기 전용 팝업으로 흐름을 위에서 아래로 보여 주고 닫을 수 있다", async () => {
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("button", { name: "세로로 보기" }));
+      const dialog = within(screen.getByRole("dialog", { name: "세로로 보기" }));
+      expect(dialog.getByText("1. 도입")).toBeInTheDocument();
+      expect(dialog.getByText("2. 2차 조사")).toBeInTheDocument();     // 이름이 없으면 안의 카드 이름
+      expect(dialog.getByText(/총 30분/)).toBeInTheDocument();
+      expect(dialog.queryByRole("textbox")).not.toBeInTheDocument();    // 편집 칸 없음
+      await userEvent.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("붙은 카드를 설정째로 다른 페이즈에 복사한다(같은 진행단계가 이미 있는 페이즈는 뺀다)", async () => {
+      routes["POST /api/works/7/content/phase-steps"] = () => json({ 번호: 11 }, 201);
+      bundle.phases = [{ 순서: 1, 이름: "도입", 진행시간: 10 }, { 순서: 2, 이름: null, 진행시간: 20 }, { 순서: 3, 이름: "결말", 진행시간: 5 }];
+      renderApp("/works/7?tab=phases");
+      await openPhase(2);
+      await userEvent.click(editor().getByRole("button", { name: "2차 조사 복사" }));
+      const box = within(screen.getByRole("group", { name: "복사" }));
+      const options = box.getAllByRole("option").map((o) => o.textContent);
+      expect(options).toEqual(["고르기…", "3. 결말"]);   // 1번째에는 이미 같은 카드가 있고, 자기 자신도 뺀다
+      await userEvent.selectOptions(box.getByRole("combobox"), "3");
+      await userEvent.click(box.getByRole("button", { name: "복사" }));
+      expect(await sent("POST /api/works/7/content/phase-steps")[0].req.json()).toEqual({
+        진행순서_순서: 3, 진행단계_번호: 5, 설정: { 탭유지: false, 횟수: 3 },
+      });
     });
 
     it("카드 설정: 탭을 남기지 않기를 고르면 설정에 담고, 기본값이면 비운다", async () => {
@@ -273,6 +316,7 @@ describe("진행 탭", () => {
       await userEvent.click(box.getByRole("button", { name: "설정 저장" }));
       expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: { 탭유지: false } });
 
+      await openPhase(2);
       await userEvent.click(await screen.findByRole("button", { name: "2차 조사 설정" }));
       const second = within(screen.getByRole("group", { name: "세부 설정" }));
       expect(second.getByLabelText(/다음 페이즈에도 남기기/)).not.toBeChecked();
