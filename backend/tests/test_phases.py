@@ -170,3 +170,51 @@ def test_snapshot_carries_names_settings_and_display_names(client, headers, test
     cards = {(c["진행순서_순서"], c["진행단계_번호"]): c for c in snap["진행구성"]}
     assert cards[(1, ids["A"])]["표시이름"] == "1차 카드A" and cards[(3, ids["A"])]["표시이름"] == "2차 카드A"
     assert cards[(3, ids["A"])]["설정"] == {"탭유지": False} and cards[(2, ids["B"])]["표시이름"] == "카드B"
+
+
+def bundle(client, headers, w):
+    return client.get(f"/api/works/{w}/content", headers=headers).json()
+
+
+def test_phase_name_follows_its_cards_unless_the_author_names_it(client, headers):
+    w = work(client, headers)
+    inv, talk = library_phase(client, headers, "조사"), library_phase(client, headers, "밀담")
+    add(client, headers, w, "phases")
+    add(client, headers, w, "phases", 이름="자유 시간")
+    assert [p["표시이름"] for p in bundle(client, headers, w)["phases"]] == [None, "자유 시간"]       # 카드가 없으면 이름 없음
+    add(client, headers, w, "phase-steps", 진행순서_순서=1, 진행단계_번호=inv)
+    assert bundle(client, headers, w)["phases"][0]["표시이름"] == "조사"
+    add(client, headers, w, "phase-steps", 진행순서_순서=1, 진행단계_번호=talk)
+    first = bundle(client, headers, w)["phases"][0]
+    assert first["이름"] is None and first["표시이름"] == "조사·밀담"                                    # 따라가는 이름은 저장하지 않는다
+    add(client, headers, w, "phase-steps", 진행순서_순서=2, 진행단계_번호=inv)
+    assert bundle(client, headers, w)["phases"][1]["표시이름"] == "자유 시간"                            # 정한 이름이 우선
+
+
+def test_clearing_the_name_makes_the_phase_follow_its_cards_again(client, headers):
+    w = work(client, headers)
+    inv = library_phase(client, headers, "조사")
+    add(client, headers, w, "phases", 이름="내 이름")
+    add(client, headers, w, "phase-steps", 진행순서_순서=1, 진행단계_번호=inv)
+    assert bundle(client, headers, w)["phases"][0]["표시이름"] == "내 이름"
+    assert client.patch(url(w, "phases", 1), headers=headers, json={"이름": None}).status_code == 200
+    assert bundle(client, headers, w)["phases"][0]["표시이름"] == "조사"
+    client.patch(url(w, "phases", 1), headers=headers, json={"이름": "   "})                           # 공백뿐이어도 따라간다
+    assert bundle(client, headers, w)["phases"][0]["표시이름"] == "조사"
+
+
+def test_snapshot_carries_phase_display_names(client, headers, test_dbname):
+    w, ids = setup(client, headers)
+    add(client, headers, w, "phase-steps", 진행순서_순서=2, 진행단계_번호=ids["A"])
+    client.post(f"/api/works/{w}/characters", headers=headers, json={"이름": "A"})
+    assert client.post(f"/api/works/{w}/confirm", headers=headers, json={}).status_code == 201
+    with psycopg.connect(dbname=test_dbname) as conn:
+        snap = conn.execute('SELECT "시나리오" FROM "버전" WHERE "작품_번호" = %s', (w,)).fetchone()[0]
+    assert [(p["이름"], p["표시이름"]) for p in snap["진행순서"]] == [("도입", "도입"), ("조사", "조사"), ("결말", "결말")]
+    p2 = add(client, headers, w, "phases")["순서"]                                                  # 이름 없는 페이즈는 카드 이름을 따라간다
+    add(client, headers, w, "phase-steps", 진행순서_순서=p2, 진행단계_번호=ids["A"])
+    add(client, headers, w, "phase-steps", 진행순서_순서=p2, 진행단계_번호=ids["B"])
+    client.post(f"/api/works/{w}/confirm", headers=headers, json={})
+    with psycopg.connect(dbname=test_dbname) as conn:
+        snap = conn.execute('SELECT "시나리오" FROM "버전" WHERE "작품_번호" = %s ORDER BY "번호" DESC LIMIT 1', (w,)).fetchone()[0]
+    assert snap["진행순서"][-1]["이름"] is None and snap["진행순서"][-1]["표시이름"] == "3차 카드A·2차 카드B"   # 같은 카드가 여럿이면 1차·2차 이름을 그대로 잇는다

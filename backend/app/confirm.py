@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 
 from .auth import CurrentUser
 from .characters import COLUMNS as CHARACTER_COLUMNS
-from .content import RESOURCES, Resource, card_display_names, columns, ensure_mine, key_col
+from .content import RESOURCES, Resource, card_display_names, columns, ensure_mine, key_col, phase_display_names
 from .db import Conn
 from .works import lock_work
 
@@ -148,6 +148,9 @@ def build_snapshot(conn: Connection, work_id: int) -> dict[str, Any]:
             shown = card_display_names([{**r, "번호": i} for i, r in enumerate(rows)], names)
             rows = [{**r, "표시이름": shown[i]} for i, r in enumerate(rows)]
         snap[res.table] = rows
+    # 페이즈 표시 이름(제작자가 정한 이름, 없으면 붙은 진행단계 이름을 이은 것)도 확정 내용에 담는다
+    shown_phase = phase_display_names(snap["진행순서"], snap["진행구성"])
+    snap["진행순서"] = [{**p, "표시이름": shown_phase[p["순서"]]} for p in snap["진행순서"]]
     snap["라이브러리"] = {
         table: [
             conn.execute(

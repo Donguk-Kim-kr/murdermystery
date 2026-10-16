@@ -344,6 +344,23 @@ def card_display_names(cards: list[dict], names: dict[int, str]) -> dict[int, st
     return out
 
 
+def phase_display_names(phases: list[dict], cards: list[dict]) -> dict[int, str | None]:
+    """페이즈(칸)의 표시 이름. 키는 칸 번호(순서).
+
+    제작자가 이름을 정했으면 그것, 비워 두었으면 **붙은 진행단계 이름을 가운데점으로 이어** 따라간다("조사·밀담").
+    진행단계도 없으면 None. 저장하지 않고 읽을 때마다 계산하므로, 카드를 바꾸면 이름도 따라 바뀐다.
+    cards 는 진행구성 행(표시이름 포함)이며 주어진 순서대로 잇는다.
+    """
+    by_slot: dict[int, list[str]] = {}
+    for c in cards:
+        by_slot.setdefault(c["진행순서_순서"], []).append(c["표시이름"])
+    out: dict[int, str | None] = {}
+    for p in phases:
+        custom = (p.get("이름") or "").strip()
+        out[p["순서"]] = custom or "·".join(by_slot.get(p["순서"], [])) or None
+    return out
+
+
 @router.get("")
 def content_bundle(work_id: int, conn: Conn, me: CurrentUser) -> dict:
     """작품의 모든 콘텐츠를 한 번에 돌려준다. 화면이 서로 가리키는 항목의 이름을 보여 주는 데 쓴다."""
@@ -373,6 +390,9 @@ def content_bundle(work_id: int, conn: Conn, me: CurrentUser) -> dict:
     shown = card_display_names(out["phase-steps"], names)
     for card in out["phase-steps"]:
         card["표시이름"] = shown[card["번호"]]
+    names_by_slot = phase_display_names(out["phases"], out["phase-steps"])
+    for phase in out["phases"]:
+        phase["표시이름"] = names_by_slot[phase["순서"]]
     return out
 
 

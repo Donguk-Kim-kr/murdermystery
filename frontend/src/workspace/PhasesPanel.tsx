@@ -15,7 +15,6 @@ export interface LibraryItem {
   공통: boolean;
 }
 
-const itemLabel = (i: LibraryItem) => `${i.이름} v${i.버전}${i.변경내역 ? ` — ${i.변경내역}` : ""}${i.공통 ? " (공통)" : ""}`;
 const pad = (n: number) => String(n).padStart(2, "0");
 
 type Call = (method: string, path: string, body?: unknown) => Promise<boolean>;
@@ -186,8 +185,8 @@ function PhasesBody({ workId, ws, phaseItems, gimmickItems }: {
         )}
       </ol>
       {sel >= 0 && (
-        <PhaseEditor ws={ws} phase={phases[sel]} index={sel} total={phases.length} phaseItems={phaseItems}
-          gimmickItems={gimmickItems} call={call} onClose={() => setSelected(null)} />
+        <PhaseEditor ws={ws} phase={phases[sel]} index={sel} total={phases.length} call={call}
+          onNavigate={(delta) => setSelected((phases[sel + delta]?.순서 as number | undefined) ?? selected)} onClose={() => setSelected(null)} />
       )}
       <TraySection ws={ws} phaseItems={phaseItems} gimmickItems={gimmickItems} tray={tray} press={press}
         onOpenLoader={() => setLoader(true)} onUnload={toggle} />
@@ -274,11 +273,11 @@ function FlowVertical({ ws }: { ws: Workspace }) {
   );
 }
 
-/** 페이즈 제목: 제작자가 정한 이름, 없으면 안의 진행단계 이름들, 그것도 없으면 "N번째". */
+/** 페이즈 제목: 제작자가 정한 이름, 없으면 붙은 진행단계 이름을 이은 것(서버가 계산한 표시이름), 그것도 없으면 "이름 없음". */
 function phaseTitle(phase: Row, index: number, cards: Row[]): string {
-  const name = typeof phase.이름 === "string" && phase.이름.trim() ? phase.이름 : null;
-  const fallback = cards.map((c) => String(c.표시이름 ?? "")).filter(Boolean).join(" + ");
-  return `${index + 1}. ${name ?? (fallback || "이름 없음")}`;
+  const shown = typeof phase.표시이름 === "string" && phase.표시이름 !== "" ? phase.표시이름 : null;
+  const fallback = cards.map((c) => String(c.표시이름 ?? "")).filter(Boolean).join("·");
+  return `${index + 1}. ${shown ?? (fallback || "이름 없음")}`;
 }
 
 /** 진행카드 영역: 불러와 둔 진행단계·기믹 카드. 흐름에 끌어다 놓아 쓴다. */
@@ -399,7 +398,8 @@ function PhaseTile({ ws, phase, index, selected, attach, origin, collapsed, pres
   const no = phase.순서 as number;
   const steps = rowsOf(ws, "phase-steps").filter((s) => s.진행순서_순서 === no);
   const uses = rowsOf(ws, "gimmick-uses").filter((u) => u.진행순서_순서 === no);
-  const name = typeof phase.이름 === "string" && phase.이름.trim() !== "" ? phase.이름 : null;
+  // 이름은 제작자가 정한 것, 없으면 붙은 진행단계 이름을 이은 것("조사·밀담"). 서버가 계산해 내려 준다.
+  const name = typeof phase.표시이름 === "string" && phase.표시이름 !== "" ? phase.표시이름 : null;
   return (
     <li className={`phase tile${selected ? " selected" : ""}${attach ? " over" : ""}${origin ? " drag-origin" : ""}${collapsed ? " collapsed" : ""}`}
       data-tile data-order={no} aria-label={`페이즈 ${index + 1}`} aria-hidden={origin || undefined} tabIndex={origin ? -1 : 0}
@@ -434,15 +434,14 @@ function TileChip({ row, lib, libCol, step, from, press }: {
   );
 }
 
-/** 고른 페이즈의 편집 패널: 이름·시간, 위치·삭제, 붙은 진행단계·기믹과 그 세부 설정·복사. */
-function PhaseEditor({ ws, phase, index, total, phaseItems, gimmickItems, call, onClose }: {
-  ws: Workspace; phase: Row; index: number; total: number;
-  phaseItems: LibraryItem[]; gimmickItems: LibraryItem[]; call: Call; onClose: () => void;
+/** 고른 페이즈의 수정 패널: 이름·시간, 이전/다음 페이즈로 넘어가기, 삭제, 붙은 진행단계·기믹 각각의 수정. */
+function PhaseEditor({ ws, phase, index, total, call, onNavigate, onClose }: {
+  ws: Workspace; phase: Row; index: number; total: number; call: Call; onNavigate: (delta: -1 | 1) => void; onClose: () => void;
 }) {
   const no = phase.순서 as number;
   const [time, setTime] = useState(String(phase.진행시간));
   const [name, setName] = useState(typeof phase.이름 === "string" ? phase.이름 : "");
-  // 다른 페이즈를 고르거나 끼워 넣기·옮기기로 서버 값이 바뀌면 입력칸도 맞춘다.
+  // 다른 페이즈로 넘어가거나 끼워 넣기·옮기기로 서버 값이 바뀌면 입력칸도 맞춘다.
   useEffect(() => {
     setTime(String(phase.진행시간));
     setName(typeof phase.이름 === "string" ? phase.이름 : "");
@@ -450,20 +449,18 @@ function PhaseEditor({ ws, phase, index, total, phaseItems, gimmickItems, call, 
   const steps = rowsOf(ws, "phase-steps").filter((s) => s.진행순서_순서 === no);
   const uses = rowsOf(ws, "gimmick-uses").filter((u) => u.진행순서_순서 === no);
   const allPhases = rowsOf(ws, "phases");
+  const autoName = steps.map((c) => String(c.표시이름 ?? "")).filter(Boolean).join("·");   // 이름을 비워 두면 따라갈 이름
 
   return (
     <section className="editor" aria-label="페이즈 편집">
       <div className="row">
-        <h3>{pad(index + 1)} 페이즈 편집</h3>
         <span className="row start">
-          <button type="button" className="small secondary" disabled={index === 0} aria-label={`페이즈 ${index + 1} 앞으로`}
-            onClick={() => void call("POST", `/phases/${no}/move`, { position: index })}>
-            ← 앞
-          </button>
-          <button type="button" className="small secondary" disabled={index === total - 1} aria-label={`페이즈 ${index + 1} 뒤로`}
-            onClick={() => void call("POST", `/phases/${no}/move`, { position: index + 2 })}>
-            뒤 →
-          </button>
+          {/* 화살표는 페이즈를 옮기지 않고, 수정하는 페이즈를 이전/다음으로 바꾼다 */}
+          <button type="button" className="small secondary" disabled={index === 0} aria-label="이전 페이즈 수정" onClick={() => onNavigate(-1)}>←</button>
+          <h3>{pad(index + 1)} 페이즈 편집</h3>
+          <button type="button" className="small secondary" disabled={index === total - 1} aria-label="다음 페이즈 수정" onClick={() => onNavigate(1)}>→</button>
+        </span>
+        <span className="row start">
           <button type="button" className="small secondary" aria-label={`페이즈 ${index + 1} 삭제`}
             onClick={async () => {
               if (window.confirm(`${pad(index + 1)} 페이즈를 삭제할까요? 놓인 카드는 내려가고 뒤의 페이즈가 한 칸 앞으로 옵니다.`)
@@ -477,7 +474,7 @@ function PhaseEditor({ ws, phase, index, total, phaseItems, gimmickItems, call, 
       <div className="row start">
         <label className="inline">
           페이즈 이름
-          <input value={name} maxLength={100} placeholder="플레이어에게 보이는 이름 (비우면 카드 이름)" onChange={(e) => setName(e.target.value)} />
+          <input value={name} maxLength={100} placeholder={autoName || "플레이어에게 보이는 이름"} onChange={(e) => setName(e.target.value)} />
         </label>
         <label className="inline">
           진행 시간(분)
@@ -488,78 +485,65 @@ function PhaseEditor({ ws, phase, index, total, phaseItems, gimmickItems, call, 
           이름·시간 저장
         </button>
       </div>
-      <LinkedList title="진행단계" empty="붙은 진행단계가 없습니다." rows={steps} lib={ws.bundle.library.phases}
-        libCol="진행단계_번호" items={phaseItems} resource="phase-steps" phaseNo={no} phaseLabel={index + 1} call={call}
-        ws={ws} allPhases={allPhases} />
-      <LinkedList title="기믹" empty="붙은 기믹이 없습니다." rows={uses} lib={ws.bundle.library.gimmicks}
-        libCol="기믹_번호" items={gimmickItems} resource="gimmick-uses" phaseNo={no} phaseLabel={index + 1} call={call}
-        ws={ws} allPhases={allPhases} />
+      <p className="muted">
+        이름을 비워 두면 붙은 진행단계 이름을 따라갑니다{autoName ? ` (지금은 "${autoName}")` : ""}. 직접 정하면 그 이름이 우선합니다.
+      </p>
+      <AttachedCards title="진행단계" empty="붙은 진행단계가 없습니다. 아래 진행카드를 이 페이즈에 끌어다 놓으세요." rows={steps}
+        lib={ws.bundle.library.phases} libCol="진행단계_번호" resource="phase-steps" phaseNo={no} call={call} ws={ws} allPhases={allPhases} />
+      {uses.length > 0 && (
+        <AttachedCards title="기믹" empty="" rows={uses} lib={ws.bundle.library.gimmicks} libCol="기믹_번호" resource="gimmick-uses"
+          phaseNo={no} call={call} ws={ws} allPhases={allPhases} />
+      )}
     </section>
   );
 }
 
-function LinkedList({ title, empty, rows, lib, libCol, items, resource, phaseNo, phaseLabel, call, ws, allPhases }: {
-  title: string; empty: string; rows: Row[]; lib: Record<string, LibraryRef>; libCol: string;
-  items: LibraryItem[]; resource: string; phaseNo: number; phaseLabel: number; call: Call; ws: Workspace; allPhases: Row[];
+/** 페이즈에 붙은 진행단계(또는 기믹) 목록. 각각 이 페이즈에서만 쓰는 세부 설정을 바로 고치고, 다른 페이즈로 복사하거나 뗀다. */
+function AttachedCards({ title, empty, rows, lib, libCol, resource, phaseNo, call, ws, allPhases }: {
+  title: string; empty: string; rows: Row[]; lib: Record<string, LibraryRef>; libCol: string; resource: string;
+  phaseNo: number; call: Call; ws: Workspace; allPhases: Row[];
 }) {
-  const [choice, setChoice] = useState("");
-  const [editing, setEditing] = useState<number | null>(null);
   const [copying, setCopying] = useState<number | null>(null);
-  const idCol = resource === "phase-steps" ? "번호" : "순서";
   const isCard = resource === "phase-steps";
+  const idCol = isCard ? "번호" : "순서";
   return (
-    <div className="linked" role="group" aria-label={`페이즈 ${phaseLabel} ${title}`}>
+    <div className="linked" role="group" aria-label={title}>
       <span className="linked-title">{title}</span>
       {rows.length === 0 && <span className="muted">{empty}</span>}
-      <ul className="chips">
+      <ul className="attached">
         {rows.map((r) => {
           const ref = lib[String(r[libCol])];
           const id = r[idCol] as number;
           // 같은 카드가 둘 이상이면 서버가 계산해 둔 "1차 ○○" 이름을 쓴다.
           const base = (isCard && typeof r.표시이름 === "string" ? r.표시이름 : ref?.이름) ?? title;
           return (
-            <li key={String(id)} className={ref?.삭제됨 ? "chip danger" : "chip accent"}>
-              {ref ? `${base} v${ref.버전}` : `#${String(r[libCol])}`}
-              {ref?.삭제됨 && " · 삭제된 항목"}
-              {r.설정 != null && <span className="muted"> · 설정 있음</span>}
-              <button type="button" className="link" aria-label={`${base} 설정`} aria-expanded={editing === id}
-                onClick={() => { setEditing(editing === id ? null : id); setCopying(null); }}>
-                설정
-              </button>
-              <button type="button" className="link" aria-label={`${base} 복사`} aria-expanded={copying === id}
-                onClick={() => { setCopying(copying === id ? null : id); setEditing(null); }}>
-                복사
-              </button>
-              <button type="button" className="link" aria-label={`${base} 떼기`}
-                onClick={() => void call("DELETE", `${resource}/${id}`)}>
-                ×
-              </button>
+            <li key={String(id)} className={`attached-card${ref?.삭제됨 ? " deleted" : ""}`} role="group" aria-label={`${base} 수정`}>
+              <div className="row">
+                <span>
+                  <strong>{base}</strong>{" "}
+                  {ref ? <span className="muted">v{ref.버전}</span> : <span className="muted">#{String(r[libCol])}</span>}
+                  {ref?.삭제됨 && <span className="muted"> · 삭제된 항목</span>}
+                </span>
+                <span className="row start">
+                  <button type="button" className="small secondary" aria-label={`${base} 복사`} aria-expanded={copying === id}
+                    onClick={() => setCopying(copying === id ? null : id)}>
+                    복사
+                  </button>
+                  <button type="button" className="small secondary" aria-label={`${base} 떼기`} onClick={() => void call("DELETE", `${resource}/${id}`)}>
+                    떼기
+                  </button>
+                </span>
+              </div>
+              <SettingsEditor key={`${id}:${JSON.stringify(r.설정 ?? null)}`} resource={resource} id={id} value={r.설정}
+                showTab={isCard} call={call} />
+              {copying === id && (
+                <CopyEditor resource={resource} libCol={libCol} row={r} fromNo={phaseNo} allPhases={allPhases} ws={ws} call={call}
+                  onDone={() => setCopying(null)} />
+              )}
             </li>
           );
         })}
       </ul>
-      {editing !== null && rows.some((r) => r[idCol] === editing) && (
-        <SettingsEditor key={editing} resource={resource} id={editing} value={rows.find((r) => r[idCol] === editing)!.설정}
-          showTab={isCard} call={call} onDone={() => setEditing(null)} />
-      )}
-      {copying !== null && rows.some((r) => r[idCol] === copying) && (
-        <CopyEditor key={copying} resource={resource} libCol={libCol} row={rows.find((r) => r[idCol] === copying)!}
-          fromNo={phaseNo} allPhases={allPhases} ws={ws} call={call} onDone={() => setCopying(null)} />
-      )}
-      <div className="row start">
-        <select aria-label={`${title} 선택`} value={choice} onChange={(e) => setChoice(e.target.value)}>
-          <option value="">{title} 고르기…</option>
-          {items.map((i) => (
-            <option key={i.번호} value={i.번호}>{itemLabel(i)}</option>
-          ))}
-        </select>
-        <button type="button" className="small" disabled={!choice}
-          onClick={async () => {
-            if (await call("POST", resource, { 진행순서_순서: phaseNo, [libCol]: Number(choice) })) setChoice("");
-          }}>
-          붙이기
-        </button>
-      </div>
     </div>
   );
 }
@@ -607,8 +591,8 @@ const asObject = (v: unknown): Record<string, unknown> =>
  * 카드·기믹을 이 페이즈에 놓을 때만 적용하는 세부 설정. 비우면 정의의 기본값을 쓴다.
  * 카드에는 "다음 페이즈에도 탭 남기기"를 따로 보여 준다(기본: 남김). 나머지는 JSON 으로 직접 쓴다(내부 구조는 엔진 설계에서 정함).
  */
-function SettingsEditor({ resource, id, value, showTab, call, onDone }: {
-  resource: string; id: number; value: unknown; showTab: boolean; call: Call; onDone: () => void;
+function SettingsEditor({ resource, id, value, showTab, call }: {
+  resource: string; id: number; value: unknown; showTab: boolean; call: Call;
 }) {
   const current = asObject(value);
   const { [KEEP_TAB]: keepRaw, ...rest } = current;
@@ -629,7 +613,8 @@ function SettingsEditor({ resource, id, value, showTab, call, onDone }: {
       }
     }
     const next = showTab && !keepTab ? { ...extra, [KEEP_TAB]: false } : extra;
-    if (await call("PATCH", `${resource}/${id}`, { 설정: Object.keys(next).length ? next : null })) onDone();
+    setError(null);
+    await call("PATCH", `${resource}/${id}`, { 설정: Object.keys(next).length ? next : null });
   }
 
   return (
@@ -647,7 +632,6 @@ function SettingsEditor({ resource, id, value, showTab, call, onDone }: {
       {error && <p role="alert" className="error">{error}</p>}
       <div className="row start">
         <button type="button" className="small" onClick={() => void save()}>설정 저장</button>
-        <button type="button" className="small secondary" onClick={onDone}>닫기</button>
       </div>
     </div>
   );

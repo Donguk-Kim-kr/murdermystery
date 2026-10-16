@@ -633,6 +633,9 @@ ol.vertical { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.8re
 ol.vertical ul { margin: 0.25rem 0 0; padding-left: 1.1rem; }
 .linked { display: grid; gap: 0.4rem; }
 .settings { display: grid; gap: 0.5rem; padding: 0.6rem; border: 1px dashed var(--border); border-radius: 0.6rem; }
+.attached { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.7rem; }
+.attached-card { display: grid; gap: 0.6rem; padding: 0.7rem 0.8rem; border: 1px solid var(--border-strong); border-radius: 0.7rem; background: var(--surface); }
+.attached-card.deleted { border-color: var(--danger); }
 .linked-title { font-size: 0.85rem; font-weight: 600; color: var(--text-2); }
 ul.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
 ul.chips .chip { display: inline-flex; align-items: center; gap: 0.35rem; }
