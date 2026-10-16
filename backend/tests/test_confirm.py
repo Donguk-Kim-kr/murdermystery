@@ -84,7 +84,7 @@ def test_snapshot_is_a_frozen_copy_of_the_work(client, headers, test_dbname):
     post(client, headers, w, "clues", 이름="편지", 장소_순서=place["순서"], 인물_순서=a)
     ph = post(client, headers, w, "phases", 진행시간=20)
     post(client, headers, w, "timelines", 설명="자정에 사건", 시작시간="2026-01-01T00:00:00")
-    lib = next(r for r in client.get("/api/library/phases", headers=headers).json() if r["공통"])
+    lib = client.post("/api/library/phases", headers=headers, json={"이름": "조사", "설명": "d", "규칙": {}}).json()
     post(client, headers, w, "phase-steps", 진행순서_순서=ph["순서"], 진행단계_번호=lib["번호"])
     assert confirm(client, headers, w).status_code == 201
     snap = snapshot(test_dbname, w, "1.0")

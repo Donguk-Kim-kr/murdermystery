@@ -190,21 +190,40 @@ for _t, _s in TABLES.items():
 
 
 class TestCommonPhaseSeed(unittest.TestCase):
-    """0015 가 공통 진행단계 11개를 등록한다 (시험용 기본값)."""
+    """0015 가 넣은 시험용 공통 진행단계 11개를 0019 가 없앤다 (진행단계는 제작자가 직접 만든다)."""
 
-    def test_seed_rows_exist_after_migrations(self):
+    def make_db(self):
         name = "mm_seed_" + uuid.uuid4().hex[:12]
         admin_sql(f'CREATE DATABASE "{name}"')
-        try:
-            migrate.run(name, MIGRATIONS_DIR)
-            db = Db(name)
-            rows = db.rows('SELECT "이름", "버전", "계정_번호" IS NULL FROM "진행단계" ORDER BY "번호"')
-            self.assertEqual([r[0] for r in rows], [
-                "프롤로그", "캐릭터 선택", "프로필 숙지", "자기소개", "조사", "토론", "밀담",
-                "추리발표(개인)", "투표", "에필로그", "후일담"])
-            self.assertTrue(all(r[1] == "1" and r[2] == "t" for r in rows))
-        finally:
-            admin_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        self.addCleanup(admin_sql, f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        return name
+
+    def test_new_database_has_no_phases_after_all_migrations(self):
+        name = self.make_db()
+        migrate.run(name, MIGRATIONS_DIR)
+        self.assertEqual(Db(name).val('SELECT count(*) FROM "진행단계"'), "0")
+
+    def test_seed_is_removed_but_referenced_rows_are_only_marked_deleted(self):
+        name = self.make_db()
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        for p in sorted(MIGRATIONS_DIR.glob("*.sql")):
+            if p.name < "0019":
+                (tmp / p.name).symlink_to(p)
+        migrate.run(name, tmp)
+        db = Db(name)
+        self.assertEqual(db.val('SELECT count(*) FROM "진행단계"'), "11")
+        acc = db.val("INSERT INTO \"계정\"(\"아이디\",\"패스워드\",\"닉네임\") VALUES ('a','x','a') RETURNING \"번호\"")
+        w = db.val(f"INSERT INTO \"작품\"(\"계정_번호\",\"제목\",\"시놉시스\",\"장르\") VALUES ({acc},'t','s','g') RETURNING \"번호\"")
+        used = db.val('SELECT "번호" FROM "진행단계" WHERE "이름" = \'조사\'')
+        db.ok(f'INSERT INTO "진행순서"("작품_번호","순서") VALUES ({w},1)')
+        db.ok(f'INSERT INTO "진행구성"("작품_번호","진행순서_순서","진행단계_번호") VALUES ({w},1,{used})')
+        # 운영자가 직접 올린 공통 항목은 시험용 기본값이 아니므로 남는다
+        db.ok("INSERT INTO \"진행단계\"(\"이름\",\"규칙\",\"설명\") VALUES ('운영자 단계','{}','d')")
+        migrate.run(name, MIGRATIONS_DIR)
+        rows = db.rows('SELECT "이름", "삭제일시" IS NOT NULL FROM "진행단계" ORDER BY "번호"')
+        self.assertEqual(rows, [["조사", "t"], ["운영자 단계", "f"]])
+        self.assertEqual(db.val('SELECT count(*) FROM "진행구성"'), "1")     # 연결은 그대로
 
 
 class TestBackfillOfExistingRows(unittest.TestCase):

@@ -109,9 +109,9 @@ def test_share_flag_toggles(client, headers):
 
 def test_common_items_are_visible_to_all_but_changeable_only_by_operator(client, make_account):
     user, operator = make_account(), make_account("운영자")
-    seeded = [r for r in client.get(url("phases"), headers=user.headers).json() if r["공통"]]
-    assert len(seeded) >= 11  # 마이그레이션 0015 가 넣은 기본 진행단계
-    target = seeded[0]
+    assert not any(r["공통"] for r in client.get(url("phases"), headers=user.headers).json())  # 기본 진행단계는 없다(0019)
+    target = client.post(url("phases"), headers=operator.headers,
+                         json={"이름": "공통 조사", "설명": "d", "공통": True}).json()
     assert client.delete(url("phases", target["번호"]), headers=user.headers).status_code == 403
     assert client.patch(url("phases", target["번호"]), headers=user.headers, json={"이름": "x"}).status_code == 403
     assert client.post(url("phases"), headers=user.headers, json={"이름": "x", "설명": "d", "공통": True}).status_code == 403
