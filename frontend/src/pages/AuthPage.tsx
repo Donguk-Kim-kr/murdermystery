@@ -29,13 +29,12 @@ export function AuthPage() {
           <h1>머더미스터리</h1>
         </div>
         <form onSubmit={onSubmit}>
-          <div className="id-row">
-            <label>
-              아이디
-              <input value={id} onChange={(e) => setId(e.target.value)} autoComplete="username" required />
-            </label>
-            <ThemeToggle />
-          </div>
+          {/* 탭 순서는 라이트/다크 버튼 → 아이디 → 패스워드. 버튼은 화면에서 아이디 글자 줄 오른쪽 끝에 그려진다 */}
+          <ThemeToggle className="auth-theme" />
+          <label>
+            아이디
+            <input value={id} onChange={(e) => setId(e.target.value)} autoComplete="username" required />
+          </label>
           <label>
             패스워드
             <input

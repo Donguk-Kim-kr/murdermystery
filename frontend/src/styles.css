@@ -395,11 +395,11 @@ form.row input { flex: 1; min-width: 0; }
 .theme-toggle button:hover { background: var(--surface); color: var(--text); }
 .theme-toggle button[aria-pressed="true"] { background: var(--accent); color: var(--accent-contrast); }
 .theme-toggle button[aria-pressed="true"]:hover { background: var(--accent-hover); color: var(--accent-contrast); }
-/* 로그인 화면: 아이디 글자와 같은 줄의 오른쪽 끝 */
-.id-row { position: relative; }
-.id-row .theme-toggle { position: absolute; top: 0; right: 0; padding: 1px; gap: 1px; }
-.id-row .theme-toggle button { width: 1.2rem; height: 1.2rem; }
-.id-row .theme-toggle svg { width: 12px; height: 12px; }
+/* 로그인 화면: 아이디 글자와 같은 줄의 오른쪽 끝(양식의 첫 줄). DOM 에서는 양식 맨 앞에 있어 탭 순서가 버튼 → 아이디 → 패스워드가 된다 */
+.auth-card form { position: relative; }
+.auth-theme { position: absolute; top: 0; right: 0; padding: 1px; gap: 1px; }
+.auth-theme button { width: 1.2rem; height: 1.2rem; }
+.auth-theme svg { width: 12px; height: 12px; }
 .auth-switch { text-align: center; font-size: 0.875rem; color: var(--muted); }
 
 /* ==========================================================================

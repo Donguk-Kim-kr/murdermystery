@@ -121,10 +121,14 @@ describe("로그인 화면 구성과 다크 모드", () => {
     expect(localStorage.getItem("theme")).toBeNull();
   });
 
-  it("아이디 칸과 같은 줄에 있다", async () => {
+  it("탭 순서: 라이트/다크 버튼 → 아이디 → 패스워드", async () => {
     renderApp();
-    const row = (await screen.findByLabelText("아이디")).closest(".id-row")!;
-    expect(row.querySelector('[role="group"][aria-label="화면 모드"]')).not.toBeNull();
+    const id = await screen.findByLabelText("아이디");
+    const toggle = screen.getByRole("group", { name: "화면 모드" });
+    expect(toggle.compareDocumentPosition(id) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();   // 버튼이 아이디보다 앞
+    await userEvent.click(id);
+    await userEvent.tab();
+    expect(screen.getByLabelText("패스워드")).toHaveFocus();                                      // 아이디 다음은 패스워드
   });
 });
 
