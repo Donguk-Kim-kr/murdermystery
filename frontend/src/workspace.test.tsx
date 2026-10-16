@@ -324,8 +324,11 @@ describe("진행 탭", () => {
       await userEvent.type(dialog.getByLabelText("이름 검색"), "없는이름");
       expect(dialog.getByText("찾는 이름이 없습니다.")).toBeInTheDocument();
       await userEvent.clear(dialog.getByLabelText("이름 검색"));
-      await userEvent.click(dialog.getByRole("button", { name: "조사 v2 불러오기" }));
-      expect(dialog.getByRole("button", { name: "조사 v2 빼기" })).toBeInTheDocument();
+      const pick = dialog.getByRole("button", { name: "조사 v2" });
+      expect(pick).toHaveAttribute("aria-pressed", "false");
+      await userEvent.click(pick);                                                       // 눌러서 선택
+      expect(pick).toHaveAttribute("aria-pressed", "true");
+      expect(pick).toHaveTextContent("선택됨");
       await userEvent.keyboard("{Escape}");
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(screen.getByLabelText("진행단계 카드 조사")).toHaveTextContent("v2");
@@ -339,6 +342,35 @@ describe("진행 탭", () => {
       renderApp("/works/7?tab=phases");
       await userEvent.click(await screen.findByRole("button", { name: "진행카드 불러오기" }));
       expect(screen.getByRole("link", { name: "라이브러리 만들기" })).toHaveAttribute("href", "/make/library");
+    });
+
+    it("격자 카드는 이름만 보이고(같은 이름이 둘 이상일 때만 버전), 설명은 마우스를 올렸을 때 나오는 안내에 있다", async () => {
+      routes["GET /api/library/phases"] = () => json([
+        { 번호: 5, 이름: "조사", 버전: 2, 설명: "장소를 골라 단서를 얻는 단계", 변경내역: "시간 연장", 공통: false },
+        { 번호: 4, 이름: "조사", 버전: 1, 설명: "장소를 골라 단서를 얻는 단계", 변경내역: null, 공통: false },
+        { 번호: 6, 이름: "토론", 버전: 1, 설명: "모두가 이야기", 변경내역: null, 공통: false },
+      ]);
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("button", { name: "진행카드 불러오기" }));
+      const dialog = screen.getByRole("dialog", { name: "진행카드 불러오기" });
+      const grid = within(dialog).getByRole("list");
+      expect(grid).toHaveClass("loader-grid");
+      const talk = within(grid).getByRole("button", { name: "토론 v1" });
+      expect(talk).toHaveTextContent("토론");
+      expect(talk).not.toHaveTextContent("v1");                                     // 이름만
+      expect(within(grid).getByRole("button", { name: "조사 v2" })).toHaveTextContent("v2");   // 같은 이름 둘 → 버전으로 구분
+            // 설명은 카드 오른쪽 위의 i 버튼으로 펼친다(마우스를 올리는 것에 기대지 않는다)
+      expect(screen.queryByText(/모두가 이야기/)).not.toBeInTheDocument();
+      const info = within(grid).getByRole("button", { name: "토론 v1 설명 보기" });
+      expect(info).toHaveAttribute("aria-expanded", "false");
+      await userEvent.click(info);
+      expect(within(grid).getByRole("note")).toHaveTextContent(/v1[\s\S]*모두가 이야기/);
+      expect(talk).toHaveAttribute("aria-pressed", "false");                         // 설명을 열어도 선택되지는 않는다
+      await userEvent.click(within(grid).getByRole("button", { name: "조사 v2 설명 보기" }));      // 다른 카드를 열면 앞의 것은 닫힌다
+      expect(within(grid).getAllByRole("note")).toHaveLength(1);
+      expect(within(grid).getByRole("note")).toHaveTextContent("변경: 시간 연장");
+      await userEvent.click(screen.getByLabelText("이름 검색"));                      // 다른 곳을 누르면 닫힌다
+      expect(within(grid).queryByRole("note")).not.toBeInTheDocument();
     });
   });
 

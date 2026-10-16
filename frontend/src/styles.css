@@ -607,9 +607,17 @@ body.flow-dragging, body.flow-dragging * { cursor: grabbing !important; user-sel
 .tray-kind { font-size: 0.7rem; color: var(--muted); }
 .tray-desc { font-size: 0.75rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .tray-x { position: absolute; top: 0.15rem; right: 0.35rem; }
-.loader-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
-.loader-row { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem; }
-.loader-name { display: grid; gap: 0.1rem; min-width: 0; }
+.loader-grid { list-style: none; margin: 0; padding: 0.2rem 0 5rem; display: grid; gap: 0.6rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.loader-item { position: relative; }
+.loader-card { width: 100%; min-height: 3.6rem; padding: 0.6rem 1.9rem 0.6rem 0.7rem; display: grid; gap: 0.15rem; align-content: center; justify-items: start; text-align: left; font-weight: 400; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 0.6rem; }
+.loader-card:hover, .loader-card:focus-visible { border-color: var(--accent); background: var(--surface-2); }
+.loader-card.loaded { border-color: var(--accent); background: var(--accent-soft); }
+.loader-check { font-size: 0.75rem; color: var(--accent-soft-text); }
+/* 설명 안내: i 버튼으로 펼친다. 마우스를 올리는 것에 기대지 않는다 */
+.loader-tip { position: absolute; left: 0; top: calc(100% + 0.3rem); z-index: 5; width: max-content; min-width: 100%; max-width: 15rem; padding: 0.5rem 0.65rem; white-space: pre-line; font-size: 0.8rem; line-height: 1.45; color: var(--text); background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 0.5rem; box-shadow: var(--shadow-md); }
+.loader-info { position: absolute; top: 0.3rem; right: 0.3rem; width: 1.5rem; height: 1.5rem; padding: 0; display: grid; place-items: center; border: 0; border-radius: 999px; background: transparent; color: var(--muted); }
+.loader-info:hover, .loader-info[aria-expanded="true"] { color: var(--accent); background: var(--accent-soft); }
+.loader-item:nth-child(3n) .loader-tip { left: auto; right: 0; }   /* 오른쪽 열은 안쪽으로 펼쳐 팝업 밖으로 나가지 않게 */
 .dot { color: var(--accent); margin-left: 0.3rem; font-size: 0.7rem; }
 .editor { border: 1px solid var(--border); border-radius: 0.8rem; padding: 0.9rem; margin-top: 0.9rem; display: grid; gap: 0.8rem; background: var(--surface-2); }
 .editor h3 { font-size: 1rem; }

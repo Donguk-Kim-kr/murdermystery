@@ -330,6 +330,7 @@ function CardLoader({ phaseItems, gimmickItems, tray, onToggle, onClose }: {
 }) {
   const [kind, setKind] = useState<"steps" | "gimmicks">("steps");
   const [query, setQuery] = useState("");
+  const [tipOpen, setTipOpen] = useState<number | null>(null);   // 설명을 펼쳐 둔 카드(i 버튼)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -339,7 +340,7 @@ function CardLoader({ phaseItems, gimmickItems, tray, onToggle, onClose }: {
   const shown = all.filter((i) => i.이름.includes(query.trim()));
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="dialog" role="dialog" aria-modal="true" aria-label="진행카드 불러오기" onClick={(e) => e.stopPropagation()}>
+      <div className="dialog" role="dialog" aria-modal="true" aria-label="진행카드 불러오기" onClick={(e) => { e.stopPropagation(); setTipOpen(null); }}>
         <div className="row">
           <h2>진행카드 불러오기</h2>
           <button type="button" className="small secondary" onClick={onClose}>닫기</button>
@@ -357,19 +358,30 @@ function CardLoader({ phaseItems, gimmickItems, tray, onToggle, onClose }: {
           </p>
         )}
         {all.length > 0 && shown.length === 0 && <p className="muted">찾는 이름이 없습니다.</p>}
-        <ul className="loader-list">
+        {/* 이름만 있는 카드를 격자로 늘어놓는다. 누르면 선택, 다시 누르면 해제(선택된 카드가 흐름 아래 진행카드에 놓인다).
+            많아져도 한눈에 보이고, 마우스를 올리면(또는 포커스하면) 설명이 나온다 */}
+        <ul className="loader-grid">
           {shown.map((i) => {
             const loaded = tray[kind].includes(i.번호);
+            const sameName = all.filter((x) => x.이름 === i.이름).length > 1;   // 같은 이름의 다른 버전이 있을 때만 버전을 보여 구분한다
+            const tip = [`v${i.버전}${i.공통 ? " · 공통" : ""}`, i.변경내역 ? `변경: ${i.변경내역}` : null, i.설명 || null].filter(Boolean).join("\n");
+            const open = tipOpen === i.번호;
             return (
-              <li key={i.번호} className="loader-row">
-                <span className="loader-name">
-                  <strong>{i.이름}</strong> <span className="muted">v{i.버전}{i.공통 ? " · 공통" : ""}</span>
-                  {(i.변경내역 || i.설명) && <span className="muted tray-desc">{i.변경내역 ?? i.설명}</span>}
-                </span>
-                <button type="button" className={loaded ? "small secondary" : "small"} aria-pressed={loaded}
-                  aria-label={`${i.이름} v${i.버전} ${loaded ? "빼기" : "불러오기"}`} onClick={() => onToggle(kind, i.번호)}>
-                  {loaded ? "빼기" : "불러오기"}
+              <li key={i.번호} className="loader-item">
+                <button type="button" className={`loader-card${loaded ? " loaded" : ""}`} aria-pressed={loaded}
+                  aria-label={`${i.이름} v${i.버전}`} onClick={() => onToggle(kind, i.번호)}>
+                  <strong>{i.이름}</strong>
+                  {sameName && <span className="muted">v{i.버전}</span>}
+                  {loaded && <span className="loader-check" aria-hidden="true">✓ 선택됨</span>}
                 </button>
+                {/* 카드 오른쪽 위의 i 버튼: 누르면 설명이 펼쳐지고, 다시 누르거나 다른 곳을 누르면 닫힌다 */}
+                <button type="button" className="loader-info" aria-label={`${i.이름} v${i.버전} 설명 보기`} aria-expanded={open}
+                  onClick={(e) => { e.stopPropagation(); setTipOpen(open ? null : i.번호); }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><path d="M12 8h.01" />
+                  </svg>
+                </button>
+                {open && <span role="note" className="loader-tip">{tip}</span>}
               </li>
             );
           })}
