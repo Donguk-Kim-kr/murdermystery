@@ -78,7 +78,11 @@ function useTray(workId: number) {
 function PhasesBody({ workId, ws, phaseItems, gimmickItems }: {
   workId: number; ws: Workspace; phaseItems: LibraryItem[]; gimmickItems: LibraryItem[];
 }) {
-  const phases = rowsOf(ws, "phases");
+  const serverPhases = rowsOf(ws, "phases");
+  // 페이즈 카드를 놓은 뒤 서버가 응답할 때까지는 놓은 자리에 그대로 보여 준다(원래 자리로 돌아갔다가 다시 옮겨 가 보이지 않게).
+  // base 는 놓을 때의 서버 목록이고, 다시 읽어 와 목록이 바뀌면 더는 적용하지 않는다.
+  const [settling, setSettling] = useState<{ base: Row[]; from: number; to: number } | null>(null);
+  const phases = settling && settling.base === serverPhases ? moved(serverPhases, settling.from, settling.to) : serverPhases;
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);   // 수정 패널에 열린 페이즈의 칸 번호
   const [vertical, setVertical] = useState(false);
@@ -123,13 +127,24 @@ function PhasesBody({ workId, ws, phaseItems, gimmickItems }: {
   }
 
   async function onDrop(p: Payload, hit: Hit) {
+    try {
+      await drop(p, hit);
+    } finally {
+      setSettling(null);
+    }
+  }
+
+  async function drop(p: Payload, hit: Hit) {
     if (!hit) return;
     setError(null);
     if (hit.type === "attach") {
       await putInto(hit.order, p);
     } else if (p.kind === "phase") {
       // hit.index 는 끌고 있는 카드를 뺀 목록에서의 자리이다 → 옮길 위치(1부터)는 index + 1
-      if (hit.index !== p.index) await req("POST", `/phases/${p.order}/move`, { position: hit.index + 1 });
+      if (hit.index !== p.index) {
+        setSettling({ base: serverPhases, from: p.index, to: hit.index });
+        await req("POST", `/phases/${p.order}/move`, { position: hit.index + 1 });
+      }
     } else {
       const made = await req<{ phases: Row[] }>("POST", "/phases/insert", { position: hit.index + 1, 이름: null, 진행시간: 30 });
       if (made) await putInto(made.data.phases[hit.index].순서 as number, p);
@@ -178,7 +193,7 @@ function PhasesBody({ workId, ws, phaseItems, gimmickItems }: {
           세로로 보기
         </button>
       </div>
-      <ol className="flow" ref={flowRef} aria-label="게임 흐름">
+      <ol className={`flow${settling ? " settling" : ""}`} ref={flowRef} aria-label="게임 흐름">
         {items}
         {empty && !dragging && (
           <li className="flow-empty">아래 진행카드를 이곳으로 끌어다 놓으면 첫 페이즈가 만들어집니다.</li>
@@ -195,6 +210,14 @@ function PhasesBody({ workId, ws, phaseItems, gimmickItems }: {
       {loader && <CardLoader phaseItems={phaseItems} gimmickItems={gimmickItems} tray={tray} onToggle={toggle} onClose={() => setLoader(false)} />}
     </section>
   );
+}
+
+/** 목록에서 from 번째를 빼 to 번째(빼고 난 목록에서의 자리)에 끼운 새 목록. */
+function moved<T>(list: T[], from: number, to: number): T[] {
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
 }
 
 type PressFn = (e: React.PointerEvent<HTMLElement>, payload: Payload) => void;

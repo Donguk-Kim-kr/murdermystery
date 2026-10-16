@@ -500,6 +500,27 @@ describe("진행 탭", () => {
       expect(await sent("POST /api/works/7/phases/1/move")[0].req.json()).toEqual({ position: 2 });
     });
 
+    it("페이즈 카드를 놓으면 서버가 응답하기 전에도 놓은 자리에 그대로 있고, 원래 자리로 돌아갔다 가지 않는다", async () => {
+      twoPhases();
+      let release!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      routes["POST /api/works/7/phases/1/move"] = async () => {
+        await gate;
+        return json({ phases: [] });
+      };
+      renderApp("/works/7?tab=phases");
+      const first = await screen.findByRole("listitem", { name: "페이즈 1" });
+      expect(tile(1).querySelector(".tile-name")).toHaveTextContent("도입");
+      drag(first, [[10, 150], [tileX(1) + 150, 150]]);                           // 두 번째 카드 뒤에 놓는다
+      expect(sent("POST /api/works/7/phases/1/move")).toHaveLength(1);
+      expect(tile(1).querySelector(".tile-name")).toHaveTextContent("2차 조사");   // 응답 전에 벌써 새 자리
+      expect(tile(2).querySelector(".tile-name")).toHaveTextContent("도입");
+      expect(document.querySelector("ol.flow")).toHaveClass("settling");           // 놓은 직후에는 움직임(전환) 없이
+      expect(document.querySelector(".flow-slot.open")).toBeNull();
+      release();
+      await waitFor(() => expect(document.querySelector("ol.flow")).not.toHaveClass("settling"));
+    });
+
     it("페이즈 카드를 제자리에 놓으면 서버에 요청하지 않는다", async () => {
       renderApp("/works/7?tab=phases");
       drag(await screen.findByRole("listitem", { name: "페이즈 1" }), [[10, 150]]);
