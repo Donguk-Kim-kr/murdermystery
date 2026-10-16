@@ -360,7 +360,24 @@ class TestRuntimeConstraints(Builders):
         # 다른 판에서는 같은 계정·같은 배역이 가능
         g2 = self.game(self.room(w), w)
         self.participant(w, g2, a1, 인물_순서=1)
-        self.assertEqual(self.db.val('SELECT "비공개" FROM "참여" LIMIT 1'), "f")
+        self.assertEqual(self.db.val('SELECT "후기공개" FROM "참여" LIMIT 1'), "t")  # 후기는 기본적으로 공개
+
+    def test_participation_record_columns(self):
+        """평점·난이도: 0~5, 0.5 단위, 비워 둘 수 있다(비어 있음 = 기록 안 함, 0 과 다르다). 메모·후기는 자유 글."""
+        w, g = self.playable_game()
+        for v in ("0", "0.5", "2.5", "5"):
+            p = self.participant(w, g, self.account(), 평점=v, 난이도=v)
+            self.assertEqual(self.db.val(f'SELECT "평점"::text FROM "참여" WHERE "번호"={p}'), f"{float(v):.1f}")
+        # 후기만 쓰고 평점·난이도를 비워도, 반대로 평점만 남겨도 된다 (서로 묶지 않는다)
+        a = self.participant(w, g, self.account(), 후기="오류가 있어요", 후기공개=False, 메모="내 메모")
+        self.assertEqual(self.db.val(f'SELECT "평점" IS NULL, "난이도" IS NULL, "후기공개", "메모" FROM "참여" WHERE "번호"={a}'), "t|t|f|내 메모")
+        self.participant(w, g, self.account(), 평점="4.5")
+        # 0 과 비어 있음은 다르다: 평균은 비어 있는 값을 건너뛴다
+        avg = self.db.val(f'SELECT round(avg("난이도"), 2) FROM "참여" WHERE "작품_번호"={w}')
+        self.assertEqual(avg, "2.00")  # (0 + 0.5 + 2.5 + 5) / 4, 비어 있는 2개는 제외
+        for col in ("평점", "난이도"):
+            for bad in ("5.5", "-0.5", "2.3", "0.25"):
+                self.ins_fails("참여", f"ck_참여_{col}", 작품_번호=w, 진행_번호=g, 계정_번호=self.account(), **{col: bad})
 
     def test_gimmick_execution_unique_per_game(self):
         w, g = self.playable_game()

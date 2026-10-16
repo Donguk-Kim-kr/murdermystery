@@ -19,6 +19,7 @@ from helpers import SPEC_PATH, PgTestCase
 
 TYPE_MAP = {
     "INTEGER": "integer",
+    "NUMERIC(2,1)": "numeric",
     "TEXT": "text",
     "TIMESTAMPTZ": "timestamp with time zone",
     "TIMESTAMP": "timestamp without time zone",

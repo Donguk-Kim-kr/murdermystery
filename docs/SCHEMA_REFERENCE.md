@@ -31,13 +31,13 @@
 | 23 | 미디어 |
 | 24 | 방 |
 | 25 | 진행 |
-| 26 | 참여 |
-| 27 | 기믹실행 |
-| 28 | 투표결과 |
-| 29 | 엔딩 |
-| 30 | 획득 |
-| 31 | 테스터 |
-| 32 | 자료 |
+| 26 | 기믹실행 |
+| 27 | 투표결과 |
+| 28 | 엔딩 |
+| 29 | 획득 |
+| 30 | 테스터 |
+| 31 | 자료 |
+| 32 | 참여 |
 
 ## 계정
 
@@ -701,34 +701,6 @@
 
 - `tg_진행_시각`: `CREATE TRIGGER "tg_진행_시각" BEFORE INSERT OR UPDATE ON public."진행" FOR EACH ROW EXECUTE FUNCTION "fn_진행_시각"()`
 
-## 참여
-
-| 순번 | 컬럼 | 타입 | NULL | 기본값 / 특성 |
-|---|---|---|---|---|
-| 1 | 번호 | integer | 불가 | IDENTITY (GENERATED ALWAYS) |
-| 2 | 작품_번호 | integer | 불가 |  |
-| 3 | 진행_번호 | integer | 불가 |  |
-| 4 | 계정_번호 | integer | 불가 |  |
-| 5 | 인물_순서 | integer | 가능 |  |
-| 6 | 후기 | text | 가능 |  |
-| 7 | 비공개 | boolean | 불가 | false |
-
-**제약조건**
-
-| 종류 | 이름 | 정의 |
-|---|---|---|
-| PK | `pk_참여` | `PRIMARY KEY ("번호")` |
-| UNIQUE | `uq_참여_진행_계정` | `UNIQUE ("진행_번호", "계정_번호")` |
-| UNIQUE | `uq_참여_진행_인물` | `UNIQUE ("진행_번호", "인물_순서")` |
-| FK | `fk_참여_계정` | `FOREIGN KEY ("계정_번호") REFERENCES "계정"("번호") ON DELETE RESTRICT` |
-| FK | `fk_참여_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE RESTRICT` |
-| FK | `fk_참여_진행` | `FOREIGN KEY ("진행_번호") REFERENCES "진행"("번호") ON DELETE CASCADE` |
-
-**추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
-
-- `ix_참여_계정`: `CREATE INDEX "ix_참여_계정" ON public."참여" USING btree ("계정_번호")`
-- `ix_참여_작품`: `CREATE INDEX "ix_참여_작품" ON public."참여" USING btree ("작품_번호")`
-
 ## 기믹실행
 
 | 순번 | 컬럼 | 타입 | NULL | 기본값 / 특성 |
@@ -873,4 +845,37 @@
 | UNIQUE | `uq_자료_작품_순서` | `UNIQUE ("작품_번호", "순서")` |
 | FK | `fk_자료_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE CASCADE` |
 | CHECK | `ck_자료_순서` | `CHECK (("순서" >= 1))` |
+
+## 참여
+
+| 순번 | 컬럼 | 타입 | NULL | 기본값 / 특성 |
+|---|---|---|---|---|
+| 1 | 번호 | integer | 불가 | IDENTITY (GENERATED ALWAYS) |
+| 2 | 작품_번호 | integer | 불가 |  |
+| 3 | 진행_번호 | integer | 불가 |  |
+| 4 | 계정_번호 | integer | 불가 |  |
+| 5 | 인물_순서 | integer | 가능 |  |
+| 6 | 평점 | numeric(2,1) | 가능 |  |
+| 7 | 난이도 | numeric(2,1) | 가능 |  |
+| 8 | 후기 | text | 가능 |  |
+| 9 | 후기공개 | boolean | 불가 | true |
+| 10 | 메모 | text | 가능 |  |
+
+**제약조건**
+
+| 종류 | 이름 | 정의 |
+|---|---|---|
+| PK | `pk_참여` | `PRIMARY KEY ("번호")` |
+| UNIQUE | `uq_참여_진행_계정` | `UNIQUE ("진행_번호", "계정_번호")` |
+| UNIQUE | `uq_참여_진행_인물` | `UNIQUE ("진행_번호", "인물_순서")` |
+| FK | `fk_참여_계정` | `FOREIGN KEY ("계정_번호") REFERENCES "계정"("번호") ON DELETE RESTRICT` |
+| FK | `fk_참여_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE RESTRICT` |
+| FK | `fk_참여_진행` | `FOREIGN KEY ("진행_번호") REFERENCES "진행"("번호") ON DELETE CASCADE` |
+| CHECK | `ck_참여_난이도` | `CHECK ((("난이도" IS NULL) OR ((("난이도" >= (0)::numeric) AND ("난이도" <= (5)::numeric)) AND (("난이도" * (2)::numeric) = trunc(("난이도" * (2)::numeric))))))` |
+| CHECK | `ck_참여_평점` | `CHECK ((("평점" IS NULL) OR ((("평점" >= (0)::numeric) AND ("평점" <= (5)::numeric)) AND (("평점" * (2)::numeric) = trunc(("평점" * (2)::numeric))))))` |
+
+**추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
+
+- `ix_참여_계정`: `CREATE INDEX "ix_참여_계정" ON public."참여" USING btree ("계정_번호")`
+- `ix_참여_작품`: `CREATE INDEX "ix_참여_작품" ON public."참여" USING btree ("작품_번호")`
 
