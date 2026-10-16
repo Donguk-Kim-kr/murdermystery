@@ -7,6 +7,7 @@
 * 식별자(테이블·컬럼 이름)는 이 파일의 명세에서만 가져오므로 SQL 에 끼워 넣어도 안전하다.
 * 규칙 형식(JSON)은 아직 정해지지 않아 `json` 종류는 객체(딕셔너리)이기만 하면 받는다.
 """
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -128,15 +129,19 @@ RESOURCES: tuple[Resource, ...] = (
         F("내용", "long", True, 20000),
     ), title=("제목",)),
     Resource("phases", "진행순서", "페이즈(진행 순서)", (
+        F("이름", "text", max=100, label="페이즈 이름", help="플레이어에게 보이는 이름입니다. 비우면 안의 진행단계 이름으로 보입니다"),
         F("진행시간", "int", True, min=0, max=1440, default=30, label="진행 시간(분)"),
-    ), help="페이즈 번호는 만든 순서대로 붙고 바꿀 수 없습니다. (다른 항목이 번호로 가리키기 때문)"),
+    ), title=("이름",),
+        help="페이즈 위치는 끼워 넣기·옮기기로 바꿉니다. (칸 번호는 다른 항목이 가리키므로 그대로 두고 칸의 내용을 옮깁니다)"),
     Resource("phase-steps", "진행구성", "페이즈의 진행단계", (
         _ref("진행순서_순서", "phases", "페이즈", required=True),
         F("진행단계_번호", "libref", True, ref="phases", label="진행단계"),
+        F("설정", "json", label="세부 설정", help="이 페이즈에서만 정의의 기본값을 덮어쓰는 설정입니다. 비우면 정의의 기본값을 씁니다"),
     ), ordered=False, group_by="진행순서_순서"),
     Resource("gimmick-uses", "기믹적용", "페이즈에 붙은 기믹", (
         F("기믹_번호", "libref", True, ref="gimmicks", label="기믹"),
         _ref("진행순서_순서", "phases", "적용되는 페이즈", required=True),
+        F("설정", "json", label="세부 설정", help="이 페이즈에서만 정의의 기본값을 덮어쓰는 설정입니다. 비우면 정의의 기본값을 씁니다"),
     ), group_by="진행순서_순서"),
 )
 BY_KEY = {r.key: r for r in RESOURCES}
@@ -320,6 +325,25 @@ def touch_work(conn: Connection, work_id: int) -> None:
     conn.execute('UPDATE "작품" SET "수정일시" = CURRENT_TIMESTAMP WHERE "번호" = %s', (work_id,))
 
 
+def card_display_names(cards: list[dict], names: dict[int, str]) -> dict[int, str]:
+    """칸에 놓인 진행단계 카드(진행구성 행)의 표시 이름. 키는 진행구성 번호.
+
+    기본은 진행단계 이름 그대로이고, 같은 이름이 한 작품에 둘 이상 놓이면 칸 위치 순서대로 "1차 이름", "2차 이름"이 된다.
+    같은 칸에 같은 이름이 둘일 수는 없다(UNIQUE). 저장하지 않고 읽을 때마다 계산한다.
+    """
+    counts = Counter(names[c["진행단계_번호"]] for c in cards)
+    seen: Counter = Counter()
+    out: dict[int, str] = {}
+    for c in sorted(cards, key=lambda c: (c["진행순서_순서"], c["번호"])):
+        name = names[c["진행단계_번호"]]
+        if counts[name] > 1:
+            seen[name] += 1
+            out[c["번호"]] = f"{seen[name]}차 {name}"
+        else:
+            out[c["번호"]] = name
+    return out
+
+
 @router.get("")
 def content_bundle(work_id: int, conn: Conn, me: CurrentUser) -> dict:
     """작품의 모든 콘텐츠를 한 번에 돌려준다. 화면이 서로 가리키는 항목의 이름을 보여 주는 데 쓴다."""
@@ -345,6 +369,10 @@ def content_bundle(work_id: int, conn: Conn, me: CurrentUser) -> dict:
             ).fetchall()
         },
     }
+    names = {n: row["이름"] for n, row in out["library"]["phases"].items()}
+    shown = card_display_names(out["phase-steps"], names)
+    for card in out["phase-steps"]:
+        card["표시이름"] = shown[card["번호"]]
     return out
 
 

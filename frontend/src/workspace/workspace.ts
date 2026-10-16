@@ -74,12 +74,22 @@ export function titleOf(titleFields: string[], row: Row): string | null {
 
 /** 다른 항목을 가리키는 값(`순서`)을 사람이 읽는 이름으로 바꾼다. 아직 없는 항목이면 번호만 보여 준다. */
 export function refLabel(ws: Workspace, key: string, order: number): string {
+  if (key === "phases") return phaseLabel(ws, order);
   const ext = ws.schema.external.find((e) => e.key === key);
   const meta = ext ?? ws.schema.resources.find((r) => r.key === key);
   if (!meta) return String(order);
   const row = rowsOf(ws, key).find((r) => r[meta.key_col] === order);
   const title = row ? titleOf(meta.title_fields, row) : null;
   return title ? `${order}. ${title}` : `${shortLabel(meta.label)} ${order}`;
+}
+
+/** 페이즈는 칸 번호가 아니라 흐름 안의 위치(1부터)로 부른다. 칸 번호는 끼워 넣기·옮기기로 위치와 달라질 수 있다. */
+export function phaseLabel(ws: Workspace, order: number): string {
+  const phases = rowsOf(ws, "phases");
+  const i = phases.findIndex((p) => p.순서 === order);
+  if (i < 0) return `페이즈 ${order}`;
+  const name = phases[i].이름;
+  return typeof name === "string" && name.trim() !== "" ? `${i + 1}. ${name}` : `페이즈 ${i + 1}`;
 }
 
 export function useWorkspace(workId: number): { ws: Workspace | null; error: string | null } {

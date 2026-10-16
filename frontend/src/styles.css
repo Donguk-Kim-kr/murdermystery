@@ -508,6 +508,7 @@ label.inline { display: inline-flex; align-items: center; gap: 0.5rem; }
 label.inline input { width: 6rem; }
 .phase { border: 1px solid var(--border); border-radius: 0.7rem; padding: 0.8rem; display: grid; gap: 0.7rem; }
 .linked { display: grid; gap: 0.4rem; }
+.settings { display: grid; gap: 0.5rem; padding: 0.6rem; border: 1px dashed var(--border); border-radius: 0.6rem; }
 .linked-title { font-size: 0.85rem; font-weight: 600; color: var(--text-2); }
 ul.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
 ul.chips .chip { display: inline-flex; align-items: center; gap: 0.35rem; }

@@ -32,11 +32,12 @@ const schema = {
     { key: "clues", label: "단서", key_col: "순서", title_fields: ["이름"], group_by: null, help: null, fields: [
       field("이름", "text", { required: true }), field("인물_순서", "ref", { ref: "characters", label: "관련 인물" }),
     ] },
-    { key: "phases", label: "페이즈(진행 순서)", key_col: "순서", title_fields: [], group_by: null, help: null, fields: [
-      field("진행시간", "int", { required: true, default: 30 }),
+    { key: "phases", label: "페이즈(진행 순서)", key_col: "순서", title_fields: ["이름"], group_by: null, help: null, fields: [
+      field("이름", "text"), field("진행시간", "int", { required: true, default: 30 }),
     ] },
     { key: "phase-steps", label: "페이즈의 진행단계", key_col: "번호", title_fields: [], group_by: "진행순서_순서", help: null, fields: [
       field("진행순서_순서", "ref", { ref: "phases", required: true }), field("진행단계_번호", "libref", { ref: "phases", required: true }),
+      field("설정", "json"),
     ] },
     { key: "gimmick-uses", label: "페이즈에 붙은 기믹", key_col: "순서", title_fields: [], group_by: "진행순서_순서", help: null, fields: [
       field("기믹_번호", "libref", { ref: "gimmicks", required: true }), field("진행순서_순서", "ref", { ref: "phases", required: true }),
@@ -175,19 +176,19 @@ describe("진행 탭", () => {
   });
 
   it("페이즈를 만들고 진행단계를 변경내역과 함께 골라 붙인다", async () => {
-    routes["POST /api/works/7/content/phases"] = () => {
-      bundle.phases = [{ 순서: 1, 진행시간: 30 }];
-      return json({ 순서: 1, 진행시간: 30 }, 201);
+    routes["POST /api/works/7/phases/insert"] = () => {
+      bundle.phases = [{ 순서: 1, 이름: null, 진행시간: 30 }];
+      return json({ phases: bundle.phases }, 201);
     };
     routes["POST /api/works/7/content/phase-steps"] = () => {
-      bundle["phase-steps"] = [{ 번호: 9, 진행순서_순서: 1, 진행단계_번호: 5 }];
+      bundle["phase-steps"] = [{ 번호: 9, 진행순서_순서: 1, 진행단계_번호: 5, 설정: null, 표시이름: "조사" }];
       (bundle.library as { phases: object }).phases = { 5: { 번호: 5, 이름: "조사", 버전: 2, 설명: "d", 삭제됨: false } };
       return json({ 번호: 9 }, 201);
     };
     routes["GET /api/works/7/content/votes"] = () => json([]);
     renderApp("/works/7?tab=phases");
     await userEvent.click(await screen.findByRole("button", { name: "페이즈 추가" }));
-    expect(await sent("POST /api/works/7/content/phases")[0].req.json()).toEqual({ 진행시간: 30 });
+    expect(await sent("POST /api/works/7/phases/insert")[0].req.json()).toEqual({ position: 1, 이름: null, 진행시간: 30 });
     const group = await screen.findByRole("group", { name: "페이즈 1 진행단계" });
     expect(within(group).getByRole("option", { name: "조사 v2 — 시간 연장 (공통)" })).toBeInTheDocument();
     await userEvent.selectOptions(within(group).getByLabelText("진행단계 선택"), "5");
@@ -196,9 +197,96 @@ describe("진행 탭", () => {
     expect(await sent("POST /api/works/7/content/phase-steps")[0].req.json()).toEqual({ 진행순서_순서: 1, 진행단계_번호: 5 });
   });
 
+  describe("페이즈가 둘 있을 때", () => {
+    beforeEach(() => {
+      bundle.phases = [{ 순서: 1, 이름: "도입", 진행시간: 10 }, { 순서: 2, 이름: null, 진행시간: 20 }];
+      (bundle.library as { phases: object }).phases = { 5: { 번호: 5, 이름: "조사", 버전: 2, 설명: "d", 삭제됨: false } };
+      bundle["phase-steps"] = [
+        { 번호: 9, 진행순서_순서: 1, 진행단계_번호: 5, 설정: null, 표시이름: "1차 조사" },
+        { 번호: 10, 진행순서_순서: 2, 진행단계_번호: 5, 설정: { 탭유지: false, 횟수: 3 }, 표시이름: "2차 조사" },
+      ];
+    });
+
+    it("같은 카드가 둘 이상이면 서버가 정한 1차·2차 이름으로 보여 준다", async () => {
+      renderApp("/works/7?tab=phases");
+      expect(await screen.findByText("1차 조사 v2")).toBeInTheDocument();
+      expect(screen.getByText("2차 조사 v2")).toHaveTextContent("설정 있음");
+    });
+
+    it("위로·아래로·끼워 넣기는 위치(1부터)로 서버에 요청한다", async () => {
+      routes["POST /api/works/7/phases/2/move"] = () => json({ phases: bundle.phases });
+      routes["POST /api/works/7/phases/insert"] = () => json({ phases: bundle.phases }, 201);
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("button", { name: "페이즈 2 위로" }));
+      expect(await sent("POST /api/works/7/phases/2/move")[0].req.json()).toEqual({ position: 1 });
+      expect(screen.getByRole("button", { name: "페이즈 1 위로" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "페이즈 2 아래로" })).toBeDisabled();
+      await userEvent.type(screen.getAllByLabelText("페이즈 이름").at(-1)!, "밀담");
+      await userEvent.selectOptions(screen.getByLabelText("넣을 위치"), "2");
+      await userEvent.click(screen.getByRole("button", { name: "페이즈 추가" }));
+      expect(await sent("POST /api/works/7/phases/insert")[0].req.json()).toEqual({ position: 2, 이름: "밀담", 진행시간: 30 });
+    });
+
+    it("옮겨서 서버 값이 바뀌면 입력칸도 새 값으로 바뀐다", async () => {
+      routes["POST /api/works/7/phases/2/move"] = () => {
+        bundle.phases = [{ 순서: 1, 이름: null, 진행시간: 20 }, { 순서: 2, 이름: "도입", 진행시간: 10 }];
+        return json({ phases: bundle.phases });
+      };
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("button", { name: "페이즈 2 위로" }));
+      const first = await screen.findByRole("listitem", { name: "페이즈 1" });
+      await waitFor(() => expect(within(first).getByLabelText("진행 시간(분)")).toHaveValue(20));
+      expect(within(screen.getByRole("listitem", { name: "페이즈 2" })).getByLabelText("페이즈 이름")).toHaveValue("도입");
+    });
+
+    it("페이즈 삭제와 이름·시간 저장", async () => {
+      routes["DELETE /api/works/7/phases/1"] = () => json({ phases: [] });
+      routes["PATCH /api/works/7/content/phases/2"] = () => json({});
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      renderApp("/works/7?tab=phases");
+      const second = (await screen.findByRole("listitem", { name: "페이즈 2" }));
+      await userEvent.type(within(second).getByLabelText("페이즈 이름"), "토론");
+      await userEvent.click(within(second).getByRole("button", { name: "이름·시간 저장" }));
+      expect(await sent("PATCH /api/works/7/content/phases/2")[0].req.json()).toEqual({ 이름: "토론", 진행시간: 20 });
+      await userEvent.click(screen.getByRole("button", { name: "페이즈 1 삭제" }));
+      await waitFor(() => expect(sent("DELETE /api/works/7/phases/1")).toHaveLength(1));
+    });
+
+    it("카드 설정: 탭을 남기지 않기를 고르면 설정에 담고, 기본값이면 비운다", async () => {
+      routes["PATCH /api/works/7/content/phase-steps/9"] = () => json({});
+      routes["PATCH /api/works/7/content/phase-steps/10"] = () => json({});
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("button", { name: "1차 조사 설정" }));
+      const box = within(screen.getByRole("group", { name: "세부 설정" }));
+      expect(box.getByLabelText(/다음 페이즈에도 남기기/)).toBeChecked();
+      await userEvent.click(box.getByLabelText(/다음 페이즈에도 남기기/));
+      await userEvent.click(box.getByRole("button", { name: "설정 저장" }));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: { 탭유지: false } });
+
+      await userEvent.click(await screen.findByRole("button", { name: "2차 조사 설정" }));
+      const second = within(screen.getByRole("group", { name: "세부 설정" }));
+      expect(second.getByLabelText(/다음 페이즈에도 남기기/)).not.toBeChecked();
+      expect(second.getByLabelText(/JSON/)).toHaveValue(JSON.stringify({ 횟수: 3 }, null, 2));
+      await userEvent.click(second.getByLabelText(/다음 페이즈에도 남기기/));
+      await userEvent.clear(second.getByLabelText(/JSON/));
+      await userEvent.click(second.getByRole("button", { name: "설정 저장" }));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/10")[0].req.json()).toEqual({ 설정: null });
+    });
+
+    it("JSON 이 객체가 아니면 저장하지 않는다", async () => {
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("button", { name: "1차 조사 설정" }));
+      const box = within(screen.getByRole("group", { name: "세부 설정" }));
+      await userEvent.type(box.getByLabelText(/JSON/), "[[1]");   // "[[" 는 글자 "[" 이다
+      await userEvent.click(box.getByRole("button", { name: "설정 저장" }));
+      expect(await box.findByRole("alert")).toHaveTextContent("JSON 객체");
+      expect(sent("PATCH /api/works/7/content/phase-steps/9")).toHaveLength(0);
+    });
+  });
+
   it("삭제된 라이브러리 항목은 '삭제된 항목'으로 표시한다", async () => {
-    bundle.phases = [{ 순서: 1, 진행시간: 30 }];
-    bundle["phase-steps"] = [{ 번호: 9, 진행순서_순서: 1, 진행단계_번호: 5 }];
+    bundle.phases = [{ 순서: 1, 이름: null, 진행시간: 30 }];
+    bundle["phase-steps"] = [{ 번호: 9, 진행순서_순서: 1, 진행단계_번호: 5, 설정: null, 표시이름: "옛 조사" }];
     (bundle.library as { phases: object }).phases = { 5: { 번호: 5, 이름: "옛 조사", 버전: 1, 설명: "", 삭제됨: true } };
     renderApp("/works/7?tab=phases");
     expect(await screen.findByText(/옛 조사 v1/)).toHaveTextContent("삭제된 항목");

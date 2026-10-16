@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 
 from .auth import CurrentUser
 from .characters import COLUMNS as CHARACTER_COLUMNS
-from .content import RESOURCES, Resource, columns, ensure_mine, key_col
+from .content import RESOURCES, Resource, card_display_names, columns, ensure_mine, key_col
 from .db import Conn
 from .works import lock_work
 
@@ -141,6 +141,12 @@ def build_snapshot(conn: Connection, work_id: int) -> dict[str, Any]:
             }
             rows = [r for r in rows if r[col] in alive]
             used[table].update(r[col] for r in rows)
+        if res.key == "phase-steps":    # 칸에 놓인 카드의 표시 이름(같은 카드가 둘 이상이면 1차·2차)도 확정 내용에 담는다
+            names = {
+                r["번호"]: r["이름"] for r in conn.execute('SELECT "번호", "이름" FROM "진행단계"').fetchall()
+            }
+            shown = card_display_names([{**r, "번호": i} for i, r in enumerate(rows)], names)
+            rows = [{**r, "표시이름": shown[i]} for i, r in enumerate(rows)]
         snap[res.table] = rows
     snap["라이브러리"] = {
         table: [

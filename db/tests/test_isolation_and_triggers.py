@@ -285,6 +285,8 @@ class TestJsonbColumnsAreFreeForm(Scenario):
         ("기믹", "결과"): False,
         ("기믹실행", "결과"): True,
         ("투표", "규칙"): False,
+        ("진행구성", "설정"): True,
+        ("기믹적용", "설정"): True,
     }
 
     def test_jsonb_column_inventory_matches_spec(self):
@@ -313,6 +315,12 @@ class TestJsonbColumnsAreFreeForm(Scenario):
             return f'INSERT INTO "기믹"("이름","조건","결과") VALUES (\'x\',\'{{}}\',{value_sql})'
         if table == "투표":
             return f'INSERT INTO "투표"("작품_번호","순서","진행순서_순서","이름","내용","규칙") VALUES ({w},1,1,\'x\',\'y\',{value_sql})'
+        if table == "진행구성":
+            p = self.phase()
+            return f'INSERT INTO "진행구성"("작품_번호","진행순서_순서","진행단계_번호","설정") VALUES ({w},1,{p},{value_sql})'
+        if table == "기믹적용":
+            g = self.gimmick()
+            return f'INSERT INTO "기믹적용"("작품_번호","순서","기믹_번호","진행순서_순서","설정") VALUES ({w},1,{g},1,{value_sql})'
         if table == "기믹실행":
             self.version(w)
             g = self.game(self.room(w), w)

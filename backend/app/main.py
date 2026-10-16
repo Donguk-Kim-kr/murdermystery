@@ -12,6 +12,7 @@ from .confirm import router as confirm_router
 from .content import router as content_router, schema_router as content_schema_router
 from .db import Conn, create_pool
 from .library import router as library_router
+from .phases import router as phases_router
 from .publishing import router as publishing_router
 from .roomstate import JoinLimiter, RoomRegistry
 from .rooms import expire_rooms, router as rooms_router
@@ -69,6 +70,7 @@ app.include_router(works_router)
 app.include_router(characters_router)
 app.include_router(content_schema_router)
 app.include_router(content_router)
+app.include_router(phases_router)
 app.include_router(library_router)
 app.include_router(confirm_router)
 app.include_router(publishing_router)
