@@ -633,7 +633,10 @@ ol.vertical { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.8re
 ol.vertical ul { margin: 0.25rem 0 0; padding-left: 1.1rem; }
 .linked { display: grid; gap: 0.4rem; }
 .settings { display: grid; gap: 0.5rem; padding: 0.6rem; border: 1px dashed var(--border); border-radius: 0.6rem; }
-.attached { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.7rem; }
+.attached-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.attached-pick { font: inherit; font-size: 0.9rem; padding: 0.5rem 0.9rem; border-radius: 0.7rem; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer; }
+.attached-pick:hover { border-color: var(--accent); }
+.attached-pick.on { background: var(--accent-soft); color: var(--accent-soft-text); border-color: var(--accent); }
 .attached-card { display: grid; gap: 0.6rem; padding: 0.7rem 0.8rem; border: 1px solid var(--border-strong); border-radius: 0.7rem; background: var(--surface); }
 .attached-card.deleted { border-color: var(--danger); }
 .linked-title { font-size: 0.85rem; font-weight: 600; color: var(--text-2); }

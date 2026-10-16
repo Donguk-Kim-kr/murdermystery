@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { errorMessage, http } from "../api/client";
 import type { Hit } from "./flowDrag";
 import { useFlowDrag, type Payload } from "./useFlowDrag";
-import { phaseLabel, rowsOf, useWorkspace, type LibraryRef, type Row, type Workspace } from "./workspace";
+import { rowsOf, useWorkspace, type LibraryRef, type Row, type Workspace } from "./workspace";
 
 export interface LibraryItem {
   번호: number;
@@ -434,7 +434,7 @@ function TileChip({ row, lib, libCol, step, from, press }: {
   );
 }
 
-/** 고른 페이즈의 수정 패널: 이름·시간, 이전/다음 페이즈로 넘어가기, 삭제, 붙은 진행단계·기믹 각각의 수정. */
+/** 고른 페이즈의 수정 패널: 이름·시간, 이전/다음 페이즈로 넘어가기, 삭제, 붙은 진행단계·기믹 목록(골라서 수정·삭제). */
 function PhaseEditor({ ws, phase, index, total, call, onNavigate, onClose }: {
   ws: Workspace; phase: Row; index: number; total: number; call: Call; onNavigate: (delta: -1 | 1) => void; onClose: () => void;
 }) {
@@ -448,7 +448,6 @@ function PhaseEditor({ ws, phase, index, total, call, onNavigate, onClose }: {
   }, [no, phase.이름, phase.진행시간]);
   const steps = rowsOf(ws, "phase-steps").filter((s) => s.진행순서_순서 === no);
   const uses = rowsOf(ws, "gimmick-uses").filter((u) => u.진행순서_순서 === no);
-  const allPhases = rowsOf(ws, "phases");
   const autoName = steps.map((c) => String(c.표시이름 ?? "")).filter(Boolean).join("·");   // 이름을 비워 두면 따라갈 이름
 
   return (
@@ -457,7 +456,7 @@ function PhaseEditor({ ws, phase, index, total, call, onNavigate, onClose }: {
         <span className="row start">
           {/* 화살표는 페이즈를 옮기지 않고, 수정하는 페이즈를 이전/다음으로 바꾼다 */}
           <button type="button" className="small secondary" disabled={index === 0} aria-label="이전 페이즈 수정" onClick={() => onNavigate(-1)}>←</button>
-          <h3>{pad(index + 1)} 페이즈 편집</h3>
+          <h3>{pad(index + 1)}</h3>
           <button type="button" className="small secondary" disabled={index === total - 1} aria-label="다음 페이즈 수정" onClick={() => onNavigate(1)}>→</button>
         </span>
         <span className="row start">
@@ -484,101 +483,64 @@ function PhaseEditor({ ws, phase, index, total, call, onNavigate, onClose }: {
           이름·시간 저장
         </button>
       </div>
-      <p className="muted">
-        이름을 비워 두면 붙은 진행단계 이름을 따라갑니다{autoName ? ` (지금은 "${autoName}")` : ""}. 직접 정하면 그 이름이 우선합니다.
-      </p>
-      <AttachedCards title="진행단계" empty="붙은 진행단계가 없습니다. 아래 진행카드를 이 페이즈에 끌어다 놓으세요." rows={steps}
-        lib={ws.bundle.library.phases} libCol="진행단계_번호" resource="phase-steps" phaseNo={no} call={call} ws={ws} allPhases={allPhases} />
+      <AttachedCards key={`step:${no}`} title="진행단계" empty="붙은 진행단계가 없습니다. 아래 진행카드를 이 페이즈에 끌어다 놓으세요." rows={steps}
+        lib={ws.bundle.library.phases} libCol="진행단계_번호" resource="phase-steps" call={call} />
       {uses.length > 0 && (
-        <AttachedCards title="기믹" empty="" rows={uses} lib={ws.bundle.library.gimmicks} libCol="기믹_번호" resource="gimmick-uses"
-          phaseNo={no} call={call} ws={ws} allPhases={allPhases} />
+        <AttachedCards key={`gimmick:${no}`} title="기믹" empty="" rows={uses} lib={ws.bundle.library.gimmicks} libCol="기믹_번호" resource="gimmick-uses"
+          call={call} />
       )}
     </section>
   );
 }
 
-/** 페이즈에 붙은 진행단계(또는 기믹) 목록. 각각 이 페이즈에서만 쓰는 세부 설정을 바로 고치고, 다른 페이즈로 복사하거나 뗀다. */
-function AttachedCards({ title, empty, rows, lib, libCol, resource, phaseNo, call, ws, allPhases }: {
-  title: string; empty: string; rows: Row[]; lib: Record<string, LibraryRef>; libCol: string; resource: string;
-  phaseNo: number; call: Call; ws: Workspace; allPhases: Row[];
+/** 페이즈에 붙은 진행단계(또는 기믹) 목록. 하나를 골라야 그 카드의 수정 항목과 삭제 버튼이 나타난다(다시 누르면 접힌다). */
+function AttachedCards({ title, empty, rows, lib, libCol, resource, call }: {
+  title: string; empty: string; rows: Row[]; lib: Record<string, LibraryRef>; libCol: string; resource: string; call: Call;
 }) {
-  const [copying, setCopying] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(null);
   const isCard = resource === "phase-steps";
   const idCol = isCard ? "번호" : "순서";
+  // 같은 카드가 둘 이상이면 서버가 계산해 둔 "1차 ○○" 이름을 쓴다.
+  const nameOf = (r: Row) => (isCard && typeof r.표시이름 === "string" ? r.표시이름 : lib[String(r[libCol])]?.이름) ?? title;
+  const current = rows.find((r) => r[idCol] === selected);
+  const ref = current ? lib[String(current[libCol])] : undefined;
   return (
     <div className="linked" role="group" aria-label={title}>
       <span className="linked-title">{title}</span>
       {rows.length === 0 && <span className="muted">{empty}</span>}
-      <ul className="attached">
+      <ul className="attached-list">
         {rows.map((r) => {
-          const ref = lib[String(r[libCol])];
           const id = r[idCol] as number;
-          // 같은 카드가 둘 이상이면 서버가 계산해 둔 "1차 ○○" 이름을 쓴다.
-          const base = (isCard && typeof r.표시이름 === "string" ? r.표시이름 : ref?.이름) ?? title;
+          const on = id === selected;
           return (
-            <li key={String(id)} className={`attached-card${ref?.삭제됨 ? " deleted" : ""}`} role="group" aria-label={`${base} 수정`}>
-              <div className="row">
-                <span>
-                  <strong>{base}</strong>{" "}
-                  {ref ? <span className="muted">v{ref.버전}</span> : <span className="muted">#{String(r[libCol])}</span>}
-                  {ref?.삭제됨 && <span className="muted"> · 삭제된 항목</span>}
-                </span>
-                <span className="row start">
-                  <button type="button" className="small secondary" aria-label={`${base} 복사`} aria-expanded={copying === id}
-                    onClick={() => setCopying(copying === id ? null : id)}>
-                    복사
-                  </button>
-                  <button type="button" className="small secondary" aria-label={`${base} 떼기`} onClick={() => void call("DELETE", `${resource}/${id}`)}>
-                    떼기
-                  </button>
-                </span>
-              </div>
-              <SettingsEditor key={`${id}:${JSON.stringify(r.설정 ?? null)}`} resource={resource} id={id} value={r.설정}
-                showTab={isCard} call={call} />
-              {copying === id && (
-                <CopyEditor resource={resource} libCol={libCol} row={r} fromNo={phaseNo} allPhases={allPhases} ws={ws} call={call}
-                  onDone={() => setCopying(null)} />
-              )}
+            <li key={String(id)}>
+              <button type="button" className={`attached-pick${on ? " on" : ""}`} aria-pressed={on}
+                onClick={() => setSelected(on ? null : id)}>
+                {nameOf(r)}
+              </button>
             </li>
           );
         })}
       </ul>
-    </div>
-  );
-}
-
-/** 놓은 카드·기믹을 세부 설정째로 다른 페이즈에 복사한다. 같은 진행단계는 한 페이즈에 한 번만 놓을 수 있어 이미 있는 페이즈는 뺀다. */
-function CopyEditor({ resource, libCol, row, fromNo, allPhases, ws, call, onDone }: {
-  resource: string; libCol: string; row: Row; fromNo: number; allPhases: Row[]; ws: Workspace; call: Call; onDone: () => void;
-}) {
-  const isCard = resource === "phase-steps";
-  const taken = new Set(
-    rowsOf(ws, resource).filter((r) => r[libCol] === row[libCol]).map((r) => r.진행순서_순서 as number),
-  );
-  const targets = allPhases.filter((p) => p.순서 !== fromNo && !(isCard && taken.has(p.순서 as number)));
-  const [target, setTarget] = useState("");
-  return (
-    <div className="settings" role="group" aria-label="복사">
-      {targets.length === 0 ? (
-        <p className="muted">복사할 수 있는 다른 페이즈가 없습니다.{isCard ? " (같은 진행단계는 한 페이즈에 한 번만 놓을 수 있습니다)" : ""}</p>
-      ) : (
-        <label>
-          복사할 페이즈
-          <select value={target} onChange={(e) => setTarget(e.target.value)}>
-            <option value="">고르기…</option>
-            {targets.map((p) => <option key={String(p.순서)} value={String(p.순서)}>{phaseLabel(ws, p.순서 as number)}</option>)}
-          </select>
-        </label>
+      {current && (
+        <div className={`attached-card${ref?.삭제됨 ? " deleted" : ""}`} role="group" aria-label={`${nameOf(current)} 수정`}>
+          <div className="row">
+            <span>
+              <strong>{nameOf(current)}</strong>{" "}
+              {ref ? <span className="muted">v{ref.버전}</span> : <span className="muted">#{String(current[libCol])}</span>}
+              {ref?.삭제됨 && <span className="muted"> · 삭제된 항목</span>}
+            </span>
+            <button type="button" className="small secondary" aria-label={`${nameOf(current)} 삭제`}
+              onClick={async () => {
+                if (await call("DELETE", `${resource}/${current[idCol] as number}`)) setSelected(null);
+              }}>
+              삭제
+            </button>
+          </div>
+          <SettingsEditor key={`${selected}:${JSON.stringify(current.설정 ?? null)}`} resource={resource} id={current[idCol] as number}
+            value={current.설정} showTab={isCard} call={call} />
+        </div>
       )}
-      <div className="row start">
-        <button type="button" className="small" disabled={!target}
-          onClick={async () => {
-            if (await call("POST", resource, { 진행순서_순서: Number(target), [libCol]: row[libCol], 설정: row.설정 ?? null })) onDone();
-          }}>
-          복사
-        </button>
-        <button type="button" className="small secondary" onClick={onDone}>닫기</button>
-      </div>
     </div>
   );
 }
