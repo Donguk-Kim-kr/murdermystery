@@ -377,7 +377,7 @@ function CardLoader({ phaseItems, gimmickItems, tray, onToggle, onClose }: {
                 {/* 카드 오른쪽 위의 i 버튼: 누르면 설명이 펼쳐지고, 다시 누르거나 다른 곳을 누르면 닫힌다 */}
                 <button type="button" className="loader-info" aria-label={`${i.이름} v${i.버전} 설명 보기`} aria-expanded={open}
                   onClick={(e) => { e.stopPropagation(); setTipOpen(open ? null : i.번호); }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><path d="M12 8h.01" />
                   </svg>
                 </button>
