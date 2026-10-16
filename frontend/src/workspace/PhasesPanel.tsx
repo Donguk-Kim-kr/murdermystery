@@ -295,7 +295,7 @@ function Gap({ index, dnd, onGapDrop, wide = false }: {
   return (
     <div className={`gap${active ? " active" : ""}${dnd.over === id ? " over" : ""}${wide ? " wide" : ""}`}
       aria-label={`${index + 1}번째 앞 틈`} {...t}>
-      {active ? "+ 여기에 끼워 넣기" : ""}
+      {wide ? (active ? "+ 여기에 놓아 첫 페이즈 만들기" : "카드를 끌어다 놓으면 첫 페이즈가 만들어집니다") : active ? "+ 여기에 끼워 넣기" : ""}
     </div>
   );
 }

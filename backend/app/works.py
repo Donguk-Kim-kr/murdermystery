@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, status
-from psycopg import Connection
+from psycopg import Connection, errors
 from pydantic import BaseModel, Field
 
 from .auth import CurrentSession, CurrentUser
@@ -139,3 +139,18 @@ def update_work(work_id: int, body: WorkPatch, conn: Conn, me: CurrentUser) -> d
         f'UPDATE "작품" SET {assignments}, "수정일시" = CURRENT_TIMESTAMP WHERE "번호" = %s RETURNING {WORK_COLUMNS}',
         (*changes.values(), work_id),
     ).fetchone()
+
+
+@router.delete("/{work_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_work(work_id: int, conn: Conn, me: CurrentUser) -> None:
+    """내 작품을 지운다. 제작용 콘텐츠·확정 버전·테스터는 함께 지워진다(되돌릴 수 없다).
+
+    이 작품으로 만든 방이나 플레이 기록이 있으면 DB 가 거부하므로 지울 수 없다(409, docs/DB_RULES.md B11).
+    """
+    lock_work(conn, work_id, me.계정.번호)
+    try:
+        conn.execute('DELETE FROM "작품" WHERE "번호" = %s', (work_id,))
+    except errors.ForeignKeyViolation as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "이 작품으로 만든 방이나 플레이 기록이 있어 삭제할 수 없습니다"
+        ) from exc

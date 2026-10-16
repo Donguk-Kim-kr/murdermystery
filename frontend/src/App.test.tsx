@@ -206,6 +206,24 @@ describe("작품", () => {
     expect(await screen.findByText("아직 작품이 없습니다.")).toBeInTheDocument();
   });
 
+  it("작품 목록에서 확인 후 삭제하고, 서버가 거부하면 사유를 보여 준다", async () => {
+    routes["GET /api/works"] = () => json([work, { ...work, 번호: 8, 제목: "방이 있는 작품" }]);
+    // 내 작품은 비공개 플레이 목록에도 내려오지만, 위 목록에 없어지면 그쪽에 따로 나타나므로 함께 지워야 한다
+    routes["GET /api/private-play-works"] = () => json([{ ...work }]);
+    routes["DELETE /api/works/7"] = () => new Response(null, { status: 204 });
+    routes["DELETE /api/works/8"] = () => json({ detail: "이 작품으로 만든 방이나 플레이 기록이 있어 삭제할 수 없습니다" }, 409);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValue(true);
+    renderApp();
+    await userEvent.click(await screen.findByRole("button", { name: "저택의 비밀 삭제" }));
+    expect(calls.filter((c) => c.key === "DELETE /api/works/7")).toHaveLength(0);                         // 취소하면 보내지 않는다
+    await userEvent.click(screen.getByRole("button", { name: "저택의 비밀 삭제" }));
+    await waitFor(() => expect(screen.queryByText("저택의 비밀")).not.toBeInTheDocument());
+    expect(confirm.mock.calls[1][0]).toContain("저택의 비밀");
+    await userEvent.click(screen.getByRole("button", { name: "방이 있는 작품 삭제" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("방이나 플레이 기록이 있어");
+    expect(screen.getByText("방이 있는 작품")).toBeInTheDocument();             // 목록에 그대로 남는다
+  });
+
   it("새 작품을 만들면 그 작품 화면으로 이동한다", async () => {
     routes["POST /api/works"] = () => json(work, 201);
     routes["GET /api/works/7"] = () => json(work);

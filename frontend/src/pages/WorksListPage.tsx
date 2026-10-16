@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { api, errorMessage } from "../api/client";
+import { api, errorMessage, http } from "../api/client";
 import type { components } from "../api/schema";
 
 type Work = components["schemas"]["WorkOut"];
@@ -26,6 +26,17 @@ export function WorksListPage() {
       cancelled = true;
     };
   }, []);
+
+  async function remove(w: Work) {
+    if (!window.confirm(`'${w.제목}' 작품을 삭제할까요?\n인물·장소·단서·흐름 등 만들어 둔 내용이 모두 지워지고 되돌릴 수 없습니다.`)) return;
+    setError(null);
+    const res = await http("DELETE", `/api/works/${w.번호}`);
+    if (res.error) setError(errorMessage(res.error, "삭제하지 못했습니다"));
+    else {
+      setWorks((list) => (list ?? []).filter((x) => x.번호 !== w.번호));
+      setPrivateWorks((list) => list.filter((x) => x.번호 !== w.번호));   // 내 작품은 비공개 플레이 목록에도 있으므로 함께 뺀다
+    }
+  }
 
   // 내가 제작자인 작품은 위 목록에 있으므로, 남이 테스터로 지정해 준 작품만 따로 보여 준다.
   const mine = new Set((works ?? []).map((w) => w.번호));
@@ -52,16 +63,21 @@ export function WorksListPage() {
       {works && works.length > 0 && (
         <div className="work-grid">
           {works.map((w) => (
-            <Link key={w.번호} to={`/works/${w.번호}`} className="work-card">
-              <h3>{w.제목}</h3>
-              <p className="synopsis">{w.시놉시스 || "시놉시스가 아직 없습니다."}</p>
-              <div className="work-meta">
-                <span className={w.공개여부 ? "chip success" : "chip"}>{w.공개여부 ? "공개" : "비공개"}</span>
-                <span className="chip">{w.상태}</span>
-                <span className="chip">{w.장르 || "장르 미정"}</span>
-                <span className="chip">인원 {w.최소인원}~{w.최대인원}명</span>
-              </div>
-            </Link>
+            <div key={w.번호} className="work-item">
+              <Link to={`/works/${w.번호}`} className="work-card">
+                <h3>{w.제목}</h3>
+                <p className="synopsis">{w.시놉시스 || "시놉시스가 아직 없습니다."}</p>
+                <div className="work-meta">
+                  <span className={w.공개여부 ? "chip success" : "chip"}>{w.공개여부 ? "공개" : "비공개"}</span>
+                  <span className="chip">{w.상태}</span>
+                  <span className="chip">{w.장르 || "장르 미정"}</span>
+                  <span className="chip">인원 {w.최소인원}~{w.최대인원}명</span>
+                </div>
+              </Link>
+              <button type="button" className="small secondary work-delete" aria-label={`${w.제목} 삭제`} onClick={() => void remove(w)}>
+                삭제
+              </button>
+            </div>
           ))}
         </div>
       )}

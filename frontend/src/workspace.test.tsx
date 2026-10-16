@@ -403,6 +403,11 @@ describe("진행 탭", () => {
     });
   });
 
+  it("페이즈가 없으면 카드를 놓을 빈 칸이 보인다", async () => {
+    renderApp("/works/7?tab=phases");
+    expect(await screen.findByLabelText("1번째 앞 틈")).toHaveTextContent("카드를 끌어다 놓으면 첫 페이즈가 만들어집니다");
+  });
+
   it("삭제된 라이브러리 항목은 '삭제된 항목'으로 표시한다", async () => {
     bundle.phases = [{ 순서: 1, 이름: null, 진행시간: 30 }];
     bundle["phase-steps"] = [{ 번호: 9, 진행순서_순서: 1, 진행단계_번호: 5, 설정: null, 표시이름: "옛 조사" }];

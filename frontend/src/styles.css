@@ -427,6 +427,10 @@ a.work-card:hover {
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
+.work-item { position: relative; display: grid; }
+.work-item > .work-card { height: 100%; }
+.work-delete { position: absolute; top: 0.7rem; right: 0.7rem; }
+.work-item .work-card h3 { padding-right: 3.5rem; }
 .work-card h3 { font-size: 1.05rem; font-weight: 650; }
 .work-card .synopsis {
   color: var(--muted);
@@ -558,7 +562,7 @@ button.tab.active { color: var(--accent); border-bottom-color: var(--accent); ba
 .item .body { flex: 1; min-width: 0; display: grid; gap: 0.1rem; }
 .item .name { font-weight: 600; overflow-wrap: anywhere; }
 .hint { font-size: 0.8rem; color: var(--muted); font-weight: 400; }
-label.inline { display: inline-flex; align-items: center; gap: 0.5rem; }
+label.inline { display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; }
 label.inline input { width: 6rem; }
 .phase { border: 1px solid var(--border); border-radius: 0.7rem; padding: 0.8rem; display: grid; gap: 0.7rem; align-content: start; background: var(--surface); }
 /* 게임 흐름: 페이즈를 왼쪽에서 오른쪽으로 놓는다. 넘치면 가로로 스크롤한다. */
@@ -568,7 +572,7 @@ ol.flow > li.flow-gap, ol.flow > li.flow-end { flex: 0 0 auto; display: flex; }
 .gap { width: 0.9rem; border: 2px dashed transparent; border-radius: 0.6rem; display: grid; place-items: center; text-align: center; font-size: 0.75rem; color: var(--muted); transition: width 0.12s; }
 .gap.active { width: 4.5rem; border-color: var(--border-strong); }
 .gap.over { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-soft-text); }
-.gap.wide.active { width: 16rem; min-height: 7rem; }
+.gap.wide { width: 16rem; min-height: 7rem; padding: 0.6rem; border-color: var(--border-strong); }
 .phase.over { outline: 2px dashed var(--accent); outline-offset: 2px; }
 .phase.dragging { opacity: 0.45; }
 .phase-head, .draggable { cursor: grab; }

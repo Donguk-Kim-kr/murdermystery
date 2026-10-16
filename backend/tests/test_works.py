@@ -90,3 +90,32 @@ def test_common_story_is_optional_and_editable(client, headers):
     assert client.patch(f"/api/works/{work['번호']}", headers=headers, json={"공통스토리": None}).status_code == 422
     too_long = "가" * 20001
     assert client.patch(f"/api/works/{work['번호']}", headers=headers, json={"공통스토리": too_long}).status_code == 422
+
+
+def test_delete_removes_the_work_with_its_content(client, headers):
+    w = create(client, headers, 제목="지울 작품")["번호"]
+    client.post(f"/api/works/{w}/characters", headers=headers, json={"이름": "A"})
+    client.post(f"/api/works/{w}/content/places", headers=headers, json={"이름": "서재"})
+    client.post(f"/api/works/{w}/content/phases", headers=headers, json={})
+    assert client.delete(f"/api/works/{w}", headers=headers).status_code == 204
+    assert client.get(f"/api/works/{w}", headers=headers).status_code == 404
+    assert all(x["번호"] != w for x in client.get("/api/works", headers=headers).json())
+    assert client.delete(f"/api/works/{w}", headers=headers).status_code == 404     # 이미 없다
+
+
+def test_only_the_owner_can_delete(client, new_user):
+    owner, other = new_user(), new_user()
+    w = create(client, owner)["번호"]
+    assert client.delete(f"/api/works/{w}", headers=other).status_code == 404
+    assert client.delete(f"/api/works/{w}").status_code == 401
+    assert client.get(f"/api/works/{w}", headers=owner).status_code == 200          # 그대로 남아 있다
+
+
+def test_work_with_a_room_cannot_be_deleted(client, headers, confirm):
+    w = create(client, headers)["번호"]
+    client.post(f"/api/works/{w}/characters", headers=headers, json={"이름": "A"})
+    confirm(w)
+    assert client.post("/api/rooms", headers=headers, json={"작품_번호": w}).status_code == 201
+    res = client.delete(f"/api/works/{w}", headers=headers)
+    assert res.status_code == 409 and "방" in res.json()["detail"]
+    assert client.get(f"/api/works/{w}", headers=headers).status_code == 200

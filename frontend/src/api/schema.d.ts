@@ -101,7 +101,13 @@ export interface paths {
         get: operations["get_work_api_works__work_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Work
+         * @description 내 작품을 지운다. 제작용 콘텐츠·확정 버전·테스터는 함께 지워진다(되돌릴 수 없다).
+         *
+         *     이 작품으로 만든 방이나 플레이 기록이 있으면 DB 가 거부하므로 지울 수 없다(409, docs/DB_RULES.md B11).
+         */
+        delete: operations["delete_work_api_works__work_id__delete"];
         options?: never;
         head?: never;
         /** Update Work */
@@ -1187,6 +1193,37 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WorkOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_work_api_works__work_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
