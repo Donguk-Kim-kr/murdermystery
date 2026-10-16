@@ -463,8 +463,7 @@ function PhaseEditor({ ws, phase, index, total, call, onNavigate, onClose }: {
         <span className="row start">
           <button type="button" className="small secondary" aria-label={`페이즈 ${index + 1} 삭제`}
             onClick={async () => {
-              if (window.confirm(`${pad(index + 1)} 페이즈를 삭제할까요? 놓인 카드는 내려가고 뒤의 페이즈가 한 칸 앞으로 옵니다.`)
-                && (await call("DELETE", `/phases/${no}`))) onClose();
+              if (await call("DELETE", `/phases/${no}`)) onClose();   // 확인창 없이 바로 지운다(놓인 카드는 내려가고 뒤의 페이즈가 한 칸 앞으로 온다)
             }}>
             삭제
           </button>

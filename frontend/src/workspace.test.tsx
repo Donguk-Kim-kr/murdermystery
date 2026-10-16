@@ -546,15 +546,17 @@ describe("진행 탭", () => {
       expect(within(second).getByText("45분")).toBeInTheDocument();
     });
 
-    it("페이즈 삭제는 확인 후 서버에 요청하고 수정 패널을 닫는다", async () => {
+    it("페이즈 삭제는 확인창 없이 바로 서버에 요청하고 수정 패널을 닫는다", async () => {
       routes["DELETE /api/works/7/phases/2"] = () => json({ phases: [] });
-      vi.spyOn(window, "confirm").mockReturnValue(true);
+      const confirm = vi.spyOn(window, "confirm");
       renderApp("/works/7?tab=phases");
       await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 2" }));
       await userEvent.click(screen.getByRole("button", { name: "페이즈 2 삭제" }));
       await waitFor(() => expect(sent("DELETE /api/works/7/phases/2")).toHaveLength(1));
+      expect(confirm).not.toHaveBeenCalled();
       await waitFor(() => expect(screen.queryByRole("region", { name: "페이즈 편집" })).not.toBeInTheDocument());
     });
+
 
     it("세로로 보기는 읽기 전용 팝업으로 흐름을 위에서 아래로 보여 주고 닫을 수 있다", async () => {
       renderApp("/works/7?tab=phases");
