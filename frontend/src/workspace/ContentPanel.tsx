@@ -137,7 +137,7 @@ export function RowForm(props: {
   const [draft, setDraft] = useState<Draft>(Object.fromEntries(meta.fields.map((f) => [f.name, initialValue(f, row)])));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const fields = meta.fields.filter((f) => f.kind !== "libref"); // 진행단계·기믹 선택은 진행 탭 전용 화면에서 한다
+  const fields = meta.fields.filter((f) => f.kind !== "libref"); // 진행단계·기믹 선택은 흐름 탭 전용 화면에서 한다
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

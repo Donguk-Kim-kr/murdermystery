@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -113,8 +113,18 @@ describe("작업공간 탭", () => {
     expect(await sent("POST /api/works/7/content/places")[0].req.json()).toEqual({ 이름: "서재", 유형: null, 상위_장소_순서: null });
   });
 
-  it("탭을 눌러 오가고, 개요에는 기존 화면이 그대로 있다", async () => {
+  it("작품을 열면 게임 흐름 탭이 먼저 열린다", async () => {
+    routes["GET /api/library/phases"] = () => json([]);
+    routes["GET /api/library/gimmicks"] = () => json([]);
+    routes["GET /api/works/7/content/votes"] = () => json([]);
     renderApp("/works/7");
+    expect(await screen.findByRole("tab", { name: "흐름", selected: true })).toBeInTheDocument();
+    expect(screen.getAllByRole("tab")[0]).toHaveAccessibleName("흐름");
+    expect(await screen.findByRole("region", { name: "페이즈" })).toBeInTheDocument();
+  });
+
+  it("탭을 눌러 오가고, 개요에는 기존 화면이 그대로 있다", async () => {
+    renderApp("/works/7?tab=overview");
     expect(await screen.findByRole("form", { name: "기본정보" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "결말" }));
     expect(await screen.findByRole("region", { name: "엔딩 분기" })).toBeInTheDocument();
@@ -213,14 +223,14 @@ describe("진행 탭", () => {
       expect(screen.getByText("2차 조사 v2")).toHaveTextContent("설정 있음");
     });
 
-    it("위로·아래로·끼워 넣기는 위치(1부터)로 서버에 요청한다", async () => {
+    it("앞으로·뒤로·끼워 넣기는 위치(1부터)로 서버에 요청한다", async () => {
       routes["POST /api/works/7/phases/2/move"] = () => json({ phases: bundle.phases });
       routes["POST /api/works/7/phases/insert"] = () => json({ phases: bundle.phases }, 201);
       renderApp("/works/7?tab=phases");
-      await userEvent.click(await screen.findByRole("button", { name: "페이즈 2 위로" }));
+      await userEvent.click(await screen.findByRole("button", { name: "페이즈 2 앞으로" }));
       expect(await sent("POST /api/works/7/phases/2/move")[0].req.json()).toEqual({ position: 1 });
-      expect(screen.getByRole("button", { name: "페이즈 1 위로" })).toBeDisabled();
-      expect(screen.getByRole("button", { name: "페이즈 2 아래로" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "페이즈 1 앞으로" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "페이즈 2 뒤로" })).toBeDisabled();
       await userEvent.type(screen.getAllByLabelText("페이즈 이름").at(-1)!, "밀담");
       await userEvent.selectOptions(screen.getByLabelText("넣을 위치"), "2");
       await userEvent.click(screen.getByRole("button", { name: "페이즈 추가" }));
@@ -233,7 +243,7 @@ describe("진행 탭", () => {
         return json({ phases: bundle.phases });
       };
       renderApp("/works/7?tab=phases");
-      await userEvent.click(await screen.findByRole("button", { name: "페이즈 2 위로" }));
+      await userEvent.click(await screen.findByRole("button", { name: "페이즈 2 앞으로" }));
       const first = await screen.findByRole("listitem", { name: "페이즈 1" });
       await waitFor(() => expect(within(first).getByLabelText("진행 시간(분)")).toHaveValue(20));
       expect(within(screen.getByRole("listitem", { name: "페이즈 2" })).getByLabelText("페이즈 이름")).toHaveValue("도입");
@@ -271,6 +281,71 @@ describe("진행 탭", () => {
       await userEvent.clear(second.getByLabelText(/JSON/));
       await userEvent.click(second.getByRole("button", { name: "설정 저장" }));
       expect(await sent("PATCH /api/works/7/content/phase-steps/10")[0].req.json()).toEqual({ 설정: null });
+    });
+
+    const dt = () => ({ setData: vi.fn(), effectAllowed: "", dropEffect: "" });
+    /** 끌기: 시작 → 대상 위로 → 놓기. */
+    const dragDrop = (from: Element, to: Element) => {
+      const dataTransfer = dt();
+      fireEvent.dragStart(from, { dataTransfer });
+      fireEvent.dragOver(to, { dataTransfer });
+      fireEvent.drop(to, { dataTransfer });
+      fireEvent.dragEnd(from, { dataTransfer });
+    };
+
+    it("카드 상자의 카드를 페이즈 위에 놓으면 붙는다", async () => {
+      routes["POST /api/works/7/content/phase-steps"] = () => json({ 번호: 11 }, 201);
+      renderApp("/works/7?tab=phases");
+      const palette = await screen.findByRole("group", { name: "카드 상자 진행단계 카드" });
+      dragDrop(within(palette).getByText(/^조사 v2/), await screen.findByRole("listitem", { name: "페이즈 2" }));
+      await waitFor(() => expect(sent("POST /api/works/7/content/phase-steps")).toHaveLength(1));
+      expect(await sent("POST /api/works/7/content/phase-steps")[0].req.json()).toEqual({ 진행순서_순서: 2, 진행단계_번호: 5 });
+    });
+
+    it("페이즈 사이 틈에 놓으면 새 페이즈를 끼워 넣고 거기에 붙인다", async () => {
+      routes["POST /api/works/7/phases/insert"] = () => json({ phases: [
+        { 순서: 1, 이름: "도입", 진행시간: 10 }, { 순서: 3, 이름: null, 진행시간: 30 }, { 순서: 2, 이름: null, 진행시간: 20 },
+      ] }, 201);
+      routes["POST /api/works/7/content/phase-steps"] = () => json({ 번호: 11 }, 201);
+      renderApp("/works/7?tab=phases");
+      const palette = await screen.findByRole("group", { name: "카드 상자 진행단계 카드" });
+      dragDrop(within(palette).getByText(/^조사 v2/), screen.getByLabelText("2번째 앞 틈"));
+      await waitFor(() => expect(sent("POST /api/works/7/content/phase-steps")).toHaveLength(1));
+      expect(await sent("POST /api/works/7/phases/insert")[0].req.json()).toEqual({ position: 2, 이름: null, 진행시간: 30 });
+      // 새로 생긴 칸(번호 3)에 붙는다
+      expect(await sent("POST /api/works/7/content/phase-steps")[0].req.json()).toEqual({ 진행순서_순서: 3, 진행단계_번호: 5 });
+    });
+
+    it("붙은 카드를 다른 페이즈로 끌어 옮긴다", async () => {
+      routes["PATCH /api/works/7/content/phase-steps/9"] = () => json({});
+      renderApp("/works/7?tab=phases");
+      const first = await screen.findByRole("listitem", { name: "페이즈 1" });
+      dragDrop(within(first).getByText(/^1차 조사/).closest("li")!, screen.getByRole("listitem", { name: "페이즈 2" }));
+      await waitFor(() => expect(sent("PATCH /api/works/7/content/phase-steps/9")).toHaveLength(1));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 진행순서_순서: 2 });
+    });
+
+    it("페이즈를 끌어 다른 페이즈 자리나 틈에 놓으면 순서가 바뀐다", async () => {
+      routes["POST /api/works/7/phases/1/move"] = () => json({ phases: [] });
+      routes["POST /api/works/7/phases/2/move"] = () => json({ phases: [] });
+      renderApp("/works/7?tab=phases");
+      const first = await screen.findByRole("listitem", { name: "페이즈 1" });
+      const second = screen.getByRole("listitem", { name: "페이즈 2" });
+      dragDrop(first.querySelector(".phase-head")!, second);                 // 2번째 자리로
+      await waitFor(() => expect(sent("POST /api/works/7/phases/1/move")).toHaveLength(1));
+      expect(await sent("POST /api/works/7/phases/1/move")[0].req.json()).toEqual({ position: 2 });
+      dragDrop(second.querySelector(".phase-head")!, screen.getByLabelText("1번째 앞 틈"));   // 맨 앞으로
+      await waitFor(() => expect(sent("POST /api/works/7/phases/2/move")).toHaveLength(1));
+      expect(await sent("POST /api/works/7/phases/2/move")[0].req.json()).toEqual({ position: 1 });
+    });
+
+    it("제자리에 놓는 것은 서버에 요청하지 않는다", async () => {
+      renderApp("/works/7?tab=phases");
+      const first = await screen.findByRole("listitem", { name: "페이즈 1" });
+      dragDrop(first.querySelector(".phase-head")!, screen.getByLabelText("2번째 앞 틈"));   // 자기 바로 뒤 틈
+      dragDrop(first.querySelector(".phase-head")!, screen.getByLabelText("1번째 앞 틈"));   // 자기 바로 앞 틈
+      await new Promise((r) => setTimeout(r, 50));
+      expect(calls.filter((c) => c.key.includes("/move"))).toHaveLength(0);
     });
 
     it("JSON 이 객체가 아니면 저장하지 않는다", async () => {
@@ -322,7 +397,7 @@ describe("확정 탭", () => {
 
 describe("개요 탭", () => {
   it("제목과 인물 이름은 나중에 바꿀 수 있다고 안내한다", async () => {
-    renderApp("/works/7");
+    renderApp("/works/7?tab=overview");
     expect(await screen.findByText(/제목은 임시로 정해도 됩니다/)).toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: "인물 추가" }));
     expect(screen.getByText(/이름은 임시로 정해도 됩니다/)).toBeInTheDocument();
@@ -331,7 +406,7 @@ describe("개요 탭", () => {
   it("인물을 삭제하면 확인 후 서버에 알리고, 거부되면 사유를 보여 준다", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     routes["DELETE /api/works/7/characters/1"] = () => json({ detail: "다른 항목이 이 인물을 사용하고 있어 지울 수 없습니다" }, 409);
-    renderApp("/works/7");
+    renderApp("/works/7?tab=overview");
     await userEvent.click(await screen.findByRole("button", { name: "삭제" }));
     expect(await screen.findByText(/다른 항목이 이 인물을 사용하고 있어/)).toBeInTheDocument();
   });

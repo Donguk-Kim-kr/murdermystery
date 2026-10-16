@@ -14,13 +14,13 @@ import { VisibilityPanel } from "./VisibilityPanel";
 
 type Work = components["schemas"]["WorkOut"];
 
-/** 작업공간의 탭. 어느 탭부터 채워도 되고, 확정할 때만 검사한다. */
+/** 작업공간의 탭. 게임 흐름이 중심이라 첫 탭이고 기본으로 열린다. 어느 탭부터 채워도 되고, 확정할 때만 검사한다. */
 const TABS = [
+  { id: "phases", label: "흐름" },
   { id: "overview", label: "개요" },
   { id: "places", label: "장소·단서" },
   { id: "incidents", label: "사건" },
   { id: "relations", label: "관계·자료" },
-  { id: "phases", label: "진행" },
   { id: "endings", label: "결말" },
   { id: "confirm", label: "확정" },
 ] as const;
@@ -36,7 +36,7 @@ export function WorkPage() {
   // null: 폼 닫힘, "new": 새 인물, 숫자: 그 순서의 인물 수정
   const [editing, setEditing] = useState<null | "new" | number>(null);
   const [params, setParams] = useSearchParams();
-  const tab: TabId = TABS.find((t) => t.id === params.get("tab"))?.id ?? "overview";
+  const tab: TabId = TABS.find((t) => t.id === params.get("tab"))?.id ?? "phases";
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -90,7 +90,7 @@ export function WorkPage() {
         {TABS.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
             className={tab === t.id ? "tab active" : "tab"}
-            onClick={() => setParams(t.id === "overview" ? {} : { tab: t.id }, { replace: true })}>
+            onClick={() => setParams(t.id === "phases" ? {} : { tab: t.id }, { replace: true })}>
             {t.label}
           </button>
         ))}

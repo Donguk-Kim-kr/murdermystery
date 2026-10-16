@@ -24,16 +24,18 @@ export function AuthPage() {
 
   return (
     <main className="auth">
-      <ThemeToggle />
       <div className="auth-card">
         <div className="auth-brand">
           <h1>머더미스터리</h1>
         </div>
         <form onSubmit={onSubmit}>
-          <label>
-            아이디
-            <input value={id} onChange={(e) => setId(e.target.value)} autoComplete="username" required />
-          </label>
+          <div className="id-row">
+            <label>
+              아이디
+              <input value={id} onChange={(e) => setId(e.target.value)} autoComplete="username" required />
+            </label>
+            <ThemeToggle />
+          </div>
           <label>
             패스워드
             <input
