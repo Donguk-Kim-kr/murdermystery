@@ -68,6 +68,8 @@ const emptyBundle = () => ({
 beforeEach(() => {
   bundle = emptyBundle();
   routes = {
+    "GET /api/works/7/confirm/check": () => json({ errors: [], warnings: [], 다음버전: "1.0" }),
+    "GET /api/works/7/versions": () => json([]),
     "GET /api/works": () => json([]),
     "GET /api/private-play-works": () => json([]),
     "GET /api/rooms/me": () => json(null),
@@ -141,9 +143,9 @@ describe("작업공간 탭", () => {
     renderApp("/works/7");
     await screen.findByRole("tab", { name: "흐름", selected: true });
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
-      "흐름", "인물", "장소", "조사", "확인", "개요", "사건", "자료", "결말",
+      "흐름", "인물", "장소", "조사", "정리", "사건", "자료", "결말",
     ]);
-    expect(screen.queryByRole("tab", { name: "확정" })).not.toBeInTheDocument();    // 확정 → 확인
+    expect(screen.queryByRole("tab", { name: "개요" })).not.toBeInTheDocument();    // 개요는 정리 탭으로 합쳤다
   });
 
   it("인물 탭에서 관계를 설정하고, 장소 탭에는 장소만, 조사 탭에는 단서·증언·조합이 있다", async () => {
@@ -171,13 +173,13 @@ describe("작업공간 탭", () => {
     expect(await screen.findByRole("button", { name: "버전 1.0 확정" })).toBeInTheDocument();
   });
 
-  it("탭을 눌러 오가고, 개요에는 기존 화면이 그대로 있다", async () => {
-    renderApp("/works/7?tab=overview");
+  it("탭을 눌러 오가고, 정리 탭에는 기본정보가 있다", async () => {
+    renderApp("/works/7?tab=confirm");
     expect(await screen.findByRole("form", { name: "기본정보" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "결말" }));
     expect(await screen.findByRole("region", { name: "엔딩 분기" })).toBeInTheDocument();
     expect(screen.queryByRole("form", { name: "기본정보" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("tab", { name: "개요" }));
+    await userEvent.click(screen.getByRole("tab", { name: "정리" }));
     expect(await screen.findByRole("form", { name: "기본정보" })).toBeInTheDocument();
   });
 
@@ -494,7 +496,7 @@ describe("확정 탭", () => {
 
 describe("개요·인물 탭", () => {
   it("제목은 나중에 바꿀 수 있다고 안내한다", async () => {
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=confirm");
     expect(await screen.findByText(/제목은 임시로 정해도 됩니다/)).toBeInTheDocument();
   });
 

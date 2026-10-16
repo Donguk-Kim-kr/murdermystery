@@ -20,6 +20,8 @@ beforeEach(() => {
     "GET /api/library/phases": () => json([]),
     "GET /api/library/gimmicks": () => json([]),
     "GET /api/works/7/content": () => json({ phases: [], "phase-steps": [], "gimmick-uses": [], library: { phases: {}, gimmicks: {} } }),
+    "GET /api/works/7/confirm/check": () => json({ errors: [], warnings: [], 다음버전: "1.0" }),
+    "GET /api/works/7/versions": () => json([]),
     "GET /api/play-works": () => json([]),
     "GET /api/works": () => json([]),
     "GET /api/private-play-works": () => json([]),
@@ -266,7 +268,7 @@ describe("작품", () => {
       current = { ...work, 수정일시: "2026-10-14T01:00:00Z" }; // 저장하면 수정일시가 바뀐다
       return json(current);
     };
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=confirm");
     const form = await screen.findByRole("form", { name: "기본정보" });
     await userEvent.type(within(form).getByLabelText("장르"), "!");
     await userEvent.click(within(form).getByRole("button", { name: "저장" }));
@@ -278,7 +280,7 @@ describe("작품", () => {
     routes["GET /api/works/7"] = () => json(work);
     routes["GET /api/works/7/characters"] = () => json([]);
     routes["PATCH /api/works/7"] = () => json(work);
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=confirm");
     const form = await screen.findByRole("form", { name: "기본정보" });
     await userEvent.click(within(form).getByRole("button", { name: "저장" }));
     await within(form).findByRole("status");
@@ -295,7 +297,7 @@ describe("작품", () => {
       current = { ...work, 공개여부: true };
       return json(current);
     };
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=confirm");
     const panel = await screen.findByRole("region", { name: "공개 상태" });
     await userEvent.click(within(panel).getByRole("button", { name: "공개하기" }));
     expect(await within(panel).findByText("공개 중")).toBeInTheDocument();
@@ -305,7 +307,7 @@ describe("작품", () => {
   it("확정된 버전이 없으면 공개하기 버튼을 쓸 수 없고 이유를 보여 준다", async () => {
     routes["GET /api/works/7"] = () => json({ ...work, 확정버전_있음: false });
     routes["GET /api/works/7/characters"] = () => json([]);
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=confirm");
     const panel = await screen.findByRole("region", { name: "공개 상태" });
     expect(within(panel).getByRole("button", { name: "공개하기" })).toBeDisabled();
     expect(within(panel).getByText("확정된 버전이 없어 공개할 수 없습니다.")).toBeInTheDocument();
@@ -314,7 +316,7 @@ describe("작품", () => {
   it("관리자가 비공개한 작품은 제작자에게 공개 버튼이 없다", async () => {
     routes["GET /api/works/7"] = () => json({ ...work, 공개권한: "관리자" });
     routes["GET /api/works/7/characters"] = () => json([]);
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=confirm");
     const panel = await screen.findByRole("region", { name: "공개 상태" });
     expect(within(panel).getByText(/관리자가 비공개 처리했습니다/)).toBeInTheDocument();
     expect(within(panel).queryByRole("button", { name: "공개하기" })).not.toBeInTheDocument();
@@ -325,7 +327,7 @@ describe("작품", () => {
     routes["GET /api/auth/me"] = () => json({ ...account, 권한: "관리자" });
     routes["GET /api/works/7"] = () => json({ ...work, 공개권한: "관리자" });
     routes["GET /api/works/7/characters"] = () => json([]);
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=confirm");
     const panel = await screen.findByRole("region", { name: "공개 상태" });
     expect(within(panel).queryByRole("button", { name: "공개하기" })).not.toBeInTheDocument();
   });
@@ -334,7 +336,7 @@ describe("작품", () => {
     routes["GET /api/auth/me"] = () => json({ ...account, 권한: "운영자" });
     routes["GET /api/works/7"] = () => json({ ...work, 공개권한: "운영자" });
     routes["GET /api/works/7/characters"] = () => json([]);
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=confirm");
     const panel = await screen.findByRole("region", { name: "공개 상태" });
     expect(within(panel).getByRole("button", { name: "공개하기" })).toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: "제작자에게 공개 권한 돌려주기" })).toBeInTheDocument();
@@ -344,7 +346,7 @@ describe("작품", () => {
     routes["GET /api/works/7"] = () => json(work);
     routes["GET /api/works/7/characters"] = () => json([]);
     routes["POST /api/works/7/publish"] = () => json({ detail: "이 작품에 대한 권한이 없습니다" }, 403);
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=confirm");
     const panel = await screen.findByRole("region", { name: "공개 상태" });
     await userEvent.click(within(panel).getByRole("button", { name: "공개하기" }));
     expect(await within(panel).findByRole("alert")).toHaveTextContent("이 작품에 대한 권한이 없습니다");
@@ -364,7 +366,7 @@ describe("작품", () => {
       testers = [];
       return new Response(null, { status: 204 });
     };
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=confirm");
     const panel = await screen.findByRole("region", { name: "테스터" });
     await userEvent.type(within(panel).getByLabelText("테스터 아이디"), "bob");
     await userEvent.click(within(panel).getByRole("button", { name: "추가" }));
@@ -378,7 +380,7 @@ describe("작품", () => {
     routes["GET /api/works/7"] = () => json(work);
     routes["GET /api/works/7/characters"] = () => json([]);
     routes["POST /api/works/7/testers"] = () => json({ detail: "해당 아이디의 계정이 없습니다" }, 404);
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=confirm");
     const panel = await screen.findByRole("region", { name: "테스터" });
     await userEvent.type(within(panel).getByLabelText("테스터 아이디"), "nobody");
     await userEvent.click(within(panel).getByRole("button", { name: "추가" }));
@@ -420,7 +422,7 @@ describe("작품", () => {
     routes["GET /api/works/7"] = () => json(work);
     routes["GET /api/works/7/characters"] = () => json([]);
     routes["PATCH /api/works/7"] = () => json({ detail: "최소인원은 현재 인원(1명)보다 클 수 없습니다. 인물을 먼저 추가해 주세요" }, 409);
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=confirm");
     const form = await screen.findByRole("form", { name: "기본정보" });
     const min = within(form).getByLabelText("최소 인원");
     await userEvent.clear(min);
@@ -432,7 +434,7 @@ describe("작품", () => {
   it("없는 작품이면 오류와 목록 링크를 보여 준다", async () => {
     routes["GET /api/works/99"] = () => json({ detail: "작품을 찾을 수 없습니다" }, 404);
     routes["GET /api/works/99/characters"] = () => json({ detail: "작품을 찾을 수 없습니다" }, 404);
-    renderApp("/works/99?tab=overview");
+    renderApp("/works/99?tab=confirm");
     expect(await screen.findByRole("alert")).toHaveTextContent("작품을 찾을 수 없습니다");
   });
 });
@@ -502,7 +504,7 @@ describe("방", () => {
     routes["GET /api/works/7"] = () => json({ ...work, 확정버전_있음: false });
     routes["GET /api/works/7/characters"] = () => json([]);
     routes["GET /api/works/7/testers"] = () => json([]);
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=confirm");
     const panel = await screen.findByRole("region", { name: "방" });
     expect(within(panel).getByRole("button", { name: "방 만들기" })).toBeDisabled();
     expect(within(panel).getByText("확정된 버전이 없어 방을 만들 수 없습니다.")).toBeInTheDocument();
@@ -512,7 +514,7 @@ describe("방", () => {
     routes["GET /api/works/7"] = () => json(work);
     routes["GET /api/works/7/characters"] = () => json([]);
     routes["GET /api/works/7/testers"] = () => json([]);
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=confirm");
     const panel = await screen.findByRole("region", { name: "방" });
     expect(within(panel).getByRole("link", { name: "이 작품으로 방 만들기" })).toHaveAttribute("href", "/rooms/new/7");
   });
@@ -521,7 +523,7 @@ describe("방", () => {
     routes["GET /api/works/7"] = () => json({ ...work, 공개권한: "관리자" });
     routes["GET /api/works/7/characters"] = () => json([]);
     routes["GET /api/works/7/testers"] = () => json([]);
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=confirm");
     const panel = await screen.findByRole("region", { name: "방" });
     expect(within(panel).getByRole("button", { name: "방 만들기" })).toBeDisabled();
     expect(within(panel).getByText(/관리자가 비공개 처리한 작품은/)).toBeInTheDocument();
