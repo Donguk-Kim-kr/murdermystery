@@ -200,11 +200,12 @@ function PhasesBody({ workId, ws, phaseItems, gimmickItems }: {
 
 type PressFn = (e: React.PointerEvent<HTMLElement>, payload: Payload) => void;
 
-/** 틈마다 놓인 빈자리. 평소에는 폭 0 으로 접혀 있고, 끌고 있는 카드가 올라오면 부드럽게 폭이 늘어 옆 카드들을 밀어낸다. */
+/** 틈마다 놓인 빈자리. 평소에는 폭 0 으로 접혀 있고, 끌고 있는 카드가 올라오면 부드럽게 폭이 늘어 옆 카드들을 밀어낸다.
+ *  진행카드를 카드 사이에 놓을 때(좁은 빈자리)는 표시 없이 자리만 열린다. 페이즈 카드를 옮길 때(넓은 빈자리)는 놓일 자리를 점선으로 보여 준다. */
 function Slot({ index, open, wide }: { index: number; open: boolean; wide: boolean }) {
   return (
     <li className={`flow-slot${open ? " open" : ""}${wide ? " wide" : ""}`} data-slot data-index={index} aria-hidden="true">
-      {open ? (wide ? "여기에 놓기" : "+") : ""}
+      {open && wide ? "여기에 놓기" : ""}
     </li>
   );
 }

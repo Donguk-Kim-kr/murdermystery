@@ -438,6 +438,7 @@ describe("진행 탭", () => {
       expect(open[0].previousElementSibling).toBe(tile(1));                       // 1번과 2번 사이
       expect(open[0].nextElementSibling).toBe(tile(2));
       expect(open[0]).not.toHaveClass("wide");                                    // 진행카드를 끌 때는 좁은 빈자리
+      expect(open[0]).toHaveTextContent("");                                      // 표시(+)는 없다 — 붙일 페이즈를 강조할 때만 표시한다
       fireEvent.pointerUp(window, { clientX: tileX(1) + 4, clientY: 150 });
       await waitFor(() => expect(sent("POST /api/works/7/content/phase-steps")).toHaveLength(1));
       expect(await sent("POST /api/works/7/phases/insert")[0].req.json()).toEqual({ position: 2, 이름: null, 진행시간: 30 });

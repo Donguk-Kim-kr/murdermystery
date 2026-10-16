@@ -595,6 +595,7 @@ ol.flow > li.phase { flex: 0 0 13rem; min-width: 0; margin-right: 0.6rem; box-si
 .flow-slot { flex: 0 0 0; width: 0; min-width: 0; margin-right: 0; box-sizing: border-box; overflow: hidden; display: grid; place-items: center; list-style: none; opacity: 0; border: 0 dashed var(--accent); border-radius: 0.7rem; background: var(--accent-soft); color: var(--accent-soft-text); font-size: 1.3rem; white-space: nowrap; transition: flex-basis 0.22s ease, margin 0.22s ease, opacity 0.18s ease, border-width 0.22s ease; }
 .flow-slot.open { flex-basis: 3.5rem; margin-right: 0.6rem; opacity: 1; border-width: 2px; }
 .flow-slot.open.wide { flex-basis: 13rem; font-size: 0.85rem; }
+.flow-slot.open:not(.wide) { background: transparent; border-width: 0; }   /* 카드 사이에 넣을 때는 표시 없이 자리만 열린다 */
 /* 끌고 있는 페이즈 카드의 제자리: 처음에는 같은 폭의 빈자리 노릇을 하다가 다른 자리로 올리면 접힌다 */
 ol.flow > li.phase.drag-origin { opacity: 1; background: var(--accent-soft); border: 2px dashed var(--accent); color: transparent; }
 ol.flow > li.phase.drag-origin > * { visibility: hidden; }
