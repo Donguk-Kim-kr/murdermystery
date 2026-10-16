@@ -540,12 +540,12 @@ a.work-card:hover {
 .capacity .chip { justify-self: start; }
 .subform { display: grid; gap: 0.9rem; }
 
-.title-edit { margin: 0; font: inherit; }
-.title-edit input { font: inherit; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.015em; color: var(--text); background: transparent; border: 1px solid transparent; border-radius: 0.5rem; padding: 0.1rem 0.4rem; margin-left: -0.4rem; max-width: 100%; min-width: 4ch; box-shadow: none; field-sizing: content; }
+.title-edit { margin: 0; font: inherit; flex: 1 1 auto; min-width: 0; }   /* 제목이 남는 폭을 모두 쓴다 → 공개 표시는 오른쪽 끝 */
+.title-edit input { font: inherit; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.015em; color: var(--text); background: transparent; border: 1px solid transparent; border-radius: 0.5rem; padding: 0.15rem 0.5rem; margin-left: -0.5rem; width: calc(100% + 0.5rem); box-shadow: none; }
 .title-edit input:hover { border-color: var(--border-strong); }
 .title-edit input:focus { border-color: var(--accent); box-shadow: var(--ring); outline: none; background: var(--surface); }
 .title-error { display: block; font-size: 0.85rem; font-weight: 400; }
-.work-title { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.work-title { display: flex; align-items: center; gap: 0.75rem; }
 
 /* 방 */
 .room-chip { text-decoration: none; }
