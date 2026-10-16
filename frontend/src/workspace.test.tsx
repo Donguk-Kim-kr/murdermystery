@@ -123,6 +123,31 @@ describe("작업공간 탭", () => {
     expect(await screen.findByRole("region", { name: "페이즈" })).toBeInTheDocument();
   });
 
+  it("탭은 흐름·인물·확인이 먼저이고, 카드로 옮길 탭은 그 뒤에 따로 있다", async () => {
+    routes["GET /api/library/phases"] = () => json([]);
+    routes["GET /api/library/gimmicks"] = () => json([]);
+    routes["GET /api/works/7/content/votes"] = () => json([]);
+    renderApp("/works/7");
+    await screen.findByRole("tab", { name: "흐름", selected: true });
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+      "흐름", "인물", "확인", "개요", "장소·단서", "사건", "관계·자료", "결말",
+    ]);
+    expect(screen.queryByRole("tab", { name: "확정" })).not.toBeInTheDocument();    // 확정 → 확인
+  });
+
+  it("확인 탭은 게임 흐름을 세로로 보여 주고 확정 검사를 함께 한다", async () => {
+    bundle.phases = [{ 순서: 1, 이름: "도입", 진행시간: 10 }, { 순서: 2, 이름: null, 진행시간: 20 }];
+    bundle["phase-steps"] = [{ 번호: 9, 진행순서_순서: 2, 진행단계_번호: 5, 설정: null, 표시이름: "조사" }];
+    routes["GET /api/works/7/confirm/check"] = () => json({ errors: [], warnings: [], 다음버전: "1.0" });
+    routes["GET /api/works/7/versions"] = () => json([]);
+    renderApp("/works/7?tab=confirm");
+    const review = within(await screen.findByRole("region", { name: "게임 흐름 세로 보기" }));
+    expect(await review.findByText("1. 도입")).toBeInTheDocument();
+    expect(review.getByText("2. 조사")).toBeInTheDocument();
+    expect(review.getByText(/총 30분/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "버전 1.0 확정" })).toBeInTheDocument();
+  });
+
   it("탭을 눌러 오가고, 개요에는 기존 화면이 그대로 있다", async () => {
     renderApp("/works/7?tab=overview");
     expect(await screen.findByRole("form", { name: "기본정보" })).toBeInTheDocument();
@@ -444,10 +469,14 @@ describe("확정 탭", () => {
   });
 });
 
-describe("개요 탭", () => {
-  it("제목과 인물 이름은 나중에 바꿀 수 있다고 안내한다", async () => {
+describe("개요·인물 탭", () => {
+  it("제목은 나중에 바꿀 수 있다고 안내한다", async () => {
     renderApp("/works/7?tab=overview");
     expect(await screen.findByText(/제목은 임시로 정해도 됩니다/)).toBeInTheDocument();
+  });
+
+  it("인물 이름은 나중에 바꿀 수 있다고 안내한다", async () => {
+    renderApp("/works/7?tab=characters");
     await userEvent.click(await screen.findByRole("button", { name: "인물 추가" }));
     expect(screen.getByText(/이름은 임시로 정해도 됩니다/)).toBeInTheDocument();
   });
@@ -455,7 +484,7 @@ describe("개요 탭", () => {
   it("인물을 삭제하면 확인 후 서버에 알리고, 거부되면 사유를 보여 준다", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     routes["DELETE /api/works/7/characters/1"] = () => json({ detail: "다른 항목이 이 인물을 사용하고 있어 지울 수 없습니다" }, 409);
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=characters");
     await userEvent.click(await screen.findByRole("button", { name: "삭제" }));
     expect(await screen.findByText(/다른 항목이 이 인물을 사용하고 있어/)).toBeInTheDocument();
   });

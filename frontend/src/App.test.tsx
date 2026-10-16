@@ -245,7 +245,7 @@ describe("작품", () => {
       current = { ...work, 최대인원: 1 };
       return json(person, 201);
     };
-    renderApp("/works/7?tab=overview");
+    renderApp("/works/7?tab=characters");
     expect(await screen.findByText("아직 인물이 없습니다.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "인물 추가" }));
     const form = screen.getByRole("form", { name: "인물 추가" });
@@ -385,14 +385,14 @@ describe("작품", () => {
     expect(await within(panel).findByRole("alert")).toHaveTextContent("해당 아이디의 계정이 없습니다");
   });
 
-  it("플레이공간 첫 화면: 입장코드 칸과, 방을 만들 수 있는 작품(공개·비공개 플레이)을 보여 준다", async () => {
+  it("플레이공간 첫 화면: 방을 만들 수 있는 작품(공개·비공개 플레이)을 보여 준다", async () => {
     routes["GET /api/play-works"] = () => json([
       { 번호: 8, 제목: "공개 작품", 시놉시스: "", 장르: "추리", 최소인원: 2, 최대인원: 4, 예상시간: "2시간", 제작자: "탐정", 비공개플레이: false },
       { 번호: 9, 제목: "테스트 작품", 시놉시스: "", 장르: "", 최소인원: 1, 최대인원: 3, 예상시간: "1시간", 제작자: "나", 비공개플레이: true },
     ]);
     renderApp();
     expect(await screen.findByRole("heading", { name: "플레이" })).toBeInTheDocument();
-    expect(screen.getByRole("form", { name: "방 입장" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("입장코드")).not.toBeInTheDocument();             // 입장코드 입력은 아직 두지 않는다
     expect(await screen.findByText("공개 작품")).toBeInTheDocument();
     expect(screen.getByText("제작 탐정")).toBeInTheDocument();
     expect(screen.getAllByText("비공개 플레이")).toHaveLength(1);                       // 테스트 작품에만 붙는다

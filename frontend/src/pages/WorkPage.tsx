@@ -6,7 +6,7 @@ import type { components } from "../api/schema";
 import { useAuth } from "../auth/AuthContext";
 import { ConfirmPanel } from "../workspace/ConfirmPanel";
 import { ContentPanel } from "../workspace/ContentPanel";
-import { PhasesPanel } from "../workspace/PhasesPanel";
+import { FlowReview, PhasesPanel } from "../workspace/PhasesPanel";
 import { CharacterForm, type Character } from "./CharacterForm";
 import { RoomPanel } from "./RoomPanel";
 import { TestersPanel } from "./TestersPanel";
@@ -14,17 +14,24 @@ import { VisibilityPanel } from "./VisibilityPanel";
 
 type Work = components["schemas"]["WorkOut"];
 
-/** 작업공간의 탭. 게임 흐름이 중심이라 첫 탭이고 기본으로 열린다. 어느 탭부터 채워도 되고, 확정할 때만 검사한다. */
+/**
+ * 작업공간의 탭. 게임 흐름이 중심이라 첫 탭이고 기본으로 열린다. 어느 탭부터 채워도 되고, 확인할 때만 검사한다.
+ * 개요·장소/단서·사건·관계/자료·결말은 진행단계 카드의 내용으로 옮길 예정이라(사용자 결정 2026-10-16) 옮기기 전까지 따로 남겨 둔다.
+ */
 const TABS = [
   { id: "phases", label: "흐름" },
+  { id: "characters", label: "인물" },
+  { id: "confirm", label: "확인" },
+] as const;
+const PENDING_TABS = [
   { id: "overview", label: "개요" },
   { id: "places", label: "장소·단서" },
   { id: "incidents", label: "사건" },
   { id: "relations", label: "관계·자료" },
   { id: "endings", label: "결말" },
-  { id: "confirm", label: "확정" },
 ] as const;
-type TabId = (typeof TABS)[number]["id"];
+const ALL_TABS = [...TABS, ...PENDING_TABS];
+type TabId = (typeof ALL_TABS)[number]["id"];
 
 export function WorkPage() {
   const workId = Number(useParams().id);
@@ -36,7 +43,7 @@ export function WorkPage() {
   // null: 폼 닫힘, "new": 새 인물, 숫자: 그 순서의 인물 수정
   const [editing, setEditing] = useState<null | "new" | number>(null);
   const [params, setParams] = useSearchParams();
-  const tab: TabId = TABS.find((t) => t.id === params.get("tab"))?.id ?? "phases";
+  const tab: TabId = ALL_TABS.find((t) => t.id === params.get("tab"))?.id ?? "phases";
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -87,13 +94,17 @@ export function WorkPage() {
         <span className={work.공개여부 ? "chip success" : "chip"}>{work.공개여부 ? "공개" : "비공개"}</span>
       </div>
       <nav className="tabs" role="tablist" aria-label="작업공간">
-        {TABS.map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
-            className={tab === t.id ? "tab active" : "tab"}
-            onClick={() => setParams(t.id === "phases" ? {} : { tab: t.id }, { replace: true })}>
-            {t.label}
-          </button>
-        ))}
+        {[...TABS, null, ...PENDING_TABS].map((t, i) =>
+          t === null ? (
+            <span key="sep" className="tab-sep" aria-hidden="true" title="카드의 내용으로 옮길 예정(임시)" />
+          ) : (
+            <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
+              className={`${tab === t.id ? "tab active" : "tab"}${i > TABS.length ? " pending" : ""}`}
+              onClick={() => setParams(t.id === "phases" ? {} : { tab: t.id }, { replace: true })}>
+              {t.label}
+            </button>
+          ),
+        )}
       </nav>
       {tab === "places" && <ContentPanel workId={workId} keys={["places", "clues", "testimonies", "combos", "combo-parts"]} />}
       {tab === "incidents" && <ContentPanel workId={workId} keys={["incidents", "incident-details", "timelines"]} />}
@@ -105,11 +116,14 @@ export function WorkPage() {
         </div>
       )}
       {tab === "endings" && <ContentPanel workId={workId} keys={["endings", "epilogues"]} />}
-      {tab === "confirm" && <ConfirmPanel workId={workId} onConfirmed={load} />}
-      {tab === "overview" && (
-      <div className="work-layout">
-        <div className="col">
-          <WorkInfoForm work={work} onSaved={load} />
+      {tab === "confirm" && (
+        <div className="stack">
+          <FlowReview workId={workId} />
+          <ConfirmPanel workId={workId} onConfirmed={load} />
+        </div>
+      )}
+      {tab === "characters" && (
+        <div className="stack">
           <section aria-label="인물 목록" className="card characters">
             <div className="row">
               <h2>인물 <span className="muted">({characters.length})</span></h2>
@@ -148,6 +162,12 @@ export function WorkPage() {
             {deleteError && <p role="alert" className="error">{deleteError}</p>}
             {editing === "new" && <CharacterForm workId={workId} onCancel={closeForm} onSaved={savedForm} />}
           </section>
+        </div>
+      )}
+      {tab === "overview" && (
+      <div className="work-layout">
+        <div className="col">
+          <WorkInfoForm work={work} onSaved={load} />
         </div>
         <div className="col">
           <VisibilityPanel work={work} role={role} onChanged={load} />

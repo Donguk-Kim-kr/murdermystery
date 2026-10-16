@@ -554,6 +554,8 @@ a.work-card:hover {
 
 /* 작업공간 */
 .navlink { font-size: 0.875rem; color: var(--text-2); }
+.tab-sep { align-self: stretch; width: 1px; margin: 0.4rem 0.5rem; background: var(--border-strong); flex: 0 0 auto; }
+.tab.pending { color: var(--muted); font-style: italic; }
 .tabs { display: flex; gap: 0.25rem; overflow-x: auto; border-bottom: 1px solid var(--border); margin: 0.75rem 0 1rem; }
 button.tab {
   background: none; color: var(--text-2); border-radius: 0.5rem 0.5rem 0 0; border-bottom: 2px solid transparent;

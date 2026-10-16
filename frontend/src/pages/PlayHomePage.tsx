@@ -4,11 +4,10 @@ import { Link } from "react-router-dom";
 import { api, errorMessage } from "../api/client";
 import type { components } from "../api/schema";
 import { useRoom } from "../rooms/RoomContext";
-import { JoinCodeForm } from "./JoinRoomPage";
 
 type PlayWork = components["schemas"]["PlayWorkOut"];
 
-/** 로그인하면 처음 보이는 플레이공간: 입장코드로 들어가기, 내가 방을 만들 수 있는 작품. */
+/** 로그인하면 처음 보이는 플레이공간: 내가 방을 만들 수 있는 작품. (입장코드 입력은 아직 두지 않는다 — 사용자가 나중에 정한다) */
 export function PlayHomePage() {
   const { room } = useRoom();
   const [works, setWorks] = useState<PlayWork[] | null>(null);
@@ -39,16 +38,13 @@ export function PlayHomePage() {
           </div>
         </section>
       )}
-      <div className="play-top">
-        <JoinCodeForm />
-      </div>
       <h2>플레이할 작품</h2>
       {error && <p role="alert" className="error">{error}</p>}
       {works === null && !error && <p className="muted">불러오는 중…</p>}
       {works?.length === 0 && (
         <div className="empty">
           <strong>지금 플레이할 수 있는 작품이 없습니다.</strong>
-          <p>공개된 작품이 생기면 여기에 나타납니다. 입장코드가 있다면 위에서 바로 들어갈 수 있습니다.</p>
+          <p>공개된 작품이 생기면 여기에 나타납니다.</p>
         </div>
       )}
       {works && works.length > 0 && (

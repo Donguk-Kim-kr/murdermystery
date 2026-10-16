@@ -207,39 +207,60 @@ function VerticalView({ ws, onClose }: { ws: Workspace; onClose: () => void }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-  const phases = rowsOf(ws, "phases");
-  const steps = rowsOf(ws, "phase-steps");
-  const uses = rowsOf(ws, "gimmick-uses");
-  const total = phases.reduce((sum, p) => sum + Number(p.진행시간 ?? 0), 0);
   return (
     <div className="overlay" onClick={onClose}>
       <div className="dialog" role="dialog" aria-modal="true" aria-label="세로로 보기" onClick={(e) => e.stopPropagation()}>
         <div className="row">
-          <h2>게임 흐름 <span className="muted">(총 {total}분)</span></h2>
+          <h2>게임 흐름 <span className="muted">(총 {totalMinutes(ws)}분)</span></h2>
           <button type="button" className="small secondary" onClick={onClose}>닫기</button>
         </div>
-        <ol className="vertical">
-          {phases.map((p, i) => {
-            const mine = steps.filter((c) => c.진행순서_순서 === p.순서);
-            const gim = uses.filter((u) => u.진행순서_순서 === p.순서);
-            return (
-              <li key={String(p.순서)}>
-                <strong>{phaseTitle(p, i, mine)}</strong> <span className="muted">· {String(p.진행시간)}분</span>
-                {mine.length + gim.length === 0 && <p className="muted">비어 있음</p>}
-                <ul>
-                  {mine.map((c) => <li key={`s${c.번호}`}>{String(c.표시이름 ?? "진행단계")}{c.설정 != null && <span className="muted"> · 설정 있음</span>}</li>)}
-                  {gim.map((u) => (
-                    <li key={`g${u.순서}`}>
-                      기믹 · {ws.bundle.library.gimmicks[String(u.기믹_번호)]?.이름 ?? `#${String(u.기믹_번호)}`}
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            );
-          })}
-        </ol>
+        <FlowVertical ws={ws} />
       </div>
     </div>
+  );
+}
+
+const totalMinutes = (ws: Workspace) => rowsOf(ws, "phases").reduce((sum, p) => sum + Number(p.진행시간 ?? 0), 0);
+
+/** 확인 탭에서 쓰는 세로 보기(읽기 전용): 게임 흐름을 위에서 아래로 보여 준다. */
+export function FlowReview({ workId }: { workId: number }) {
+  const { ws, error } = useWorkspace(workId);
+  if (error) return <p role="alert" className="error">{error}</p>;
+  if (!ws) return <p className="center">불러오는 중…</p>;
+  return (
+    <section className="card" aria-label="게임 흐름 세로 보기">
+      <h2>게임 흐름 <span className="muted">(세로 보기 · 총 {totalMinutes(ws)}분)</span></h2>
+      {rowsOf(ws, "phases").length === 0 ? <p className="muted">아직 페이즈가 없습니다.</p> : <FlowVertical ws={ws} />}
+    </section>
+  );
+}
+
+/** 페이즈를 위에서 아래로 늘어놓은 읽기 전용 목록. */
+function FlowVertical({ ws }: { ws: Workspace }) {
+  const phases = rowsOf(ws, "phases");
+  const steps = rowsOf(ws, "phase-steps");
+  const uses = rowsOf(ws, "gimmick-uses");
+  return (
+    <ol className="vertical">
+      {phases.map((p, i) => {
+        const mine = steps.filter((c) => c.진행순서_순서 === p.순서);
+        const gim = uses.filter((u) => u.진행순서_순서 === p.순서);
+        return (
+          <li key={String(p.순서)}>
+            <strong>{phaseTitle(p, i, mine)}</strong> <span className="muted">· {String(p.진행시간)}분</span>
+            {mine.length + gim.length === 0 && <p className="muted">비어 있음</p>}
+            <ul>
+              {mine.map((c) => <li key={`s${c.번호}`}>{String(c.표시이름 ?? "진행단계")}{c.설정 != null && <span className="muted"> · 설정 있음</span>}</li>)}
+              {gim.map((u) => (
+                <li key={`g${u.순서}`}>
+                  기믹 · {ws.bundle.library.gimmicks[String(u.기믹_번호)]?.이름 ?? `#${String(u.기믹_번호)}`}
+                </li>
+              ))}
+            </ul>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
