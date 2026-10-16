@@ -540,12 +540,15 @@ a.work-card:hover {
 .capacity .chip { justify-self: start; }
 .subform { display: grid; gap: 0.9rem; }
 
-.title-edit { margin: 0; font: inherit; flex: 1 1 auto; min-width: 0; }   /* 제목이 남는 폭을 모두 쓴다 → 공개 표시는 오른쪽 끝 */
-.title-edit input { font: inherit; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.015em; color: var(--text); background: transparent; border: 1px solid transparent; border-radius: 0.5rem; padding: 0.15rem 0.5rem; margin-left: -0.5rem; width: calc(100% + 0.5rem); box-shadow: none; }
+/* 제목: 보이지 않는 글자 틀(sizer)과 입력칸을 같은 칸에 겹쳐 놓아, 입력칸 폭이 브라우저가 실제로 그린 글자 폭을 따라간다(글자가 잘리지 않고 공개 표시는 제목 바로 옆) */
+.title-edit { margin: 0 0 0 -0.5rem; font: inherit; display: inline-grid; max-width: 100%; min-width: 0; }   /* 글자가 다른 제목과 같은 선에서 시작하도록 입력칸 안쪽 여백만큼 당긴다 */
+.title-edit > .title-sizer, .title-edit > input { grid-area: 1 / 1; font: inherit; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.015em; padding: 0.15rem 1rem 0.15rem 0.5rem; border: 1px solid transparent; margin: 0; }
+.title-edit > .title-sizer { visibility: hidden; white-space: pre; overflow: hidden; pointer-events: none; min-width: 4ch; }
+.title-edit input { color: var(--text); background: transparent; border-radius: 0.5rem; width: 0; min-width: 100%; box-shadow: none; }   /* 폭은 sizer 가 정한다(입력칸 기본 폭이 칸을 넓히지 않게 0 + 최소 100%) */
 .title-edit input:hover { border-color: var(--border-strong); }
 .title-edit input:focus { border-color: var(--accent); box-shadow: var(--ring); outline: none; background: var(--surface); }
-.title-error { display: block; font-size: 0.85rem; font-weight: 400; }
-.work-title { display: flex; align-items: center; gap: 0.75rem; }
+.title-error { grid-area: 2 / 1; font-size: 0.85rem; font-weight: 400; }
+.work-title { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 
 /* 방 */
 .room-chip { text-decoration: none; }

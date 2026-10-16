@@ -220,6 +220,7 @@ function TitleEditor({ work, onSaved }: { work: Work; onSaved: () => Promise<voi
 
   return (
     <h1 className="title-edit">
+      <span className="title-sizer" aria-hidden="true">{value || " "}</span>
       <input aria-label="작품 제목" value={value} maxLength={100}
         onChange={(e) => setValue(e.target.value)} onBlur={() => void save()} onKeyDown={onKeyDown} />
       {error && <span role="alert" className="error title-error">{error}</span>}
