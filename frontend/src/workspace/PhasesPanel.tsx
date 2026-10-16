@@ -133,7 +133,7 @@ function PhasesBody({ workId, ws, phaseItems, gimmickItems }: {
       if (hit.index !== p.index) await req("POST", `/phases/${p.order}/move`, { position: hit.index + 1 });
     } else {
       const made = await req<{ phases: Row[] }>("POST", "/phases/insert", { position: hit.index + 1, 이름: null, 진행시간: 30 });
-      if (made && p.kind !== "newphase") await putInto(made.data.phases[hit.index].순서 as number, p);
+      if (made) await putInto(made.data.phases[hit.index].순서 as number, p);
     }
     await ws.reload();
   }
@@ -143,28 +143,33 @@ function PhasesBody({ workId, ws, phaseItems, gimmickItems }: {
     onClick: (p) => {
       if (p.kind === "phase") setSelected(p.order);
       else if (p.kind === "chip-step" || p.kind === "chip-gimmick") setSelected(p.from);
-      else if (p.kind === "newphase") void call("POST", "/phases/insert", { position: phases.length + 1, 이름: null, 진행시간: 30 });
     },
   });
 
   const dragging = view?.payload ?? null;
   const hover = view?.hover ?? null;
-  const visible = phases
-    .map((p, index) => ({ p, index }))
-    .filter(({ p }) => !(dragging?.kind === "phase" && dragging.order === p.순서));   // 끌고 있는 페이즈 카드는 흐름에서 빠져 포인터를 따라간다
+  const phaseDrag = dragging?.kind === "phase" ? dragging : null;
   const slotAt = hover?.type === "slot" ? hover.index : -1;
-  const slotWide = dragging?.kind === "phase" || phases.length === 0;   // 페이즈 카드를 끌 때만 카드 폭의 빈자리를 연다
+  const slotWide = phaseDrag !== null || phases.length === 0;   // 페이즈 카드를 끌 때(와 첫 페이즈)는 카드 폭의 빈자리, 진행카드를 끌 때는 좁은 빈자리
+  // 끌고 있는 페이즈 카드는 제자리에 남아 빈자리 역할을 하다가, 다른 자리로 올리면 부드럽게 접히며 그쪽 빈자리가 열린다.
+  const originCollapsed = phaseDrag !== null && slotAt !== -1 && slotAt !== phaseDrag.index;
   const empty = phases.length === 0;
 
+  // 모든 틈에 빈자리를 두고(접힌 채로), 올려 둔 곳만 폭을 늘린다. 요소가 그대로라 CSS 전환으로 옆 카드들이 부드럽게 밀려난다.
   const items: React.ReactNode[] = [];
-  visible.forEach(({ p, index }, i) => {
-    if (slotAt === i) items.push(<Slot key="slot" index={i} wide={slotWide} />);
+  let k = 0;   // 끌고 있는 카드를 뺀 순번
+  phases.forEach((p, index) => {
+    const origin = phaseDrag?.order === p.순서;
+    if (!origin) {
+      items.push(<Slot key={`slot-${k}`} index={k} open={slotAt === k && !(phaseDrag && k === phaseDrag.index)} wide={slotWide} />);
+    }
     items.push(
       <PhaseTile key={String(p.순서)} ws={ws} phase={p} index={index} selected={p.순서 === selected}
-        attach={hover?.type === "attach" && hover.order === p.순서} press={press} />,
+        attach={hover?.type === "attach" && hover.order === p.순서} origin={origin} collapsed={origin && originCollapsed} press={press} />,
     );
+    if (!origin) k++;
   });
-  if (slotAt === visible.length) items.push(<Slot key="slot" index={visible.length} wide={slotWide} />);
+  items.push(<Slot key={`slot-${k}`} index={k} open={slotAt === k && !(phaseDrag && k === phaseDrag.index)} wide={slotWide} />);
 
   return (
     <section className="card" aria-label="페이즈">
@@ -177,7 +182,7 @@ function PhasesBody({ workId, ws, phaseItems, gimmickItems }: {
       <ol className="flow" ref={flowRef} aria-label="게임 흐름">
         {items}
         {empty && !dragging && (
-          <li className="flow-empty">아래의 "새 페이즈"나 진행카드를 이곳으로 끌어다 놓으면 첫 페이즈가 만들어집니다.</li>
+          <li className="flow-empty">아래 진행카드를 이곳으로 끌어다 놓으면 첫 페이즈가 만들어집니다.</li>
         )}
       </ol>
       {sel >= 0 && (
@@ -195,11 +200,11 @@ function PhasesBody({ workId, ws, phaseItems, gimmickItems }: {
 
 type PressFn = (e: React.PointerEvent<HTMLElement>, payload: Payload) => void;
 
-/** 끌고 있는 카드가 놓일 빈자리. */
-function Slot({ index, wide }: { index: number; wide: boolean }) {
+/** 틈마다 놓인 빈자리. 평소에는 폭 0 으로 접혀 있고, 끌고 있는 카드가 올라오면 부드럽게 폭이 늘어 옆 카드들을 밀어낸다. */
+function Slot({ index, open, wide }: { index: number; open: boolean; wide: boolean }) {
   return (
-    <li className={`flow-slot${wide ? " wide" : ""}`} data-slot data-index={index} aria-hidden="true">
-      {wide ? "여기에 놓기" : "+"}
+    <li className={`flow-slot${open ? " open" : ""}${wide ? " wide" : ""}`} data-slot data-index={index} aria-hidden="true">
+      {open ? (wide ? "여기에 놓기" : "+") : ""}
     </li>
   );
 }
@@ -275,7 +280,7 @@ function phaseTitle(phase: Row, index: number, cards: Row[]): string {
   return `${index + 1}. ${name ?? (fallback || "이름 없음")}`;
 }
 
-/** 진행카드 영역: 새 페이즈 카드와, 불러와 둔 진행단계·기믹 카드. */
+/** 진행카드 영역: 불러와 둔 진행단계·기믹 카드. 흐름에 끌어다 놓아 쓴다. */
 function TraySection({ ws, phaseItems, gimmickItems, tray, press, onOpenLoader, onUnload }: {
   ws: Workspace; phaseItems: LibraryItem[]; gimmickItems: LibraryItem[];
   tray: { steps: number[]; gimmicks: number[] }; press: PressFn; onOpenLoader: () => void;
@@ -291,10 +296,6 @@ function TraySection({ ws, phaseItems, gimmickItems, tray, press, onOpenLoader, 
         <button type="button" className="small secondary" onClick={onOpenLoader}>진행카드 불러오기</button>
       </div>
       <ul className="tray-cards">
-        <li className="tray-card new" aria-label="새 페이즈 카드" onPointerDown={(e) => press(e, { kind: "newphase" })}>
-          <strong>＋ 새 페이즈</strong>
-          <span className="muted">흐름에 끌어다 놓거나 누르면 맨 뒤에 추가</span>
-        </li>
         {steps.map((i) => (
           <TrayCard key={`s${i.번호}`} item={i} label="진행단계" press={press} payload={{ kind: "step", id: i.번호 }}
             onUnload={() => onUnload("steps", i.번호)} />
@@ -315,7 +316,6 @@ function TrayCard({ item, label, payload, press, onUnload }: {
   return (
     <li className={`tray-card${payload.kind === "gimmick" ? " gimmick" : ""}`} aria-label={`${label} 카드 ${item.이름}`}
       onPointerDown={(e) => press(e, payload)}>
-      <span className="tray-kind">{label} · v{item.버전}</span>
       <strong>{item.이름}</strong>
       {item.설명 && <span className="muted tray-desc">{item.설명}</span>}
       <button type="button" className="link tray-x" aria-label={`${item.이름} v${item.버전} 빼기`} onClick={onUnload}>×</button>
@@ -392,16 +392,16 @@ function CardLoader({ phaseItems, gimmickItems, tray, onToggle, onClose }: {
 }
 
 /** 흐름 위의 페이즈 카드: 번호(작은 숫자), 페이즈 이름, 붙은 진행단계, 시간. 어디를 눌러도 끌 수 있고, 한 번 누르면 수정 패널이 열린다. */
-function PhaseTile({ ws, phase, index, selected, attach, press }: {
-  ws: Workspace; phase: Row; index: number; selected: boolean; attach: boolean; press: PressFn;
+function PhaseTile({ ws, phase, index, selected, attach, origin, collapsed, press }: {
+  ws: Workspace; phase: Row; index: number; selected: boolean; attach: boolean; origin: boolean; collapsed: boolean; press: PressFn;
 }) {
   const no = phase.순서 as number;
   const steps = rowsOf(ws, "phase-steps").filter((s) => s.진행순서_순서 === no);
   const uses = rowsOf(ws, "gimmick-uses").filter((u) => u.진행순서_순서 === no);
   const name = typeof phase.이름 === "string" && phase.이름.trim() !== "" ? phase.이름 : null;
   return (
-    <li className={`phase tile${selected ? " selected" : ""}${attach ? " over" : ""}`} data-tile data-order={no}
-      aria-label={`페이즈 ${index + 1}`} tabIndex={0}
+    <li className={`phase tile${selected ? " selected" : ""}${attach ? " over" : ""}${origin ? " drag-origin" : ""}${collapsed ? " collapsed" : ""}`}
+      data-tile data-order={no} aria-label={`페이즈 ${index + 1}`} aria-hidden={origin || undefined} tabIndex={origin ? -1 : 0}
       onPointerDown={(e) => press(e, { kind: "phase", order: no, index })}>
       <div className="tile-head">
         <span className="tile-no">{pad(index + 1)}</span>

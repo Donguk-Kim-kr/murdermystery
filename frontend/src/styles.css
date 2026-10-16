@@ -581,8 +581,8 @@ label.inline { display: inline-flex; align-items: center; gap: 0.5rem; white-spa
 label.inline input { width: 6rem; }
 .phase { border: 1px solid var(--border); border-radius: 0.7rem; padding: 0.8rem; display: grid; gap: 0.7rem; align-content: start; background: var(--surface); }
 /* 게임 흐름: 맨 위에 페이즈 카드가 왼쪽에서 오른쪽으로 놓인다. 넘치면 가로로 스크롤한다. */
-ol.flow { list-style: none; margin: 0.8rem 0; padding: 0.3rem 0.1rem 0.8rem; display: flex; gap: 0.6rem; align-items: stretch; overflow-x: auto; min-height: 9rem; }
-ol.flow > li.phase { flex: 0 0 13rem; min-width: 0; }
+ol.flow { list-style: none; margin: 0.8rem 0; padding: 0.3rem 0.1rem 0.8rem; display: flex; align-items: stretch; overflow-x: auto; min-height: 9rem; }
+ol.flow > li.phase { flex: 0 0 13rem; min-width: 0; margin-right: 0.6rem; box-sizing: border-box; overflow: hidden; transition: flex-basis 0.22s ease, margin 0.22s ease, padding 0.22s ease, opacity 0.18s ease, border-color 0.12s, box-shadow 0.12s; }
 .tile { cursor: grab; gap: 0.45rem; touch-action: none; user-select: none; transition: border-color 0.12s, box-shadow 0.12s; }
 .tile.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 .tile.over { outline: 2px dashed var(--accent); outline-offset: 2px; background: var(--accent-soft); }
@@ -591,9 +591,14 @@ ol.flow > li.phase { flex: 0 0 13rem; min-width: 0; }
 .tile-name { font-size: 1.05rem; line-height: 1.3; overflow-wrap: anywhere; }
 .tile-empty { font-size: 0.85rem; }
 .tile .chip { max-width: 100%; cursor: grab; }
-/* 끌고 있는 카드가 놓일 빈자리: 놓을 자리에 따라 흐름의 모양이 바뀐다 */
-.flow-slot { flex: 0 0 3.5rem; display: grid; place-items: center; border: 2px dashed var(--accent); border-radius: 0.7rem; background: var(--accent-soft); color: var(--accent-soft-text); font-size: 1.3rem; list-style: none; }
-.flow-slot.wide { flex: 0 0 13rem; font-size: 0.85rem; }
+/* 틈마다 있는 빈자리: 접혀 있다가(폭 0) 올려 둔 곳만 부드럽게 열려 옆 카드들을 밀어낸다 */
+.flow-slot { flex: 0 0 0; width: 0; min-width: 0; margin-right: 0; box-sizing: border-box; overflow: hidden; display: grid; place-items: center; list-style: none; opacity: 0; border: 0 dashed var(--accent); border-radius: 0.7rem; background: var(--accent-soft); color: var(--accent-soft-text); font-size: 1.3rem; white-space: nowrap; transition: flex-basis 0.22s ease, margin 0.22s ease, opacity 0.18s ease, border-width 0.22s ease; }
+.flow-slot.open { flex-basis: 3.5rem; margin-right: 0.6rem; opacity: 1; border-width: 2px; }
+.flow-slot.open.wide { flex-basis: 13rem; font-size: 0.85rem; }
+/* 끌고 있는 페이즈 카드의 제자리: 처음에는 같은 폭의 빈자리 노릇을 하다가 다른 자리로 올리면 접힌다 */
+ol.flow > li.phase.drag-origin { opacity: 1; background: var(--accent-soft); border: 2px dashed var(--accent); color: transparent; }
+ol.flow > li.phase.drag-origin > * { visibility: hidden; }
+ol.flow > li.phase.collapsed { flex-basis: 0; margin-right: 0; padding-left: 0; padding-right: 0; border-width: 0; opacity: 0; }
 .flow-empty { flex: 1; display: grid; place-items: center; min-height: 7rem; padding: 1.2rem; text-align: center; border: 2px dashed var(--border-strong); border-radius: 0.7rem; color: var(--muted); list-style: none; }
 .drag-ghost { position: fixed !important; left: 0; top: 0; z-index: 1000; margin: 0 !important; pointer-events: none; opacity: 0.93; box-shadow: var(--shadow-md); list-style: none; cursor: grabbing; }
 body.flow-dragging, body.flow-dragging * { cursor: grabbing !important; user-select: none; }
@@ -602,9 +607,7 @@ body.flow-dragging, body.flow-dragging * { cursor: grabbing !important; user-sel
 .tray h3 { font-size: 1rem; }
 .tray-cards { list-style: none; margin: 0; padding: 0 0 0.4rem; display: flex; gap: 0.6rem; overflow-x: auto; }
 .tray-card { position: relative; flex: 0 0 9rem; min-height: 5.4rem; padding: 0.6rem 0.7rem; border: 1px solid var(--border-strong); border-radius: 0.6rem; background: var(--surface); display: grid; gap: 0.2rem; align-content: start; cursor: grab; user-select: none; touch-action: none; }
-.tray-card.new { border-style: dashed; color: var(--accent-soft-text); background: var(--accent-soft); }
 .tray-card.gimmick { border-color: var(--warning); }
-.tray-kind { font-size: 0.7rem; color: var(--muted); }
 .tray-desc { font-size: 0.75rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .tray-x { position: absolute; top: 0.15rem; right: 0.35rem; }
 .loader-grid { list-style: none; margin: 0; padding: 0.2rem 0 5rem; display: grid; gap: 0.6rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }

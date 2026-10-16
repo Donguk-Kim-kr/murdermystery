@@ -244,9 +244,11 @@ describe("진행 탭", () => {
       if (this.parentElement?.matches("ol.flow")) {
         let left = 0;
         for (const sib of Array.from(this.parentElement.children)) {
-          const width = sib.matches("[data-slot]") ? (sib.classList.contains("wide") ? W : 56) : sib.matches("[data-tile]") ? W : 0;
+          const width = sib.matches("[data-slot]")
+            ? (sib.classList.contains("open") ? (sib.classList.contains("wide") ? W : 56) : 0)       // 접힌 빈자리는 폭 0
+            : sib.matches("[data-tile]") ? (sib.classList.contains("collapsed") ? 0 : W) : 0;
           if (sib === this) return rect(left, 100, width, 150);
-          left += width + GAP;
+          left += width > 0 ? width + GAP : 0;
         }
       }
       return rect(0, 0, 0, 0);
@@ -287,29 +289,31 @@ describe("진행 탭", () => {
       expect(screen.queryByRole("region", { name: "투표" })).not.toBeInTheDocument();
     });
 
-    it("새 페이즈 카드를 흐름에 끌어다 놓으면 페이즈가 만들어진다", async () => {
+    it("빈 흐름에 진행카드를 끌어다 놓으면 첫 페이즈가 만들어지고 거기에 붙는다", async () => {
+      withTray([5]);
       routes["POST /api/works/7/phases/insert"] = () => json({ phases: [{ 순서: 1, 이름: null, 진행시간: 30 }] }, 201);
+      routes["POST /api/works/7/content/phase-steps"] = () => json({ 번호: 11 }, 201);
       renderApp("/works/7?tab=phases");
-      const card = await screen.findByLabelText("새 페이즈 카드");
+      const card = await screen.findByLabelText("진행단계 카드 조사");
       drag(card, [[100, 150]], false);
-      expect(document.querySelector("[data-slot]")).not.toBeNull();            // 올려 둔 자리에 빈자리가 열린다
+      expect(document.querySelectorAll(".flow-slot.open")).toHaveLength(1);        // 올려 둔 자리에 빈자리가 열린다
       fireEvent.pointerUp(window, { clientX: 100, clientY: 150 });
-      await waitFor(() => expect(sent("POST /api/works/7/phases/insert")).toHaveLength(1));
+      await waitFor(() => expect(sent("POST /api/works/7/content/phase-steps")).toHaveLength(1));
       expect(await sent("POST /api/works/7/phases/insert")[0].req.json()).toEqual({ position: 1, 이름: null, 진행시간: 30 });
-      expect(document.querySelector(".drag-ghost")).toBeNull();                // 놓으면 끌던 복제본이 사라진다
+      expect(await sent("POST /api/works/7/content/phase-steps")[0].req.json()).toEqual({ 진행순서_순서: 1, 진행단계_번호: 5 });
+      expect(document.querySelector(".drag-ghost")).toBeNull();                    // 놓으면 끌던 복제본이 사라진다
     });
 
-    it("새 페이즈 카드를 누르면 맨 뒤에 추가한다", async () => {
-      routes["POST /api/works/7/phases/insert"] = () => json({ phases: [] }, 201);
+    it("새 페이즈 카드는 없다(페이즈는 진행카드를 놓아서 만든다)", async () => {
       renderApp("/works/7?tab=phases");
-      press(await screen.findByLabelText("새 페이즈 카드"));
-      await waitFor(() => expect(sent("POST /api/works/7/phases/insert")).toHaveLength(1));
-      expect(await sent("POST /api/works/7/phases/insert")[0].req.json()).toEqual({ position: 1, 이름: null, 진행시간: 30 });
+      await screen.findByRole("region", { name: "진행카드" });
+      expect(screen.queryByLabelText("새 페이즈 카드")).not.toBeInTheDocument();
     });
 
     it("흐름 밖에서 놓으면 아무것도 하지 않는다", async () => {
       renderApp("/works/7?tab=phases");
-      drag(await screen.findByLabelText("새 페이즈 카드"), [[100, 600]]);
+      withTray([5]);
+      drag(await screen.findByLabelText("진행단계 카드 조사"), [[100, 600]]);
       await new Promise((r) => setTimeout(r, 30));
       expect(calls.filter((c) => c.key.includes("/phases/"))).toHaveLength(0);
     });
@@ -331,7 +335,8 @@ describe("진행 탭", () => {
       expect(pick).toHaveTextContent("선택됨");
       await userEvent.keyboard("{Escape}");
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      expect(screen.getByLabelText("진행단계 카드 조사")).toHaveTextContent("v2");
+      expect(screen.getByLabelText("진행단계 카드 조사")).toHaveTextContent("조사");
+      expect(screen.getByLabelText("진행단계 카드 조사")).not.toHaveTextContent(/진행단계 · v/);
       expect(JSON.parse(localStorage.getItem("mm.tray.7")!)).toEqual({ steps: [5], gimmicks: [] });
       await userEvent.click(screen.getByRole("button", { name: "조사 v2 빼기" }));                 // 카드의 ×
       expect(screen.queryByLabelText("진행단계 카드 조사")).not.toBeInTheDocument();
@@ -417,7 +422,7 @@ describe("진행 탭", () => {
       fireEvent.pointerUp(window, { clientX: center(1)[0], clientY: 150 });
       await waitFor(() => expect(sent("POST /api/works/7/content/phase-steps")).toHaveLength(1));
       expect(await sent("POST /api/works/7/content/phase-steps")[0].req.json()).toEqual({ 진행순서_순서: 2, 진행단계_번호: 5 });
-      expect(screen.queryByText(/여기에 놓기/)).not.toBeInTheDocument();
+      expect(document.querySelector(".flow-slot.open")).toBeNull();
     });
 
     it("진행카드를 페이즈 가장자리(틈)에 올리면 그 자리만 열리고, 놓으면 새 페이즈로 끼워 넣어 거기에 붙인다", async () => {
@@ -428,9 +433,11 @@ describe("진행 탭", () => {
       renderApp("/works/7?tab=phases");
       const card = await screen.findByLabelText("진행단계 카드 조사");
       drag(card, [[tileX(1) + 4, 150]], false);                                   // 2번째 카드의 왼쪽 가장자리
-      expect(document.querySelectorAll("[data-slot]")).toHaveLength(1);           // 빈자리는 올려 둔 한 곳만 열린다
-      const flow = screen.getByRole("list", { name: "게임 흐름" });
-      expect([...flow.children].map((c) => c.hasAttribute("data-slot") ? "빈자리" : "카드")).toEqual(["카드", "빈자리", "카드"]);
+      const open = document.querySelectorAll(".flow-slot.open");
+      expect(open).toHaveLength(1);                                               // 빈자리는 올려 둔 한 곳만 열린다
+      expect(open[0].previousElementSibling).toBe(tile(1));                       // 1번과 2번 사이
+      expect(open[0].nextElementSibling).toBe(tile(2));
+      expect(open[0]).not.toHaveClass("wide");                                    // 진행카드를 끌 때는 좁은 빈자리
       fireEvent.pointerUp(window, { clientX: tileX(1) + 4, clientY: 150 });
       await waitFor(() => expect(sent("POST /api/works/7/content/phase-steps")).toHaveLength(1));
       expect(await sent("POST /api/works/7/phases/insert")[0].req.json()).toEqual({ position: 2, 이름: null, 진행시간: 30 });
@@ -458,11 +465,13 @@ describe("진행 탭", () => {
       renderApp("/works/7?tab=phases");
       const first = await screen.findByRole("listitem", { name: "페이즈 1" });
       drag(first, [[10, 150], [tileX(1) + 150, 150]], false);                    // 두 번째 카드의 오른쪽 절반 → 그 뒤
-      expect(screen.queryByRole("listitem", { name: "페이즈 1" })).not.toBeInTheDocument();       // 흐름에서 빠졌다
+      expect(screen.queryByRole("listitem", { name: "페이즈 1" })).not.toBeInTheDocument();       // 끌고 있는 카드는 흐름에서 읽히지 않는다
+      const origin = document.querySelector("li.drag-origin")!;
+      expect(origin).toHaveClass("collapsed");                                                    // 제자리는 접히고
+      const open = document.querySelector(".flow-slot.open")!;
+      expect(open).toHaveClass("wide");                                                           // 올려 둔 자리에 카드 폭의 빈자리가 열린다
+      expect(open.previousElementSibling).toBe(tile(2));                                          // 2번째 카드의 뒤
       expect(document.querySelector(".drag-ghost")).not.toBeNull();
-      const flow = screen.getByRole("list", { name: "게임 흐름" });
-      expect([...flow.children].map((c) => c.hasAttribute("data-slot") ? "빈자리" : "카드")).toEqual(["카드", "빈자리"]);
-      expect(flow.querySelector("[data-slot]")).toHaveClass("wide");
       fireEvent.pointerUp(window, { clientX: tileX(1) + 150, clientY: 150 });
       await waitFor(() => expect(sent("POST /api/works/7/phases/1/move")).toHaveLength(1));
       expect(await sent("POST /api/works/7/phases/1/move")[0].req.json()).toEqual({ position: 2 });

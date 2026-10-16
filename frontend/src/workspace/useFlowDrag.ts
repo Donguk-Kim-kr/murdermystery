@@ -2,10 +2,9 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPoi
 
 import { hitTest, type Hit, type TileBox } from "./flowDrag";
 
-/** 끌 수 있는 것. 페이즈 카드, 새 페이즈 카드, 진행단계·기믹 카드(카드 상자), 페이즈 안에 붙은 진행단계·기믹. */
+/** 끌 수 있는 것. 페이즈 카드, 진행단계·기믹 카드(진행카드), 페이즈 안에 붙은 진행단계·기믹. */
 export type Payload =
   | { kind: "phase"; order: number; index: number }
-  | { kind: "newphase" }
   | { kind: "step"; id: number }
   | { kind: "gimmick"; id: number }
   | { kind: "chip-step"; id: number; from: number }
@@ -58,12 +57,12 @@ export function useFlowDrag(
         if (!flow) return null;
         const fr = flow.getBoundingClientRect();
         const tiles: TileBox[] = [...flow.querySelectorAll<HTMLElement>("[data-tile]")]
-          .filter((t) => !(payload.kind === "phase" && Number(t.dataset.order) === payload.order))
+          .filter((t) => !t.classList.contains("drag-origin"))   // 끌고 있는 카드의 제자리(빈자리 역할)는 카드로 치지 않는다
           .map((t) => {
             const r = t.getBoundingClientRect();
             return { order: Number(t.dataset.order), left: r.left, right: r.right };
           });
-        const slotEl = flow.querySelector<HTMLElement>("[data-slot]");
+        const slotEl = flow.querySelector<HTMLElement>("[data-slot].open");
         const sr = slotEl?.getBoundingClientRect();
         return hitTest({
           canAttach: ATTACHABLE.has(payload.kind),
