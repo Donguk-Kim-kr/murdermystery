@@ -32,6 +32,17 @@ const schema = {
     { key: "clues", label: "단서", key_col: "순서", title_fields: ["이름"], group_by: null, help: null, fields: [
       field("이름", "text", { required: true }), field("인물_순서", "ref", { ref: "characters", label: "관련 인물" }),
     ] },
+    { key: "testimonies", label: "증언", key_col: "순서", title_fields: ["화자"], group_by: null, help: null, fields: [
+      field("화자", "text", { required: true }), field("내용", "long", { required: true }),
+    ] },
+    { key: "combos", label: "조합", key_col: "순서", title_fields: ["이름"], group_by: null, help: null, fields: [field("이름", "text", { required: true })] },
+    { key: "combo-parts", label: "조합 재료", key_col: "번호", title_fields: [], group_by: "결과_조합_순서", help: null, fields: [
+      field("결과_조합_순서", "ref", { ref: "combos", required: true }),
+    ] },
+    { key: "relations", label: "관계", key_col: "번호", title_fields: [], group_by: "인물_순서", help: null, fields: [
+      field("인물_순서", "ref", { ref: "characters", required: true }), field("대상_인물_순서", "ref", { ref: "characters", required: true }),
+      field("관계", "text", { required: true }),
+    ] },
     { key: "phases", label: "페이즈(진행 순서)", key_col: "순서", title_fields: ["이름"], group_by: null, help: null, fields: [
       field("이름", "text"), field("진행시간", "int", { required: true, default: 30 }),
     ] },
@@ -50,7 +61,7 @@ const schema = {
 };
 let bundle: Record<string, unknown>;
 const emptyBundle = () => ({
-  places: [], clues: [], phases: [], "phase-steps": [], "gimmick-uses": [], endings: [], characters: [person],
+  places: [], clues: [], testimonies: [], combos: [], "combo-parts": [], relations: [], phases: [], "phase-steps": [], "gimmick-uses": [], endings: [], characters: [person],
   library: { phases: {}, gimmicks: {} },
 });
 
@@ -130,9 +141,21 @@ describe("작업공간 탭", () => {
     renderApp("/works/7");
     await screen.findByRole("tab", { name: "흐름", selected: true });
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
-      "흐름", "인물", "확인", "개요", "장소·단서", "사건", "관계·자료", "결말",
+      "흐름", "인물", "장소", "조사", "확인", "개요", "사건", "자료", "결말",
     ]);
     expect(screen.queryByRole("tab", { name: "확정" })).not.toBeInTheDocument();    // 확정 → 확인
+  });
+
+  it("인물 탭에서 관계를 설정하고, 장소 탭에는 장소만, 조사 탭에는 단서·증언·조합이 있다", async () => {
+    renderApp("/works/7?tab=characters");
+    expect(await screen.findByRole("region", { name: "인물 목록" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "관계" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "장소" }));
+    expect(await screen.findByRole("region", { name: "장소" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "단서" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "조사" }));
+    for (const name of ["단서", "증언", "조합"]) expect(await screen.findByRole("region", { name })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "장소" })).not.toBeInTheDocument();
   });
 
   it("확인 탭은 게임 흐름을 세로로 보여 주고 확정 검사를 함께 한다", async () => {
@@ -160,7 +183,7 @@ describe("작업공간 탭", () => {
 
   it("단서의 '관련 인물'은 이름으로 고르고, 비워 두면 null 을 보낸다", async () => {
     routes["POST /api/works/7/content/clues"] = () => json({ 순서: 1 }, 201);
-    renderApp("/works/7?tab=places");
+    renderApp("/works/7?tab=clues");
     await userEvent.click(await screen.findByRole("button", { name: "단서 추가" }));
     const form = screen.getByRole("form", { name: "단서 추가" });
     await userEvent.type(within(form).getByLabelText("이름"), "편지");

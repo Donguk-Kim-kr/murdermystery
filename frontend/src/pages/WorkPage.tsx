@@ -15,19 +15,23 @@ import { VisibilityPanel } from "./VisibilityPanel";
 type Work = components["schemas"]["WorkOut"];
 
 /**
- * 작업공간의 탭. 게임 흐름이 중심이라 첫 탭이고 기본으로 열린다. 어느 탭부터 채워도 되고, 확인할 때만 검사한다.
- * 개요·장소/단서·사건·관계/자료·결말은 진행단계 카드의 내용으로 옮길 예정이라(사용자 결정 2026-10-16) 옮기기 전까지 따로 남겨 둔다.
+ * 작업공간의 탭 (사용자 결정 2026-10-16). 게임 흐름이 중심이라 첫 탭이고 기본으로 열린다.
+ *  - 인물(+관계 설정) / 장소(장소 구조) / 조사(단서·증언·조합의 설정과 위치)는 탭으로 둔다.
+ *  - 공통 스토리·자료·엔딩·후일담은 진행단계 카드의 내용으로 옮길 예정이다.
+ * 어느 탭부터 채워도 되고, 확인할 때만 검사한다.
  */
 const TABS = [
   { id: "phases", label: "흐름" },
   { id: "characters", label: "인물" },
+  { id: "places", label: "장소" },
+  { id: "clues", label: "조사" },
   { id: "confirm", label: "확인" },
 ] as const;
+// 카드로 옮기기 전까지 내용을 편집할 곳이 없어지지 않게 구분선 뒤에 임시로 남겨 둔다. (사건·타임라인의 자리는 아직 미정)
 const PENDING_TABS = [
   { id: "overview", label: "개요" },
-  { id: "places", label: "장소·단서" },
   { id: "incidents", label: "사건" },
-  { id: "relations", label: "관계·자료" },
+  { id: "relations", label: "자료" },
   { id: "endings", label: "결말" },
 ] as const;
 const ALL_TABS = [...TABS, ...PENDING_TABS];
@@ -106,9 +110,10 @@ export function WorkPage() {
           ),
         )}
       </nav>
-      {tab === "places" && <ContentPanel workId={workId} keys={["places", "clues", "testimonies", "combos", "combo-parts"]} />}
+      {tab === "places" && <ContentPanel workId={workId} keys={["places"]} />}
+      {tab === "clues" && <ContentPanel workId={workId} keys={["clues", "testimonies", "combos", "combo-parts"]} />}
       {tab === "incidents" && <ContentPanel workId={workId} keys={["incidents", "incident-details", "timelines"]} />}
-      {tab === "relations" && <ContentPanel workId={workId} keys={["relations", "materials"]} />}
+      {tab === "relations" && <ContentPanel workId={workId} keys={["materials"]} />}
       {tab === "phases" && (
         <div className="stack">
           <PhasesPanel workId={workId} />
@@ -162,6 +167,7 @@ export function WorkPage() {
             {deleteError && <p role="alert" className="error">{deleteError}</p>}
             {editing === "new" && <CharacterForm workId={workId} onCancel={closeForm} onSaved={savedForm} />}
           </section>
+          <ContentPanel workId={workId} keys={["relations"]} />
         </div>
       )}
       {tab === "overview" && (
