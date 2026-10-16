@@ -117,10 +117,7 @@ export function WorkPage() {
       {tab === "incidents" && <ContentPanel workId={workId} keys={["incidents", "incident-details", "timelines"]} />}
       {tab === "relations" && <ContentPanel workId={workId} keys={["materials"]} />}
       {tab === "phases" && (
-        <div className="stack">
-          <PhasesPanel workId={workId} />
-          <ContentPanel workId={workId} keys={["votes"]} />
-        </div>
+        <PhasesPanel workId={workId} />
       )}
       {tab === "endings" && <ContentPanel workId={workId} keys={["endings", "epilogues"]} />}
       {tab === "confirm" && (
@@ -223,7 +220,7 @@ function TitleEditor({ work, onSaved }: { work: Work; onSaved: () => Promise<voi
 
   return (
     <h1 className="title-edit">
-      <input aria-label="작품 제목" value={value} maxLength={100} size={Math.max(value.length, 4)}
+      <input aria-label="작품 제목" value={value} maxLength={100} size={Math.max(value.length * 2 + 1, 8)}
         onChange={(e) => setValue(e.target.value)} onBlur={() => void save()} onKeyDown={onKeyDown} />
       {error && <span role="alert" className="error title-error">{error}</span>}
     </h1>
