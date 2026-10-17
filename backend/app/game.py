@@ -37,7 +37,7 @@ def _my_game(request: Request, account_id: int) -> Game:
     return game
 
 
-class MemberRef(BaseModel):
+class GameMemberRef(BaseModel):
     계정_번호: int
     닉네임: str
 
@@ -46,8 +46,8 @@ class StartOut(BaseModel):
     진행_번호: int
     방_번호: int
     현재_페이즈_순서: int
-    플레이어: list[MemberRef]
-    관전자: list[MemberRef]
+    플레이어: list[GameMemberRef]
+    관전자: list[GameMemberRef]
 
 
 @router.post("/me/start", response_model=StartOut)
@@ -102,12 +102,12 @@ def start_game(conn: Conn, me: CurrentUser, request: Request) -> StartOut:
     games(request).add(game)
     return StartOut(
         진행_번호=game.id, 방_번호=game.room_id, 현재_페이즈_순서=phases[0]["순서"],
-        플레이어=[MemberRef(계정_번호=p.account_id, 닉네임=p.nickname) for p in game.players.values()],
-        관전자=[MemberRef(계정_번호=o.account_id, 닉네임=o.nickname) for o in game.observers.values()],
+        플레이어=[GameMemberRef(계정_번호=p.account_id, 닉네임=p.nickname) for p in game.players.values()],
+        관전자=[GameMemberRef(계정_번호=o.account_id, 닉네임=o.nickname) for o in game.observers.values()],
     )
 
 
-class MeOut(BaseModel):
+class GameMeOut(BaseModel):
     계정_번호: int
     역할: str
     인물_순서: int | None
@@ -115,7 +115,7 @@ class MeOut(BaseModel):
     진행_권한: bool
 
 
-class PhaseOut(BaseModel):
+class GamePhaseOut(BaseModel):
     위치: int
     전체: int
     순서: int
@@ -123,7 +123,7 @@ class PhaseOut(BaseModel):
     진행시간: int
 
 
-class PlayerOut(BaseModel):
+class GamePlayerOut(BaseModel):
     계정_번호: int
     닉네임: str
     인물_순서: int | None
@@ -131,13 +131,13 @@ class PlayerOut(BaseModel):
     접속중: bool
 
 
-class AuthorityOut(BaseModel):
+class GameAuthorityOut(BaseModel):
     계정_번호: int
     닉네임: str
     임시: bool
 
 
-class CharacterOut(BaseModel):
+class GameCharacterOut(BaseModel):
     순서: int
     이름: str | None
     직업: str | None
@@ -146,33 +146,33 @@ class CharacterOut(BaseModel):
     선택한_계정: int | None
 
 
-class TimeOut(BaseModel):
+class GameTimeOut(BaseModel):
     서버_시각: float
     일시정지: bool
     남은_초: int | None
     시간_종료: bool
 
 
-class ProgressOut(BaseModel):
+class GameProgressOut(BaseModel):
     완료: int
     전체: int
 
 
-class SettingsOut(BaseModel):
+class GameSettingsOut(BaseModel):
     자동_진행: bool
 
 
 class GameStateOut(BaseModel):
     상태_버전: int
     종료: bool
-    설정: SettingsOut
-    나: MeOut
-    권한: AuthorityOut
-    시간: TimeOut
-    선택_완료: ProgressOut
-    페이즈: PhaseOut
-    플레이어: list[PlayerOut]
-    인물: list[CharacterOut]
+    설정: GameSettingsOut
+    나: GameMeOut
+    권한: GameAuthorityOut
+    시간: GameTimeOut
+    선택_완료: GameProgressOut
+    페이즈: GamePhaseOut
+    플레이어: list[GamePlayerOut]
+    인물: list[GameCharacterOut]
 
 
 @state_router.get("/me/state", response_model=GameStateOut)
@@ -182,7 +182,7 @@ def my_state(me: CurrentUser, request: Request) -> dict:
     return view_for(game, me.계정.번호)
 
 
-class ConfirmIn(BaseModel):
+class GameConfirmIn(BaseModel):
     인물_순서: int
 
 
@@ -196,7 +196,7 @@ ASSIGN_STATUS = {
 
 
 @state_router.post("/me/confirm", response_model=GameStateOut)
-def confirm_character(body: ConfirmIn, conn: Conn, me: CurrentUser, request: Request) -> dict:
+def confirm_character(body: GameConfirmIn, conn: Conn, me: CurrentUser, request: Request) -> dict:
     """고른 인물을 "확인"한다. 선착순으로 배정되고, 확인한 뒤에는 되돌릴 수 없다."""
     game = _my_game(request, me.계정.번호)
 
@@ -236,12 +236,12 @@ def advance(conn: Conn, me: CurrentUser, request: Request) -> dict:
     return view_for(game, me.계정.번호)
 
 
-class PauseIn(BaseModel):
+class GamePauseIn(BaseModel):
     일시정지: bool
 
 
 @state_router.post("/me/pause", response_model=GameStateOut)
-def pause(body: PauseIn, me: CurrentUser, request: Request) -> dict:
+def pause(body: GamePauseIn, me: CurrentUser, request: Request) -> dict:
     """시간을 멈추거나 다시 흐르게 한다(진행 권한이 있는 사람만)."""
     game = _my_game(request, me.계정.번호)
     try:
@@ -251,12 +251,12 @@ def pause(body: PauseIn, me: CurrentUser, request: Request) -> dict:
     return view_for(game, me.계정.번호)
 
 
-class AuthorityIn(BaseModel):
+class GameAuthorityIn(BaseModel):
     계정_번호: int
 
 
 @state_router.post("/me/authority", response_model=GameStateOut)
-def give_authority(body: AuthorityIn, me: CurrentUser, request: Request) -> dict:
+def give_authority(body: GameAuthorityIn, me: CurrentUser, request: Request) -> dict:
     """방장이 진행 권한을 특정 플레이어에게 맡긴다(자기 자신에게 맡기면 되돌린다)."""
     game = _my_game(request, me.계정.번호)
     try:
@@ -311,12 +311,12 @@ async def events(request: Request, me: CurrentUser) -> StreamingResponse:
     )
 
 
-class SettingsIn(BaseModel):
+class GameSettingsIn(BaseModel):
     자동_진행: bool
 
 
 @state_router.post("/me/settings", response_model=GameStateOut)
-def change_settings(body: SettingsIn, me: CurrentUser, request: Request) -> dict:
+def change_settings(body: GameSettingsIn, me: CurrentUser, request: Request) -> dict:
     """시간이 끝나면 저절로 다음 단계로 넘어갈지 고른다(방장만). 기본은 방장이 넘기기 전에는 넘어가지 않는 것이다."""
     game = _my_game(request, me.계정.번호)
     try:

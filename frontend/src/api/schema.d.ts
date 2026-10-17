@@ -784,20 +784,6 @@ export interface components {
              */
             "\uAD8C\uD55C": "사용자" | "관리자" | "운영자";
         };
-        /** AuthorityIn */
-        AuthorityIn: {
-            /** 계정 번호 */
-            "\uACC4\uC815_\uBC88\uD638": number;
-        };
-        /** AuthorityOut */
-        AuthorityOut: {
-            /** 계정 번호 */
-            "\uACC4\uC815_\uBC88\uD638": number;
-            /** 닉네임 */
-            "\uB2C9\uB124\uC784": string;
-            /** 임시 */
-            "\uC784\uC2DC": boolean;
-        };
         /** CharacterIn */
         CharacterIn: {
             /** 이름 */
@@ -832,6 +818,39 @@ export interface components {
              */
             NPC?: boolean;
         };
+        /** CharacterOut */
+        CharacterOut: {
+            /** 이름 */
+            "\uC774\uB984": string;
+            /** 직업 */
+            "\uC9C1\uC5C5"?: string | null;
+            /** 나이 */
+            "\uB098\uC774"?: number | null;
+            /** 성별 */
+            "\uC131\uBCC4"?: string | null;
+            /** 서사 */
+            "\uC11C\uC0AC": string;
+            /** 타임라인 */
+            "\uD0C0\uC784\uB77C\uC778"?: string | null;
+            /** 능력 */
+            "\uB2A5\uB825"?: string | null;
+            /** 비밀 */
+            "\uBE44\uBC00"?: string | null;
+            /** 목표 */
+            "\uBAA9\uD45C"?: string | null;
+            /**
+             * 범인
+             * @default false
+             */
+            "\uBC94\uC778"?: boolean;
+            /**
+             * Npc
+             * @default false
+             */
+            NPC?: boolean;
+            /** 순서 */
+            "\uC21C\uC11C": number;
+        };
         /** CharacterPatch */
         CharacterPatch: {
             /** 이름 */
@@ -857,22 +876,140 @@ export interface components {
             /** Npc */
             NPC?: boolean | null;
         };
+        /** ConfirmIn */
+        ConfirmIn: {
+            /** 변경사항 */
+            "\uBCC0\uACBD\uC0AC\uD56D"?: string | null;
+        };
+        /** GameAuthorityIn */
+        GameAuthorityIn: {
+            /** 계정 번호 */
+            "\uACC4\uC815_\uBC88\uD638": number;
+        };
+        /** GameAuthorityOut */
+        GameAuthorityOut: {
+            /** 계정 번호 */
+            "\uACC4\uC815_\uBC88\uD638": number;
+            /** 닉네임 */
+            "\uB2C9\uB124\uC784": string;
+            /** 임시 */
+            "\uC784\uC2DC": boolean;
+        };
+        /** GameCharacterOut */
+        GameCharacterOut: {
+            /** 순서 */
+            "\uC21C\uC11C": number;
+            /** 이름 */
+            "\uC774\uB984": string | null;
+            /** 직업 */
+            "\uC9C1\uC5C5": string | null;
+            /** 나이 */
+            "\uB098\uC774": number | null;
+            /** 성별 */
+            "\uC131\uBCC4": string | null;
+            /** 선택한 계정 */
+            "\uC120\uD0DD\uD55C_\uACC4\uC815": number | null;
+        };
+        /** GameConfirmIn */
+        GameConfirmIn: {
+            /** 인물 순서 */
+            "\uC778\uBB3C_\uC21C\uC11C": number;
+        };
+        /** GameMeOut */
+        GameMeOut: {
+            /** 계정 번호 */
+            "\uACC4\uC815_\uBC88\uD638": number;
+            /** 역할 */
+            "\uC5ED\uD560": string;
+            /** 인물 순서 */
+            "\uC778\uBB3C_\uC21C\uC11C": number | null;
+            /** 방장 */
+            "\uBC29\uC7A5": boolean;
+            /** 진행 권한 */
+            "\uC9C4\uD589_\uAD8C\uD55C": boolean;
+        };
+        /** GameMemberRef */
+        GameMemberRef: {
+            /** 계정 번호 */
+            "\uACC4\uC815_\uBC88\uD638": number;
+            /** 닉네임 */
+            "\uB2C9\uB124\uC784": string;
+        };
+        /** GamePauseIn */
+        GamePauseIn: {
+            /** 일시정지 */
+            "\uC77C\uC2DC\uC815\uC9C0": boolean;
+        };
+        /** GamePhaseOut */
+        GamePhaseOut: {
+            /** 위치 */
+            "\uC704\uCE58": number;
+            /** 전체 */
+            "\uC804\uCCB4": number;
+            /** 순서 */
+            "\uC21C\uC11C": number;
+            /** 이름 */
+            "\uC774\uB984": string | null;
+            /** 진행시간 */
+            "\uC9C4\uD589\uC2DC\uAC04": number;
+        };
+        /** GamePlayerOut */
+        GamePlayerOut: {
+            /** 계정 번호 */
+            "\uACC4\uC815_\uBC88\uD638": number;
+            /** 닉네임 */
+            "\uB2C9\uB124\uC784": string;
+            /** 인물 순서 */
+            "\uC778\uBB3C_\uC21C\uC11C": number | null;
+            /** 인물 이름 */
+            "\uC778\uBB3C_\uC774\uB984": string | null;
+            /** 접속중 */
+            "\uC811\uC18D\uC911": boolean;
+        };
+        /** GameProgressOut */
+        GameProgressOut: {
+            /** 완료 */
+            "\uC644\uB8CC": number;
+            /** 전체 */
+            "\uC804\uCCB4": number;
+        };
+        /** GameSettingsIn */
+        GameSettingsIn: {
+            /** 자동 진행 */
+            "\uC790\uB3D9_\uC9C4\uD589": boolean;
+        };
+        /** GameSettingsOut */
+        GameSettingsOut: {
+            /** 자동 진행 */
+            "\uC790\uB3D9_\uC9C4\uD589": boolean;
+        };
         /** GameStateOut */
         GameStateOut: {
             /** 상태 버전 */
             "\uC0C1\uD0DC_\uBC84\uC804": number;
             /** 종료 */
             "\uC885\uB8CC": boolean;
-            "\uC124\uC815": components["schemas"]["SettingsOut"];
-            "\uB098": components["schemas"]["MeOut"];
-            "\uAD8C\uD55C": components["schemas"]["AuthorityOut"];
-            "\uC2DC\uAC04": components["schemas"]["TimeOut"];
-            "\uC120\uD0DD_\uC644\uB8CC": components["schemas"]["ProgressOut"];
-            "\uD398\uC774\uC988": components["schemas"]["PhaseOut"];
+            "\uC124\uC815": components["schemas"]["GameSettingsOut"];
+            "\uB098": components["schemas"]["GameMeOut"];
+            "\uAD8C\uD55C": components["schemas"]["GameAuthorityOut"];
+            "\uC2DC\uAC04": components["schemas"]["GameTimeOut"];
+            "\uC120\uD0DD_\uC644\uB8CC": components["schemas"]["GameProgressOut"];
+            "\uD398\uC774\uC988": components["schemas"]["GamePhaseOut"];
             /** 플레이어 */
-            "\uD50C\uB808\uC774\uC5B4": components["schemas"]["PlayerOut"][];
+            "\uD50C\uB808\uC774\uC5B4": components["schemas"]["GamePlayerOut"][];
             /** 인물 */
-            "\uC778\uBB3C": components["schemas"]["app__game__CharacterOut"][];
+            "\uC778\uBB3C": components["schemas"]["GameCharacterOut"][];
+        };
+        /** GameTimeOut */
+        GameTimeOut: {
+            /** 서버 시각 */
+            "\uC11C\uBC84_\uC2DC\uAC01": number;
+            /** 일시정지 */
+            "\uC77C\uC2DC\uC815\uC9C0": boolean;
+            /** 남은 초 */
+            "\uB0A8\uC740_\uCD08": number | null;
+            /** 시간 종료 */
+            "\uC2DC\uAC04_\uC885\uB8CC": boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -921,19 +1058,6 @@ export interface components {
             "\uB9CC\uB8CC\uC77C\uC2DC": string;
             "\uACC4\uC815": components["schemas"]["AccountOut"];
         };
-        /** MeOut */
-        MeOut: {
-            /** 계정 번호 */
-            "\uACC4\uC815_\uBC88\uD638": number;
-            /** 역할 */
-            "\uC5ED\uD560": string;
-            /** 인물 순서 */
-            "\uC778\uBB3C_\uC21C\uC11C": number | null;
-            /** 방장 */
-            "\uBC29\uC7A5": boolean;
-            /** 진행 권한 */
-            "\uC9C4\uD589_\uAD8C\uD55C": boolean;
-        };
         /** MemberOut */
         MemberOut: {
             /** 계정 번호 */
@@ -945,13 +1069,6 @@ export interface components {
             /** 플레이 */
             "\uD50C\uB808\uC774": boolean;
         };
-        /** MemberRef */
-        MemberRef: {
-            /** 계정 번호 */
-            "\uACC4\uC815_\uBC88\uD638": number;
-            /** 닉네임 */
-            "\uB2C9\uB124\uC784": string;
-        };
         /** MoveBody */
         MoveBody: {
             /** Position */
@@ -961,24 +1078,6 @@ export interface components {
         ParticipationIn: {
             /** 플레이 */
             "\uD50C\uB808\uC774": boolean;
-        };
-        /** PauseIn */
-        PauseIn: {
-            /** 일시정지 */
-            "\uC77C\uC2DC\uC815\uC9C0": boolean;
-        };
-        /** PhaseOut */
-        PhaseOut: {
-            /** 위치 */
-            "\uC704\uCE58": number;
-            /** 전체 */
-            "\uC804\uCCB4": number;
-            /** 순서 */
-            "\uC21C\uC11C": number;
-            /** 이름 */
-            "\uC774\uB984": string | null;
-            /** 진행시간 */
-            "\uC9C4\uD589\uC2DC\uAC04": number;
         };
         /** PlayWorkOut */
         PlayWorkOut: {
@@ -1001,19 +1100,6 @@ export interface components {
             /** 비공개플레이 */
             "\uBE44\uACF5\uAC1C\uD50C\uB808\uC774": boolean;
         };
-        /** PlayerOut */
-        PlayerOut: {
-            /** 계정 번호 */
-            "\uACC4\uC815_\uBC88\uD638": number;
-            /** 닉네임 */
-            "\uB2C9\uB124\uC784": string;
-            /** 인물 순서 */
-            "\uC778\uBB3C_\uC21C\uC11C": number | null;
-            /** 인물 이름 */
-            "\uC778\uBB3C_\uC774\uB984": string | null;
-            /** 접속중 */
-            "\uC811\uC18D\uC911": boolean;
-        };
         /**
          * PrivatePlayWorkOut
          * @description 비공개 플레이 대상 작품 요약. 인물·단서 같은 내용(범인·비밀 포함)은 포함하지 않는다.
@@ -1033,13 +1119,6 @@ export interface components {
             "\uCD5C\uB300\uC778\uC6D0": number;
             /** 예상시간 */
             "\uC608\uC0C1\uC2DC\uAC04": string;
-        };
-        /** ProgressOut */
-        ProgressOut: {
-            /** 완료 */
-            "\uC644\uB8CC": number;
-            /** 전체 */
-            "\uC804\uCCB4": number;
         };
         /** RoomCreateIn */
         RoomCreateIn: {
@@ -1091,16 +1170,6 @@ export interface components {
             /** 최대인원 */
             "\uCD5C\uB300\uC778\uC6D0": number;
         };
-        /** SettingsIn */
-        SettingsIn: {
-            /** 자동 진행 */
-            "\uC790\uB3D9_\uC9C4\uD589": boolean;
-        };
-        /** SettingsOut */
-        SettingsOut: {
-            /** 자동 진행 */
-            "\uC790\uB3D9_\uC9C4\uD589": boolean;
-        };
         /** SignupIn */
         SignupIn: {
             /** 아이디 */
@@ -1119,9 +1188,9 @@ export interface components {
             /** 현재 페이즈 순서 */
             "\uD604\uC7AC_\uD398\uC774\uC988_\uC21C\uC11C": number;
             /** 플레이어 */
-            "\uD50C\uB808\uC774\uC5B4": components["schemas"]["MemberRef"][];
+            "\uD50C\uB808\uC774\uC5B4": components["schemas"]["GameMemberRef"][];
             /** 관전자 */
-            "\uAD00\uC804\uC790": components["schemas"]["MemberRef"][];
+            "\uAD00\uC804\uC790": components["schemas"]["GameMemberRef"][];
         };
         /** TesterIn */
         TesterIn: {
@@ -1141,17 +1210,6 @@ export interface components {
              * Format: date-time
              */
             "\uBD80\uC5EC\uC77C\uC2DC": string;
-        };
-        /** TimeOut */
-        TimeOut: {
-            /** 서버 시각 */
-            "\uC11C\uBC84_\uC2DC\uAC01": number;
-            /** 일시정지 */
-            "\uC77C\uC2DC\uC815\uC9C0": boolean;
-            /** 남은 초 */
-            "\uB0A8\uC740_\uCD08": number | null;
-            /** 시간 종료 */
-            "\uC2DC\uAC04_\uC885\uB8CC": boolean;
         };
         /** ValidationError */
         ValidationError: {
@@ -1259,64 +1317,6 @@ export interface components {
             "\uCD5C\uC18C\uC778\uC6D0"?: number | null;
             /** 공통스토리 */
             "\uACF5\uD1B5\uC2A4\uD1A0\uB9AC"?: string | null;
-        };
-        /** CharacterOut */
-        app__characters__CharacterOut: {
-            /** 이름 */
-            "\uC774\uB984": string;
-            /** 직업 */
-            "\uC9C1\uC5C5"?: string | null;
-            /** 나이 */
-            "\uB098\uC774"?: number | null;
-            /** 성별 */
-            "\uC131\uBCC4"?: string | null;
-            /** 서사 */
-            "\uC11C\uC0AC": string;
-            /** 타임라인 */
-            "\uD0C0\uC784\uB77C\uC778"?: string | null;
-            /** 능력 */
-            "\uB2A5\uB825"?: string | null;
-            /** 비밀 */
-            "\uBE44\uBC00"?: string | null;
-            /** 목표 */
-            "\uBAA9\uD45C"?: string | null;
-            /**
-             * 범인
-             * @default false
-             */
-            "\uBC94\uC778"?: boolean;
-            /**
-             * Npc
-             * @default false
-             */
-            NPC?: boolean;
-            /** 순서 */
-            "\uC21C\uC11C": number;
-        };
-        /** ConfirmIn */
-        app__confirm__ConfirmIn: {
-            /** 변경사항 */
-            "\uBCC0\uACBD\uC0AC\uD56D"?: string | null;
-        };
-        /** CharacterOut */
-        app__game__CharacterOut: {
-            /** 순서 */
-            "\uC21C\uC11C": number;
-            /** 이름 */
-            "\uC774\uB984": string | null;
-            /** 직업 */
-            "\uC9C1\uC5C5": string | null;
-            /** 나이 */
-            "\uB098\uC774": number | null;
-            /** 성별 */
-            "\uC131\uBCC4": string | null;
-            /** 선택한 계정 */
-            "\uC120\uD0DD\uD55C_\uACC4\uC815": number | null;
-        };
-        /** ConfirmIn */
-        app__game__ConfirmIn: {
-            /** 인물 순서 */
-            "\uC778\uBB3C_\uC21C\uC11C": number;
         };
     };
     responses: never;
@@ -1639,7 +1639,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__characters__CharacterOut"][];
+                    "application/json": components["schemas"]["CharacterOut"][];
                 };
             };
             /** @description Validation Error */
@@ -1676,7 +1676,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__characters__CharacterOut"];
+                    "application/json": components["schemas"]["CharacterOut"];
                 };
             };
             /** @description Validation Error */
@@ -1710,7 +1710,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__characters__CharacterOut"];
+                    "application/json": components["schemas"]["CharacterOut"];
                 };
             };
             /** @description Validation Error */
@@ -1780,7 +1780,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__characters__CharacterOut"];
+                    "application/json": components["schemas"]["CharacterOut"];
                 };
             };
             /** @description Validation Error */
@@ -2368,7 +2368,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["app__confirm__ConfirmIn"];
+                "application/json": components["schemas"]["ConfirmIn"];
             };
         };
         responses: {
@@ -2895,7 +2895,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["app__game__ConfirmIn"];
+                "application/json": components["schemas"]["GameConfirmIn"];
             };
         };
         responses: {
@@ -2961,7 +2961,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PauseIn"];
+                "application/json": components["schemas"]["GamePauseIn"];
             };
         };
         responses: {
@@ -2996,7 +2996,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AuthorityIn"];
+                "application/json": components["schemas"]["GameAuthorityIn"];
             };
         };
         responses: {
@@ -3062,7 +3062,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SettingsIn"];
+                "application/json": components["schemas"]["GameSettingsIn"];
             };
         };
         responses: {
