@@ -74,7 +74,7 @@ def db(test_dbname):
 def make_scripted_game(client, make_account, db):
     """카드(이름, 스크립트, 설정)를 페이즈 하나에 하나씩 놓은 확정 작품으로 방을 열어 게임을 시작한다."""
 
-    def make(cards, players=3, observer_host=False, story="모두가 읽는 공통 스토리", unchecked=()):
+    def make(cards, players=3, observer_host=False, story="모두가 읽는 공통 스토리", unchecked=(), setup=None):
         """`unchecked` 에 든 카드 이름의 스크립트는 확정(검사)을 통과한 뒤 스냅샷에서 바꿔 넣는다(검사를 통과하지 못할 스크립트를 실행해 보려고)."""
         host = make_account()
         wid = client.post("/api/works", headers=host.headers, json={"제목": "스크립트 시험", "공통스토리": story}).json()["번호"]
@@ -85,6 +85,8 @@ def make_scripted_game(client, make_account, db):
                 **({"소개": "안녕하세요, 저는 의사입니다."} if i == 0 else {}),         # 소개가 있는 인물과 없는 인물
             })
             assert res.status_code == 201, res.text
+        if setup:
+            setup(client, host, wid)
         swaps = {}
         for position, (name, script, settings) in enumerate(cards, 1):
             if name in unchecked:
@@ -482,3 +484,15 @@ def test_intro_tab_stays_in_later_phases(client, make_scripted_game):
     advance(client, host)
     advance(client, host)
     assert tab(state(client, others[0]).json(), "자기소개") is not None
+
+
+@pytest.mark.parametrize("value", ["abc", 9999, None, [1], {"a": 1}, True])
+def test_bad_character_values_do_not_break_character_select(client, make_scripted_game, value):
+    host, others, _, _ = two_phase_game(make_scripted_game)
+    qid = block(state(client, host).json(), "캐릭터 선택")["질문ID"]
+    res = answer(client, host, qid, value)
+    assert res.status_code == 200 and res.json()["나"]["인물_순서"] is None
+    assert state(client, host).json()["오류"] == []                            # 플레이어가 보낸 값 때문에 카드가 멈추지 않는다
+    assert [n["글"] for n in res.json()["알림"]] == ["이미 다른 사람이 고른 인물입니다"]
+    slot = block(state(client, host).json(), "캐릭터 선택")["항목"][0]["값"]
+    assert pick(client, host, slot).json()["나"]["인물_순서"] == slot            # 이후에도 정상 동작한다

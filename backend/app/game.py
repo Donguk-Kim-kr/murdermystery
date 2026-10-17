@@ -30,6 +30,18 @@ def games(request: Request) -> GameRegistry:
     return request.app.state.games
 
 
+ACQUIRE_COLUMNS = {"단서": "단서_순서", "증언": "증언_순서"}
+
+
+def acquire_sql(kind: str) -> str:
+    """획득 기록을 남기는 문장. 컬럼 이름은 고정 목록에서만 고른다."""
+    column = ACQUIRE_COLUMNS[kind]
+    return (
+        f'INSERT INTO "획득" ("작품_번호", "진행_번호", "참여_번호", "{column}", "진행순서_순서", "획득방법") '
+        'SELECT "작품_번호", "진행_번호", "번호", %s, %s, %s FROM "참여" WHERE "진행_번호" = %s AND "계정_번호" = %s'
+    )
+
+
 def conn_io(conn, game: Game) -> GameIO:
     """요청의 DB 연결로 게임이 남길 기록을 쓴다(요청이 끝날 때 함께 확정된다)."""
     return GameIO(
@@ -38,6 +50,9 @@ def conn_io(conn, game: Game) -> GameIO:
             'UPDATE "참여" SET "인물_순서" = %s WHERE "진행_번호" = %s AND "계정_번호" = %s', (slot, game.id, account)
         ),
         end=lambda: conn.execute('UPDATE "진행" SET "상태" = \'종료\' WHERE "번호" = %s', (game.id,)),
+        acquire=lambda account, kind, order, slot, method: conn.execute(
+            acquire_sql(kind), (order, slot, method, game.id, account)
+        ),
     )
 
 
@@ -54,6 +69,9 @@ def pool_io(pool, game: Game) -> GameIO:
             'UPDATE "참여" SET "인물_순서" = %s WHERE "진행_번호" = %s AND "계정_번호" = %s', (slot, game.id, account)
         ),
         end=lambda: run('UPDATE "진행" SET "상태" = \'종료\' WHERE "번호" = %s', (game.id,)),
+        acquire=lambda account, kind, order, slot, method: run(
+            acquire_sql(kind), (order, slot, method, game.id, account)
+        ),
     )
 
 

@@ -329,3 +329,55 @@ describe("대기실에서 게임 시작", () => {
     expect(await screen.findByRole("heading", { name: "캐릭터 선택" }, { timeout: 3000 })).toBeInTheDocument();
   });
 });
+
+describe("조사 블록", () => {
+  const places = (disabled: boolean) => ({
+    종류: "선택지", 이름: "조사할 장소", 한사람당: 1, 확인필요: false, 질문ID: "1:5:확인", 내_선택_끝남: false,
+    항목: [
+      { 값: 2, 이름: "저택 › 서재", 유형: null, 특징: "책이 많다", 비활성: false },
+      { 값: 3, 이름: "정원", 유형: "야외", 특징: null, 비활성: disabled },
+    ],
+  });
+
+  it("장소를 누르면 확인 없이 바로 보내고, 얻을 것이 없는 장소는 누를 수 없다", async () => {
+    state = makeState({ 화면: [places(true)] });
+    render(<GamePage />);
+    const user = userEvent.setup();
+    expect(await screen.findByRole("button", { name: /정원/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "확인" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: /저택 › 서재/ }));
+    await waitFor(() => expect(posts).toEqual([{ path: "/api/game/me/answer", body: { 질문ID: "1:5:확인", 값: 2 } }]));
+  });
+
+  it("캐릭터를 이미 정한 플레이어도 장소를 고를 수 있다", async () => {
+    state = makeState({ 나: { 계정_번호: 1, 역할: "플레이어", 인물_순서: 11, 방장: true, 진행_권한: true }, 화면: [places(false)] });
+    render(<GamePage />);
+    expect(await screen.findByRole("button", { name: /정원/ })).toBeEnabled();
+  });
+
+  it("내 단서 탭에 단서와 증언 카드가 장소와 함께 보인다", async () => {
+    state = makeState({
+      화면: [],
+      탭: [{
+        종류: "카드목록", 이름: "내 단서", 카드: "조사",
+        항목: [
+          { 종류: "단서", 이름: "찢어진 편지", 내용: "편지 내용", 장소: "저택 › 서재" },
+          { 종류: "증언", 이름: "집사의 증언", 내용: "저는 보았습니다", 장소: "저택 › 주방" },
+        ],
+      }],
+    });
+    render(<GamePage />);
+    await userEvent.setup().click(await screen.findByRole("tab", { name: "내 단서" }));
+    const list = screen.getByRole("region", { name: "내 단서" });
+    expect(within(list).getByText("찢어진 편지")).toBeInTheDocument();
+    expect(within(list).getByText("저택 › 주방")).toBeInTheDocument();
+    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("얻은 것이 없으면 안내한다", async () => {
+    state = makeState({ 탭: [{ 종류: "카드목록", 이름: "내 단서", 카드: "조사", 항목: [] }] });
+    render(<GamePage />);
+    await userEvent.setup().click(await screen.findByRole("tab", { name: "내 단서" }));
+    expect(screen.getByText("아직 얻은 것이 없습니다.")).toBeInTheDocument();
+  });
+});

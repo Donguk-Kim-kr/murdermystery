@@ -12,6 +12,17 @@ interface Item {
   나이?: number | null;
   성별?: string | null;
   선택한_계정?: number | null;
+  /** 장소: 종류와 설명, 이 사람이 지금 고를 수 없는지 */
+  유형?: string | null;
+  특징?: string | null;
+  비활성?: boolean;
+}
+
+interface Card {
+  종류: string;
+  이름: string;
+  내용: string;
+  장소: string;
 }
 
 interface Props {
@@ -33,6 +44,8 @@ export function BlockView({ block, state, onAnswer }: Props) {
       return <ChoiceBlock block={block} state={state} onAnswer={onAnswer} />;
     case "입력":
       return <InputBlock block={block} onAnswer={onAnswer} isPlayer={state.나.역할 === "플레이어"} />;
+    case "카드목록":
+      return <CardsBlock block={block} />;
     case "현황":
       return <ProgressBlock block={block} />;
     default:
@@ -50,6 +63,29 @@ function TextBlock({ block }: { block: Block }) {
     <section className="block" aria-label={text(block.이름) || "글"}>
       <Title block={block} />
       <p className="prose">{text(block.내용)}</p>
+    </section>
+  );
+}
+
+/** 단서·증언 카드를 앞면이 보이게 늘어놓는다. 위에는 어느 장소에서 얻었는지, 종류가 보인다. */
+function CardsBlock({ block }: { block: Block }) {
+  const cards = (block.항목 as Card[] | undefined) ?? [];
+  return (
+    <section className="block" aria-label={text(block.이름)}>
+      <Title block={block} />
+      {cards.length === 0 && <p className="muted">아직 얻은 것이 없습니다.</p>}
+      <ul className="clue-cards">
+        {cards.map((c, i) => (
+          <li key={i} className="clue-card">
+            <span className="clue-meta">
+              <span className="chip">{c.종류}</span>
+              {c.장소 && <span className="muted">{c.장소}</span>}
+            </span>
+            <strong>{c.이름}</strong>
+            <p className="prose">{c.내용}</p>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -175,12 +211,12 @@ function ChoiceBlock({ block, state, onAnswer }: { block: Block; state: GameStat
                 type="button"
                 className={`choice${current === item.값 ? " on" : ""}${mine ? " mine" : ""}`}
                 aria-pressed={current === item.값}
-                disabled={!canPick || taken || busy}
+                disabled={!canPick || taken || busy || item.비활성 === true}
                 onClick={() => (needConfirm ? setPicked(item.값) : void send(item.값))}
               >
                 <strong>{text(item.이름) || "이름 없음"}</strong>
                 <span className="muted">
-                  {[item.직업, item.나이 != null ? `${item.나이}세` : null, item.성별].filter(Boolean).join(" · ")}
+                  {[item.직업, item.나이 != null ? `${item.나이}세` : null, item.성별, item.유형, item.특징].filter(Boolean).join(" · ")}
                 </span>
                 {taken && <span className="chip accent">{mine ? "내 인물" : `${nameOf(owner!)} 선택`}</span>}
               </button>

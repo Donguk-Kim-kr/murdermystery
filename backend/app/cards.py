@@ -11,7 +11,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from . import narrative
+from . import clues, narrative
 from .script import VM, Program, Ref, ScriptError, Suspend, builtin_names, compile_source
 
 MAX_ANSWER_BYTES = 2000
@@ -50,13 +50,15 @@ class CardRun:
 
 # ---- 호스트(스크립트가 부르는 엔진 기능) -------------------------------------------------------
 
-MUTATING = {"배정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
+MUTATING = {"배정", "조사", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
 FUNCTION_NAMES = {
     "플레이어들", "플레이어수", "인물들", "공통스토리", "서사들", "배정된_플레이어수", "인물_없는_플레이어가_있다",
-    "글", "선택지", "입력", "현황", "거부", "배정", "읽기", "기다리기", "단계_끝내기", "게임_종료",
+    "글", "선택지", "입력", "카드목록", "현황", "거부", "배정", "조사", "장소들", "보유목록", "읽기", "기다리기",
+    "단계_끝내기", "게임_종료",
 }
 CONSTANT_NAMES = {"통과", ALL}
 MAX_INPUT_CHARS = 2000
+MAX_CARDS = 200
 
 
 def known_names() -> set[str]:
@@ -108,6 +110,14 @@ class CardHost:
             return narrative.pick([str(p.get("본문", "")) for p in parts], list(번호들))
         return narrative.numbered(row.get("서사") or "", list(번호들))
 
+    def fn_장소들(self) -> list[Ref]:
+        """조사할 수 있는 장소들(가장 안쪽 장소)."""
+        return [Ref("장소", p["순서"]) for p in clues.leaf_places(self.game)]
+
+    def fn_보유목록(self, 플레이어: Any) -> list[dict[str, Any]]:
+        """이 플레이어가 지금 가진 단서·증언(얻은 순서). 각 항목은 {종류, 이름, 내용, 장소}."""
+        return clues.holdings_of(self.game, self._player_account(플레이어))
+
     def fn_배정된_플레이어수(self) -> int:
         return sum(1 for p in self.game.players.values() if p.character is not None)
 
@@ -135,6 +145,17 @@ class CardHost:
             raise ScriptError(f"입력의 글자수는 1 이상 {MAX_INPUT_CHARS} 이하여야 합니다")
         return {"종류": "입력", "이름": name, "질문": _text(질문), "글자수": 글자수, "질문ID": f"{self.run.key}:{name}"}
 
+    def fn_카드목록(self, 이름: str, 항목: Any) -> dict[str, Any]:
+        """단서·증언 같은 카드를 앞면이 보이도록 늘어놓는 블록. 항목은 `보유목록()` 이 돌려준 목록이다."""
+        if not isinstance(항목, (list, tuple)):
+            raise ScriptError("카드목록의 항목은 목록이어야 합니다")
+        cards = []
+        for item in list(항목)[:MAX_CARDS]:
+            if not isinstance(item, dict):
+                raise ScriptError("카드목록의 항목은 보유목록() 이 돌려준 카드여야 합니다")
+            cards.append({k: _text(item.get(k)) for k in ("종류", "이름", "내용", "장소")})
+        return {"종류": "카드목록", "이름": str(이름), "항목": cards}
+
     def fn_현황(self, 이름: str, 완료: int, 전체: int) -> dict[str, Any]:
         return {"종류": "현황", "이름": str(이름), "완료": int(완료), "전체": int(전체)}
 
@@ -142,11 +163,23 @@ class CardHost:
         return {"거부": _text(메시지)}
 
     # -- 엔진 명령 --
+    def fn_조사(self, 플레이어: Any, 장소: Any) -> dict[str, Any] | None:
+        """장소에서 항목 하나를 얻는다. 얻은 {종류, 이름, 내용, 장소} 를 돌려주고, 얻을 것이 없거나 장소가 아니면 None."""
+        account = self._player_account(플레이어)
+        slot = 장소.key if isinstance(장소, Ref) and 장소.kind == "장소" else 장소
+        if not isinstance(slot, int) or isinstance(slot, bool):         # 플레이어가 보낸 값이라 잘못되어도 카드가 멈추지 않는다
+            return None
+        return clues.investigate(self.game, account, slot, self.io)
+
     def fn_배정(self, 플레이어: Any, 인물: Any) -> bool:
         from .engine import AssignError, assign_character
 
         account = self._player_account(플레이어)
-        slot = self._character_slot(인물)
+        try:
+            slot = self._character_slot(인물)
+            self._character(slot)
+        except ScriptError:                                              # 플레이어가 보낸 값이라 잘못되어도 카드가 멈추지 않는다
+            return False
         try:
             assign_character(self.game, account, slot, lambda a, s: self.io.assign(a, s))
         except AssignError:
@@ -408,11 +441,18 @@ def answer(game, account_id: int, qid: str, value: Any, io) -> None:
 
 # ---- 보는 사람에게 보여 줄 것 ----------------------------------------------------------------------
 
-def _item(game, item: Any) -> dict[str, Any]:
+def _item(game, viewer: int, item: Any) -> dict[str, Any]:
     if isinstance(item, Ref) and item.kind == "인물":
         row = next((c for c in game.snapshot.get("인물") or [] if c["순서"] == item.key), None)
         taken = next((p.account_id for p in game.players.values() if p.character == item.key), None)
         return {"값": item.key, **{f: (row or {}).get(f) for f in PUBLIC_FIELDS}, "선택한_계정": taken}
+    if isinstance(item, Ref) and item.kind == "장소":
+        place = next((p for p in game.snapshot.get("장소") or [] if p["순서"] == item.key), None) or {}
+        active = viewer in game.players and clues.next_item(game, viewer, item.key) is not None
+        return {
+            "값": item.key, "이름": clues.place_path(game, item.key), "유형": place.get("유형"), "특징": place.get("특징"),
+            "비활성": not active,
+        }
     if isinstance(item, Ref):
         return {"값": None, "이름": item.kind}
     return {"값": item, "이름": str(item)}
@@ -422,9 +462,13 @@ def _block(game, viewer: int, block: dict[str, Any]) -> dict[str, Any]:
     out = {k: v for k, v in block.items() if k != "항목"}
     kind = block.get("종류")
     if kind == "선택지":
-        out["항목"] = [_item(game, i) for i in block.get("항목", [])]
+        items = block.get("항목", [])
+        out["항목"] = [_item(game, viewer, i) for i in items]
         player = game.players.get(viewer)
-        out["내_선택_끝남"] = bool(player and player.character is not None)
+        picks_character = any(isinstance(i, Ref) and i.kind == "인물" for i in items)
+        out["내_선택_끝남"] = bool(picks_character and player and player.character is not None)
+    elif kind == "카드목록":
+        out["항목"] = list(block.get("항목", []))
     elif kind == "읽기":
         record = game.reads.get(block["질문ID"], {"필요": set(), "확인": set()})
         out["확인함"] = viewer in record["확인"]

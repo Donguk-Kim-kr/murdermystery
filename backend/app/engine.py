@@ -22,6 +22,8 @@ class GameIO:
     phase: Callable[[int], None]            # 새 페이즈의 칸 번호를 진행에 기록
     assign: Callable[[int, int], None]      # (계정, 인물 순서) 를 참여에 기록
     end: Callable[[], None]                 # 진행을 종료로 기록
+    # (계정, "단서"/"증언", 순서, 진행순서 칸, 획득방법) 을 획득에 기록
+    acquire: Callable[[int, str, int, int, str], None] = lambda *args: None
 
 
 @dataclass
@@ -73,6 +75,8 @@ class Game:
     programs: dict[Any, Any] = field(default_factory=dict, repr=False)
     tab_counter: int = 0
     notice_counter: int = 0
+    # 계정 → 얻은 항목 목록([{종류, 순서, 방법, 위치, 보유}]). 조사로 얻은 단서·증언이 쌓인다(app/clues.py)
+    holdings: dict[int, list[dict[str, Any]]] = field(default_factory=dict, repr=False)
 
     @property
     def phases(self) -> list[dict[str, Any]]:
