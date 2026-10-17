@@ -173,7 +173,8 @@ def test_observer_state(client, make_account, make_game_work):
         join(client, make_account(), room["입장코드"])
     start(client, host)
     me = state(client, host).json()["나"]
-    assert me["역할"] == "관전자" and me["인물_순서"] is None and me["진행_권한"] is True
+    assert me["역할"] == "관전자" and me["인물_순서"] is None and me["방장"] is True
+    assert me["진행_권한"] is False                       # 일반 관전의 방장은 진행 권한이 플레이어에게 간다
 
 
 def test_state_never_contains_private_character_data(client, make_account, test_dbname):
@@ -419,3 +420,82 @@ def test_zero_minutes_means_no_time_limit(client, make_account, make_game_work, 
     clock["now"] += 99999
     t = state(client, host).json()["시간"]
     assert t["남은_초"] is None and t["시간_종료"] is False
+
+
+# ---- 진행 권한과 이탈 (1-5) -----------------------------------------------------------------
+
+def authority(client, who):
+    return state(client, who).json()["권한"]
+
+
+def test_host_holds_authority_by_default(client, make_account, make_game_work, clock):
+    host, others, _, _ = started(client, make_account, make_game_work)
+    a = authority(client, others[0])
+    assert a["계정_번호"] == host.number and a["임시"] is False
+
+
+def test_authority_moves_down_the_join_order_and_comes_back(client, make_account, make_game_work, clock):
+    host, others, _, _ = started(client, make_account, make_game_work)
+    clock["now"] += 50                                  # 유예(45초)를 넘긴다. 방장만 상태를 확인하지 않는다
+    state(client, others[1])                            # 3번 플레이어는 계속 접속
+    # 2번 플레이어(others[0])도 이탈한 상태로 두면 3번이 임시로 갖는다
+    a = authority(client, others[1])
+    assert a["계정_번호"] == others[1].number and a["임시"] is True
+    assert state(client, others[1]).json()["나"]["진행_권한"] is True
+    state(client, others[0])                            # 2번이 돌아오면 2번이 임시로 갖는다
+    assert authority(client, others[0])["계정_번호"] == others[0].number
+    state(client, host)                                 # 방장이 돌아오면 방장이 되돌려 받는다
+    back = authority(client, host)
+    assert back["계정_번호"] == host.number and back["임시"] is False
+
+
+def test_temporary_holder_can_advance_while_host_is_away(client, make_account, make_game_work, clock):
+    host, others, _, _ = started(client, make_account, make_game_work)
+    clock["now"] += 50                                  # 방장이 상태를 확인하지 않은 채 유예를 넘긴다
+    state(client, others[0])
+    assert authority(client, others[0])["계정_번호"] == others[0].number
+    res = advance(client, others[0])
+    assert res.status_code == 200 and res.json()["페이즈"]["위치"] == 2
+
+
+def test_player_seat_survives_being_away(client, make_account, make_game_work, clock):
+    host, others, _, _ = started(client, make_account, make_game_work)
+    slot = slots(client, host)[0]
+    confirm_pick(client, others[0], slot)
+    clock["now"] += 500
+    state(client, host)
+    seen = state(client, host).json()
+    mine = [p for p in seen["플레이어"] if p["계정_번호"] == others[0].number][0]
+    assert mine["인물_순서"] == slot and mine["접속중"] is False
+
+
+def test_observer_host_hands_authority_to_first_player(client, make_account, make_game_work, clock):
+    host = make_account()
+    wid = make_game_work(host, players=2)
+    room = create_room(client, host, wid, 방장_참여=False)
+    a, b = make_account(), make_account()
+    join(client, a, room["입장코드"])
+    join(client, b, room["입장코드"])
+    start(client, host)
+    holder = authority(client, host)
+    assert holder["계정_번호"] == a.number and holder["임시"] is True          # 입장 순서의 첫 플레이어
+    assert state(client, host).json()["나"]["진행_권한"] is False
+    assert advance(client, host).status_code == 403
+    assert advance(client, a).status_code == 200
+
+
+def test_host_can_hand_authority_to_specific_player_and_take_it_back(client, make_account, make_game_work, clock):
+    host, others, _, _ = started(client, make_account, make_game_work)
+    res = client.post("/api/game/me/authority", headers=host.headers, json={"계정_번호": others[1].number})
+    assert res.status_code == 200, res.text
+    assert res.json()["권한"] == {"계정_번호": others[1].number, "닉네임": res.json()["권한"]["닉네임"], "임시": False}
+    assert advance(client, host).status_code == 403
+    assert advance(client, others[1]).status_code == 200
+    back = client.post("/api/game/me/authority", headers=host.headers, json={"계정_번호": host.number})
+    assert back.json()["권한"]["계정_번호"] == host.number
+
+
+def test_only_host_can_hand_over_and_only_to_players(client, make_account, make_game_work):
+    host, others, _, _ = started(client, make_account, make_game_work)
+    assert client.post("/api/game/me/authority", headers=others[0].headers, json={"계정_번호": others[1].number}).status_code == 403
+    assert client.post("/api/game/me/authority", headers=host.headers, json={"계정_번호": 999999}).status_code == 422

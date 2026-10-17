@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI):
     pool.open(wait=True, timeout=10)
     app.state.pool = pool
     app.state.rooms = RoomRegistry(settings.room_member_timeout_seconds)
-    app.state.games = GameRegistry()
+    app.state.games = GameRegistry(away_seconds=settings.game_away_seconds)
     app.state.join_limiter = JoinLimiter(settings.room_join_fail_limit, settings.room_join_fail_window_seconds)
     sweeper = asyncio.create_task(sweep_loop(app, settings.room_sweep_seconds))
     try:

@@ -686,6 +686,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/game/me/authority": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give Authority
+         * @description 방장이 진행 권한을 특정 플레이어에게 맡긴다(자기 자신에게 맡기면 되돌린다).
+         */
+        post: operations["give_authority_api_game_me_authority_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -720,6 +740,20 @@ export interface components {
              * @enum {string}
              */
             "\uAD8C\uD55C": "사용자" | "관리자" | "운영자";
+        };
+        /** AuthorityIn */
+        AuthorityIn: {
+            /** 계정 번호 */
+            "\uACC4\uC815_\uBC88\uD638": number;
+        };
+        /** AuthorityOut */
+        AuthorityOut: {
+            /** 계정 번호 */
+            "\uACC4\uC815_\uBC88\uD638": number;
+            /** 닉네임 */
+            "\uB2C9\uB124\uC784": string;
+            /** 임시 */
+            "\uC784\uC2DC": boolean;
         };
         /** CharacterIn */
         CharacterIn: {
@@ -785,6 +819,7 @@ export interface components {
             /** 상태 버전 */
             "\uC0C1\uD0DC_\uBC84\uC804": number;
             "\uB098": components["schemas"]["MeOut"];
+            "\uAD8C\uD55C": components["schemas"]["AuthorityOut"];
             "\uC2DC\uAC04": components["schemas"]["TimeOut"];
             "\uC120\uD0DD_\uC644\uB8CC": components["schemas"]["ProgressOut"];
             "\uD398\uC774\uC988": components["schemas"]["PhaseOut"];
@@ -930,6 +965,8 @@ export interface components {
             "\uC778\uBB3C_\uC21C\uC11C": number | null;
             /** 인물 이름 */
             "\uC778\uBB3C_\uC774\uB984": string | null;
+            /** 접속중 */
+            "\uC811\uC18D\uC911": boolean;
         };
         /**
          * PrivatePlayWorkOut
@@ -2869,6 +2906,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PauseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    give_authority_api_game_me_authority_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthorityIn"];
             };
         };
         responses: {

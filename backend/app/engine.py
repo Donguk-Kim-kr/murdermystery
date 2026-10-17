@@ -37,7 +37,9 @@ class Game:
     snapshot: dict[str, Any]
     players: dict[int, Player]       # 계정 번호 → 플레이어. 입장한 순서를 지킨다(dict 는 넣은 순서를 기억한다)
     observers: dict[int, Observer] = field(default_factory=dict)
-    authority_id: int = 0            # 진행 권한(다음 단계로 넘기기 등)을 가진 계정. 처음에는 방장이다
+    designated_id: int = 0           # 방장이 진행 권한을 맡긴 계정. 처음에는 방장이다
+    away_seconds: float = 45.0
+    last_seen: dict[int, float] = field(default_factory=dict)   # 계정 → 마지막으로 상태를 확인한 시각
     phase_index: int = 0             # 흐름 안의 위치(0부터)
     state_version: int = 1           # 상태가 바뀔 때마다 올라간다(화면이 오래된 응답을 거르는 데 쓴다)
     lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
@@ -57,9 +59,11 @@ class Game:
         return self.phases[self.phase_index]
 
     def __post_init__(self) -> None:
-        if not self.authority_id:
-            self.authority_id = self.host_id
+        if not self.designated_id:
+            self.designated_id = self.host_id
         self.running_since = self.clock()
+        now = self.clock()
+        self.last_seen = {a: now for a in [*self.players, *self.observers]}
 
     @property
     def characters(self) -> list[dict[str, Any]]:
@@ -69,6 +73,34 @@ class Game:
     def bump(self) -> int:
         self.state_version += 1
         return self.state_version
+
+    # ---- 접속과 진행 권한 ----------------------------------------------------------------
+    def touch(self, account_id: int) -> None:
+        self.last_seen[account_id] = self.clock()
+
+    def away(self, account_id: int) -> bool:
+        """상태 확인이 유예 시간 동안 끊겼으면 이탈로 본다(자리와 인물은 그대로 유지된다)."""
+        return self.clock() - self.last_seen.get(account_id, 0.0) > self.away_seconds
+
+    def eligible(self) -> list[int]:
+        """진행 권한을 가질 수 있는 사람의 우선순서. 맡겨진 사람 → 방장 → 입장한 순서의 플레이어.
+
+        관전자는 갖지 못한다(관전 모드는 일반 관전뿐이다). 방장이 플레이하지 않으면 방장은 빠지고 첫 플레이어가 된다.
+        """
+        order: list[int] = []
+        for account in [self.designated_id, self.host_id, *self.players]:
+            if account in self.players and account not in order:
+                order.append(account)
+        return order
+
+    @property
+    def authority_id(self) -> int:
+        """지금 진행 권한을 가진 계정. 우선순서에서 이탈하지 않은 첫 사람이다. 모두 이탈했으면 맡겨진 사람(없으면 첫 사람)."""
+        order = self.eligible()
+        for account in order:
+            if not self.away(account):
+                return account
+        return order[0] if order else self.host_id
 
     # ---- 시간 ------------------------------------------------------------------------
     @property
@@ -97,15 +129,18 @@ class Game:
 class GameRegistry:
     """진행 중인 게임을 방 번호로 찾는다."""
 
-    def __init__(self, clock: Callable[[], float] = time.time) -> None:
+    def __init__(self, clock: Callable[[], float] = time.time, away_seconds: float = 45.0) -> None:
         self.clock = clock               # 테스트에서 시간을 흘려 보내기 위해 바꿀 수 있다
+        self.away_seconds = away_seconds
         self._lock = threading.RLock()
         self._games: dict[int, Game] = {}
 
     def add(self, game: Game) -> None:
         with self._lock:
             game.clock = lambda: self.clock()   # 등록한 레지스트리의 시계를 따른다
+            game.away_seconds = self.away_seconds
             game.restart_timer()
+            game.last_seen = {a: game.clock() for a in [*game.players, *game.observers]}
             self._games[game.room_id] = game
 
     def get(self, room_id: int) -> Game | None:
@@ -146,6 +181,7 @@ def view_for(game: Game, account_id: int) -> dict[str, Any]:
                 "방장": account_id == game.host_id,
                 "진행_권한": account_id == game.authority_id,
             },
+            "권한": _authority_view(game),
             "페이즈": {
                 "위치": game.phase_index + 1,
                 "전체": len(game.phases),
@@ -161,6 +197,7 @@ def view_for(game: Game, account_id: int) -> dict[str, Any]:
                     "닉네임": p.nickname,
                     "인물_순서": p.character,
                     "인물_이름": by_slot[p.character]["이름"] if p.character in by_slot else None,
+                    "접속중": not game.away(p.account_id),
                 }
                 for p in game.players.values()
             ],
@@ -259,4 +296,21 @@ def advance_phase(game: Game, account_id: int, persist: Callable[[int], None]) -
         persist(game.phases[game.phase_index + 1]["순서"])
         game.phase_index += 1
         game.restart_timer()
+        game.bump()
+
+
+def _authority_view(game: Game) -> dict[str, Any]:
+    holder = game.authority_id
+    names = {**{a: p.nickname for a, p in game.players.items()}, **{a: o.nickname for a, o in game.observers.items()}}
+    return {"계정_번호": holder, "닉네임": names.get(holder, ""), "임시": holder != game.designated_id}
+
+
+def hand_over_authority(game: Game, account_id: int, target: int) -> None:
+    """방장이 진행 권한을 특정 플레이어에게 맡긴다(자기 자신에게 맡기면 되돌린다). 방장만 할 수 있다."""
+    with game.lock:
+        if account_id != game.host_id:
+            raise AdvanceError("forbidden", "방장만 진행 권한을 맡길 수 있습니다")
+        if target not in game.players:
+            raise AdvanceError("unknown", "플레이어에게만 맡길 수 있습니다")
+        game.designated_id = target
         game.bump()

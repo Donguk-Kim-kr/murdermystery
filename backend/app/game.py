@@ -10,7 +10,8 @@ from pydantic import BaseModel
 from .auth import CurrentUser
 from .db import Conn
 from .engine import (
-    AdvanceError, AssignError, Game, GameRegistry, Observer, Player, advance_phase, assign_character, set_paused, view_for,
+    AdvanceError, AssignError, Game, GameRegistry, Observer, Player, advance_phase, assign_character, hand_over_authority,
+    set_paused, view_for,
 )
 from .rooms import find_my_room, registry
 
@@ -20,6 +21,16 @@ state_router = APIRouter(prefix="/api/game", tags=["game"])
 
 def games(request: Request) -> GameRegistry:
     return request.app.state.games
+
+
+def _my_game(request: Request, account_id: int) -> Game:
+    """내가 참여 중인 게임. 이 호출이 접속 확인(이탈 판단)을 겸한다."""
+    game = games(request).of_account(account_id)
+    if game is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "진행 중인 게임이 없습니다")
+    with game.lock:
+        game.touch(account_id)
+    return game
 
 
 class MemberRef(BaseModel):
@@ -113,6 +124,13 @@ class PlayerOut(BaseModel):
     닉네임: str
     인물_순서: int | None
     인물_이름: str | None
+    접속중: bool
+
+
+class AuthorityOut(BaseModel):
+    계정_번호: int
+    닉네임: str
+    임시: bool
 
 
 class CharacterOut(BaseModel):
@@ -139,6 +157,7 @@ class ProgressOut(BaseModel):
 class GameStateOut(BaseModel):
     상태_버전: int
     나: MeOut
+    권한: AuthorityOut
     시간: TimeOut
     선택_완료: ProgressOut
     페이즈: PhaseOut
@@ -149,9 +168,7 @@ class GameStateOut(BaseModel):
 @state_router.get("/me/state", response_model=GameStateOut)
 def my_state(me: CurrentUser, request: Request) -> dict:
     """내가 참여 중인 게임의 현재 상태. 내가 보아도 되는 것만 돌려준다."""
-    game = games(request).of_account(me.계정.번호)
-    if game is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "진행 중인 게임이 없습니다")
+    game = _my_game(request, me.계정.번호)
     return view_for(game, me.계정.번호)
 
 
@@ -170,9 +187,7 @@ ASSIGN_STATUS = {
 @state_router.post("/me/confirm", response_model=GameStateOut)
 def confirm_character(body: ConfirmIn, conn: Conn, me: CurrentUser, request: Request) -> dict:
     """고른 인물을 "확인"한다. 선착순으로 배정되고, 확인한 뒤에는 되돌릴 수 없다."""
-    game = games(request).of_account(me.계정.번호)
-    if game is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "진행 중인 게임이 없습니다")
+    game = _my_game(request, me.계정.번호)
 
     def persist(account_id: int, character: int) -> None:
         conn.execute(
@@ -189,16 +204,10 @@ def confirm_character(body: ConfirmIn, conn: Conn, me: CurrentUser, request: Req
 
 ADVANCE_STATUS = {
     "forbidden": status.HTTP_403_FORBIDDEN,
+    "unknown": status.HTTP_422_UNPROCESSABLE_CONTENT,
     "last": status.HTTP_409_CONFLICT,
     "condition": status.HTTP_409_CONFLICT,
 }
-
-
-def _my_game(request: Request, account_id: int) -> Game:
-    game = games(request).of_account(account_id)
-    if game is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "진행 중인 게임이 없습니다")
-    return game
 
 
 @state_router.post("/me/advance", response_model=GameStateOut)
@@ -226,6 +235,21 @@ def pause(body: PauseIn, me: CurrentUser, request: Request) -> dict:
     game = _my_game(request, me.계정.번호)
     try:
         set_paused(game, me.계정.번호, body.일시정지)
+    except AdvanceError as err:
+        raise HTTPException(ADVANCE_STATUS.get(err.code, status.HTTP_409_CONFLICT), err.message) from err
+    return view_for(game, me.계정.번호)
+
+
+class AuthorityIn(BaseModel):
+    계정_번호: int
+
+
+@state_router.post("/me/authority", response_model=GameStateOut)
+def give_authority(body: AuthorityIn, me: CurrentUser, request: Request) -> dict:
+    """방장이 진행 권한을 특정 플레이어에게 맡긴다(자기 자신에게 맡기면 되돌린다)."""
+    game = _my_game(request, me.계정.번호)
+    try:
+        hand_over_authority(game, me.계정.번호, body.계정_번호)
     except AdvanceError as err:
         raise HTTPException(ADVANCE_STATUS.get(err.code, status.HTTP_409_CONFLICT), err.message) from err
     return view_for(game, me.계정.번호)
