@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from .auth import CurrentUser
 from .db import Conn
-from .engine import Game, GameRegistry, Observer, Player, view_for
+from .engine import AssignError, Game, GameRegistry, Observer, Player, assign_character, view_for
 from .rooms import find_my_room, registry
 
 router = APIRouter(prefix="/api/rooms", tags=["game"])
@@ -122,9 +122,15 @@ class CharacterOut(BaseModel):
     선택한_계정: int | None
 
 
+class ProgressOut(BaseModel):
+    완료: int
+    전체: int
+
+
 class GameStateOut(BaseModel):
     상태_버전: int
     나: MeOut
+    선택_완료: ProgressOut
     페이즈: PhaseOut
     플레이어: list[PlayerOut]
     인물: list[CharacterOut]
@@ -136,4 +142,36 @@ def my_state(me: CurrentUser, request: Request) -> dict:
     game = games(request).of_account(me.계정.번호)
     if game is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "진행 중인 게임이 없습니다")
+    return view_for(game, me.계정.번호)
+
+
+class ConfirmIn(BaseModel):
+    인물_순서: int
+
+
+ASSIGN_STATUS = {
+    "not_player": status.HTTP_403_FORBIDDEN,
+    "already": status.HTTP_409_CONFLICT,
+    "taken": status.HTTP_409_CONFLICT,
+    "unknown": status.HTTP_422_UNPROCESSABLE_CONTENT,
+}
+
+
+@state_router.post("/me/confirm", response_model=GameStateOut)
+def confirm_character(body: ConfirmIn, conn: Conn, me: CurrentUser, request: Request) -> dict:
+    """고른 인물을 "확인"한다. 선착순으로 배정되고, 확인한 뒤에는 되돌릴 수 없다."""
+    game = games(request).of_account(me.계정.번호)
+    if game is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "진행 중인 게임이 없습니다")
+
+    def persist(account_id: int, character: int) -> None:
+        conn.execute(
+            'UPDATE "참여" SET "인물_순서" = %s WHERE "진행_번호" = %s AND "계정_번호" = %s',
+            (character, game.id, account_id),
+        )
+
+    try:
+        assign_character(game, me.계정.번호, body.인물_순서, persist)
+    except AssignError as err:
+        raise HTTPException(ASSIGN_STATUS.get(err.code, status.HTTP_409_CONFLICT), err.message) from err
     return view_for(game, me.계정.번호)

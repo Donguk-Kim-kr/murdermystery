@@ -118,6 +118,7 @@ def view_for(game: Game, account_id: int) -> dict[str, Any]:
                 "이름": phase.get("표시이름"),
                 "진행시간": phase["진행시간"],
             },
+            "선택_완료": {"완료": sum(1 for p in game.players.values() if p.character is not None), "전체": len(game.players)},
             "플레이어": [
                 {
                     "계정_번호": p.account_id,
@@ -136,3 +137,38 @@ def view_for(game: Game, account_id: int) -> dict[str, Any]:
                 for c in game.characters
             ],
         }
+
+
+class AssignError(Exception):
+    """배정할 수 없다. `code` 로 API 계층이 응답을 정한다."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code, self.message = code, message
+
+
+def assign_character(game: Game, account_id: int, character: int, persist) -> None:
+    """플레이어에게 인물을 배정한다(선착순, 한 번에 하나씩). 확인한 뒤에는 되돌릴 수 없다.
+
+    `persist(account_id, character)` 는 DB 에 쓰는 함수이고, 메모리를 바꾸기 전에 호출한다.
+    같은 인물을 둘이 고르면 먼저 들어온 요청만 성공한다.
+    """
+    with game.lock:
+        player = game.players.get(account_id)
+        if player is None:
+            raise AssignError("not_player", "플레이어만 캐릭터를 고를 수 있습니다")
+        if player.character is not None:
+            raise AssignError("already", "이미 캐릭터를 선택했습니다")
+        if character not in {c["순서"] for c in game.characters}:
+            raise AssignError("unknown", "고를 수 없는 인물입니다")
+        if any(p.character == character for p in game.players.values()):
+            raise AssignError("taken", "이미 다른 사람이 고른 인물입니다")
+        persist(account_id, character)
+        player.character = character
+        game.bump()
+
+
+def confirmed_count(game: Game) -> int:
+    """캐릭터를 확인한 플레이어 수."""
+    with game.lock:
+        return sum(1 for p in game.players.values() if p.character is not None)

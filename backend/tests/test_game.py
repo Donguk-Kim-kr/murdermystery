@@ -210,3 +210,102 @@ def test_state_version_is_stable_between_reads(client, make_account, make_game_w
     host, _, _, _ = full_room(client, make_account, make_game_work)
     start(client, host)
     assert state(client, host).json()["상태_버전"] == state(client, host).json()["상태_버전"] == 1
+
+
+# ---- 캐릭터 배정 (1-3) --------------------------------------------------------------------
+
+def confirm_pick(client, who, slot):
+    return client.post("/api/game/me/confirm", headers=who.headers, json={"인물_순서": slot})
+
+
+def slots(client, who):
+    return [c["순서"] for c in state(client, who).json()["인물"]]
+
+
+def test_confirm_assigns_character_and_updates_progress(client, make_account, make_game_work, db):
+    host, others, room, _ = full_room(client, make_account, make_game_work)
+    start(client, host)
+    first = slots(client, host)[0]
+    res = confirm_pick(client, others[0], first)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["나"]["인물_순서"] == first and body["상태_버전"] == 2
+    assert body["선택_완료"] == {"완료": 1, "전체": 3}
+    mine = [p for p in body["플레이어"] if p["계정_번호"] == others[0].number][0]
+    assert mine["인물_이름"] == "p0"
+    assert [c["선택한_계정"] for c in body["인물"]][0] == others[0].number
+    row = db.execute('SELECT "인물_순서" FROM "참여" WHERE "계정_번호" = %s AND "진행_번호" = (SELECT "번호" FROM "진행" WHERE "방_번호" = %s)',
+                     (others[0].number, room["번호"])).fetchone()
+    assert row[0] == first
+
+
+def test_other_players_see_who_took_a_character(client, make_account, make_game_work):
+    host, others, _, _ = full_room(client, make_account, make_game_work)
+    start(client, host)
+    first = slots(client, host)[0]
+    confirm_pick(client, others[0], first)
+    seen = state(client, host).json()
+    assert seen["선택_완료"]["완료"] == 1
+    assert seen["인물"][0]["선택한_계정"] == others[0].number
+    assert seen["나"]["인물_순서"] is None            # 내 인물은 아직 없다
+
+
+def test_same_character_cannot_be_taken_twice(client, make_account, make_game_work, db):
+    host, others, room, _ = full_room(client, make_account, make_game_work)
+    start(client, host)
+    first = slots(client, host)[0]
+    assert confirm_pick(client, others[0], first).status_code == 200
+    res = confirm_pick(client, others[1], first)
+    assert res.status_code == 409 and "이미 다른 사람" in res.json()["detail"]
+    assert state(client, others[1]).json()["나"]["인물_순서"] is None
+    assert db.execute('SELECT count(*) FROM "참여" WHERE "인물_순서" = %s AND "진행_번호" = (SELECT "번호" FROM "진행" WHERE "방_번호" = %s)',
+                      (first, room["번호"])).fetchone()[0] == 1
+
+
+def test_confirm_is_final(client, make_account, make_game_work):
+    host, others, _, _ = full_room(client, make_account, make_game_work)
+    start(client, host)
+    a, b = slots(client, host)[:2]
+    assert confirm_pick(client, others[0], a).status_code == 200
+    res = confirm_pick(client, others[0], b)
+    assert res.status_code == 409 and "이미" in res.json()["detail"]
+    assert state(client, others[0]).json()["나"]["인물_순서"] == a
+
+
+def test_unknown_character_and_non_players_are_rejected(client, make_account, make_game_work):
+    host = make_account()
+    wid = make_game_work(host, players=2, npcs=1)
+    room = create_room(client, host, wid, 방장_참여=False)
+    a, b = make_account(), make_account()
+    join(client, a, room["입장코드"])
+    join(client, b, room["입장코드"])
+    start(client, host)
+    assert confirm_pick(client, host, slots(client, a)[0]).status_code == 403          # 관전자
+    assert confirm_pick(client, a, 99999).status_code == 422
+    npc_slot = max(c["순서"] for c in client.get(f"/api/works/{wid}/characters", headers=host.headers).json())
+    assert npc_slot not in slots(client, a)                                            # NPC 는 고르는 목록에 없다
+    assert confirm_pick(client, a, npc_slot).status_code == 422
+    assert confirm_pick(client, make_account(), 1).status_code == 404                  # 게임에 없는 사람
+
+
+def test_concurrent_confirms_for_same_character_one_wins(client, make_account, make_game_work, db):
+    from concurrent.futures import ThreadPoolExecutor
+
+    host, others, room, _ = full_room(client, make_account, make_game_work)
+    start(client, host)
+    first = slots(client, host)[0]
+    who = [host, *others]
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        codes = sorted(pool.map(lambda w: confirm_pick(client, w, first).status_code, who))
+    assert codes == [200, 409, 409]
+    assert db.execute('SELECT count(*) FROM "참여" WHERE "인물_순서" = %s AND "진행_번호" = (SELECT "번호" FROM "진행" WHERE "방_번호" = %s)',
+                      (first, room["번호"])).fetchone()[0] == 1
+
+
+def test_all_players_can_confirm_distinct_characters(client, make_account, make_game_work):
+    host, others, _, _ = full_room(client, make_account, make_game_work)
+    start(client, host)
+    for who, slot in zip([host, *others], slots(client, host)):
+        assert confirm_pick(client, who, slot).status_code == 200
+    final = state(client, host).json()
+    assert final["선택_완료"] == {"완료": 3, "전체": 3} and final["상태_버전"] == 4
