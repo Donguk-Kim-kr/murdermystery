@@ -31,6 +31,8 @@ export function BlockView({ block, state, onAnswer }: Props) {
       return <ReadBlock block={block} onAnswer={onAnswer} isPlayer={state.나.역할 === "플레이어"} />;
     case "선택지":
       return <ChoiceBlock block={block} state={state} onAnswer={onAnswer} />;
+    case "입력":
+      return <InputBlock block={block} onAnswer={onAnswer} isPlayer={state.나.역할 === "플레이어"} />;
     case "현황":
       return <ProgressBlock block={block} />;
     default:
@@ -71,6 +73,40 @@ function ProgressBlock({ block }: { block: Block }) {
         <span className="chip">{done}/{total}</span>
       </div>
       <ProgressBar done={done} total={total} label={text(block.이름)} />
+    </section>
+  );
+}
+
+function InputBlock({ block, onAnswer, isPlayer }: { block: Block; onAnswer: Props["onAnswer"]; isPlayer: boolean }) {
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const limit = Number(block.글자수 ?? 300);
+  const length = Array.from(value).length;
+  return (
+    <section className="block" aria-label={text(block.이름)}>
+      <Title block={block} />
+      <label>
+        {text(block.질문)}
+        <textarea rows={3} value={value} disabled={!isPlayer} onChange={(e) => setValue(e.target.value)} />
+      </label>
+      {isPlayer ? (
+        <div className="row start">
+          <button
+            type="button"
+            disabled={busy || value.trim() === "" || length > limit}
+            onClick={async () => {
+              setBusy(true);
+              await onAnswer(text(block.질문ID), value);
+              setBusy(false);
+            }}
+          >
+            보내기
+          </button>
+          <span className={length > limit ? "error" : "muted"}>{length}/{limit}자</span>
+        </div>
+      ) : (
+        <p className="muted">관전 중에는 답할 수 없습니다.</p>
+      )}
     </section>
   );
 }

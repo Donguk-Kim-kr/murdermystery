@@ -165,6 +165,23 @@ describe("플레이 화면", () => {
     expect(screen.getByText("확인 1/3")).toBeInTheDocument();
   });
 
+  it("입력 블록은 글자를 쓰고 보내기를 눌러야 서버로 보내고, 글자 수를 넘으면 보낼 수 없다", async () => {
+    const input = { 종류: "입력", 이름: "한 줄 답변", 질문: "범인은 누구입니까?", 글자수: 5, 질문ID: "1:5:한 줄 답변" };
+    state = makeState({ 화면: [input] });
+    render(<GamePage />);
+    const user = userEvent.setup();
+    const send = await screen.findByRole("button", { name: "보내기" });
+    expect(send).toBeDisabled();
+    const box = screen.getByLabelText("범인은 누구입니까?");
+    await user.type(box, "여섯글자예요");
+    expect(screen.getByText("6/5자")).toHaveClass("error");
+    expect(send).toBeDisabled();
+    await user.clear(box);
+    await user.type(box, "집사");
+    await user.click(send);
+    await waitFor(() => expect(posts).toEqual([{ path: "/api/game/me/answer", body: { 질문ID: "1:5:한 줄 답변", 값: "집사" } }]));
+  });
+
   it("읽기 블록의 확인을 누르면 답을 보내고 현황을 보여 준다", async () => {
     const read = (done: boolean, count: number) => ({
       종류: "읽기", 이름: "공통 스토리", 내용: "모두가 읽는 이야기", 질문ID: "1:4:읽기:공통 스토리",

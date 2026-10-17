@@ -52,9 +52,10 @@ class CardRun:
 MUTATING = {"배정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
 FUNCTION_NAMES = {
     "플레이어들", "플레이어수", "인물들", "공통스토리", "서사들", "배정된_플레이어수", "인물_없는_플레이어가_있다",
-    "글", "선택지", "현황", "거부", "배정", "읽기", "기다리기", "단계_끝내기", "게임_종료",
+    "글", "선택지", "입력", "현황", "거부", "배정", "읽기", "기다리기", "단계_끝내기", "게임_종료",
 }
 CONSTANT_NAMES = {"통과", ALL}
+MAX_INPUT_CHARS = 2000
 
 
 def known_names() -> set[str]:
@@ -122,6 +123,15 @@ class CardHost:
             "종류": "선택지", "이름": str(name), "항목": list(items), "한사람당": 한사람당, "확인필요": bool(확인필요),
             "질문ID": f"{self.run.key}:확인",
         }
+
+    def fn_입력(self, name: str, prompt: Any, 글자수: int = 300) -> dict[str, Any]:
+        """글자를 받는 칸. 플레이어가 보내면 `기다리기(이름)` 이 `{플레이어, 값}` 을 돌려준다."""
+        name = str(name)
+        if ":" in name or name in ("확인", ""):
+            raise ScriptError("입력의 이름은 비워 둘 수 없고 ':' 이나 '확인' 일 수 없습니다")
+        if not isinstance(글자수, int) or isinstance(글자수, bool) or not 1 <= 글자수 <= MAX_INPUT_CHARS:
+            raise ScriptError(f"입력의 글자수는 1 이상 {MAX_INPUT_CHARS} 이하여야 합니다")
+        return {"종류": "입력", "이름": name, "질문": _text(prompt), "글자수": 글자수, "질문ID": f"{self.run.key}:{name}"}
 
     def fn_현황(self, name: str, 완료: int, 전체: int) -> dict[str, Any]:
         return {"종류": "현황", "이름": str(name), "완료": int(완료), "전체": int(전체)}
@@ -379,6 +389,13 @@ def answer(game, account_id: int, qid: str, value: Any, io) -> None:
     vm = run.vm
     if vm is None or vm.waiting is None or vm.waiting.get("종류") != rest:
         raise AnswerError("stale", "지금은 받지 않는 질문입니다")
+    block = next((b for t in run.screens.values() for b in t.values() if b.get("종류") == "입력" and b.get("이름") == rest), None)
+    if block is not None:
+        if not isinstance(value, str) or not value.strip():
+            raise AnswerError("invalid", "글자를 입력해 주세요")
+        if len(value) > block["글자수"]:
+            raise AnswerError("invalid", f"{block['글자수']}자까지 쓸 수 있습니다")
+        value = value.strip()
     vm.host.io = io                                  # 기록은 이 요청의 연결로 쓴다(시작 때의 연결은 이미 닫혔다)
     vm.resume({"플레이어": Ref("플레이어", account_id), "값": value, "종류": rest})
     _run(game, run)
@@ -417,9 +434,12 @@ def card_view(game, viewer: int) -> dict[str, Any]:
     """`viewer` 에게 보여도 되는 화면 블록·탭·알림·오류. 다른 플레이어에게만 보이도록 한 것은 들어가지 않는다."""
     screens: list[dict[str, Any]] = []
     for run in game.runs.values():
-        for target in (ALL, viewer):
-            for block in run.screens.get(target, {}).values():
-                screens.append({"카드": run.title, **_block(game, viewer, block)})
+        shown: dict[str, dict[str, Any]] = {}
+        for target in (ALL, viewer):          # 같은 이름이면 나에게만 보이도록 한 것이 모두에게 보이는 것을 대신한다(자리는 그대로)
+            for name, block in run.screens.get(target, {}).items():
+                shown[name] = block
+        for block in shown.values():
+            screens.append({"카드": run.title, **_block(game, viewer, block)})
     merged: dict[str, dict[str, Any]] = {}
     for target in (ALL, viewer):
         for name, tab in game.tabs.get(target, {}).items():

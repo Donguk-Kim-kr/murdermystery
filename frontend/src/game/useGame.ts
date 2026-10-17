@@ -39,10 +39,14 @@ export function useGame(): GameApi {
   }, []);
 
   const load = useCallback(async () => {
-    const { data, response } = await api.GET("/api/game/me/state");
-    if (!alive.current) return;
-    if (data) apply(data);
-    else if (response.status === 404) setMissing(true);
+    try {
+      const { data, response } = await api.GET("/api/game/me/state");
+      if (!alive.current) return;
+      if (data) apply(data);
+      else if (response.status === 404) setMissing(true);
+    } catch {
+      /* 네트워크가 끊긴 동안에는 읽지 못한다. 실시간 연결이 돌아오면 다시 읽는다 */
+    }
   }, [apply]);
 
   useEffect(() => {
@@ -73,7 +77,14 @@ export function useGame(): GameApi {
   const act = useCallback(
     async (run: () => Promise<{ data?: GameState; error?: unknown }>, fallback: string) => {
       setError(null);
-      const { data, error: err } = await run();
+      let result: { data?: GameState; error?: unknown };
+      try {
+        result = await run();
+      } catch {
+        if (alive.current) setError("서버에 연결하지 못했습니다. 잠시 뒤 다시 시도해 주세요");
+        return false;
+      }
+      const { data, error: err } = result;
       if (data) apply(data);
       if (err) {
         setError(errorMessage(err, fallback));
