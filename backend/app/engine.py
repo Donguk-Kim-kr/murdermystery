@@ -39,7 +39,7 @@ class Game:
     players: dict[int, Player]       # 계정 번호 → 플레이어. 입장한 순서를 지킨다(dict 는 넣은 순서를 기억한다)
     observers: dict[int, Observer] = field(default_factory=dict)
     designated_id: int = 0           # 방장이 진행 권한을 맡긴 계정. 처음에는 방장이다
-    away_seconds: float = 45.0
+    away_seconds: float = 600.0
     last_seen: dict[int, float] = field(default_factory=dict)   # 계정 → 마지막으로 상태를 확인한 시각
     phase_index: int = 0             # 흐름 안의 위치(0부터)
     auto_advance: bool = False       # 시간이 끝나면 저절로 다음 단계로 넘어갈지(방장이 고른다). 기본은 방장이 넘기기 전에는 넘어가지 않는다
@@ -151,7 +151,7 @@ class Game:
 class GameRegistry:
     """진행 중인 게임을 방 번호로 찾는다."""
 
-    def __init__(self, clock: Callable[[], float] = time.time, away_seconds: float = 45.0) -> None:
+    def __init__(self, clock: Callable[[], float] = time.time, away_seconds: float = 600.0) -> None:
         self.clock = clock               # 테스트에서 시간을 흘려 보내기 위해 바꿀 수 있다
         self.away_seconds = away_seconds
         self._lock = threading.RLock()

@@ -314,6 +314,11 @@ def test_all_players_can_confirm_distinct_characters(client, make_account, make_
 
 # ---- 페이즈 전환과 시간 (1-4) ---------------------------------------------------------------
 
+def over_grace(client):
+    """이탈 유예를 막 넘기는 시간(초)."""
+    return client.app.state.games.away_seconds + 5
+
+
 @pytest.fixture
 def clock(client):
     reg = client.app.state.games
@@ -436,7 +441,7 @@ def test_host_holds_authority_by_default(client, make_account, make_game_work, c
 
 def test_authority_moves_down_the_join_order_and_comes_back(client, make_account, make_game_work, clock):
     host, others, _, _ = started(client, make_account, make_game_work)
-    clock["now"] += 50                                  # 유예(45초)를 넘긴다. 방장만 상태를 확인하지 않는다
+    clock["now"] += over_grace(client)                  # 유예를 넘긴다. 방장만 상태를 확인하지 않는다
     state(client, others[1])                            # 3번 플레이어는 계속 접속
     # 2번 플레이어(others[0])도 이탈한 상태로 두면 3번이 임시로 갖는다
     a = authority(client, others[1])
@@ -451,7 +456,7 @@ def test_authority_moves_down_the_join_order_and_comes_back(client, make_account
 
 def test_temporary_holder_can_advance_while_host_is_away(client, make_account, make_game_work, clock):
     host, others, _, _ = started(client, make_account, make_game_work)
-    clock["now"] += 50                                  # 방장이 상태를 확인하지 않은 채 유예를 넘긴다
+    clock["now"] += over_grace(client)                  # 방장이 상태를 확인하지 않은 채 유예를 넘긴다
     state(client, others[0])
     assert authority(client, others[0])["계정_번호"] == others[0].number
     res = advance(client, others[0])
@@ -462,7 +467,7 @@ def test_player_seat_survives_being_away(client, make_account, make_game_work, c
     host, others, _, _ = started(client, make_account, make_game_work)
     slot = slots(client, host)[0]
     confirm_pick(client, others[0], slot)
-    clock["now"] += 500
+    clock["now"] += over_grace(client)
     state(client, host)
     seen = state(client, host).json()
     mine = [p for p in seen["플레이어"] if p["계정_번호"] == others[0].number][0]
@@ -663,12 +668,12 @@ def test_open_connection_counts_as_present_and_closed_one_does_not(client, make_
         try:
             await conn.event()
             for _ in range(3):
-                clock["now"] += 40                                    # 연결된 동안은 유예(45초)를 여러 번 넘겨도 접속 중이다
+                clock["now"] += over_grace(client) - 10               # 연결된 동안은 유예를 여러 번 채워도 접속 중이다
                 await asyncio.sleep(0.2)
                 assert not game.away(others[0].number)
         finally:
             await conn.close()
-        clock["now"] += 50                                            # 연결을 닫고 유예가 지나면 이탈이다
+        clock["now"] += over_grace(client)                            # 연결을 닫고 유예가 지나면 이탈이다
         assert game.away(others[0].number)
 
     run(scenario())
@@ -699,7 +704,7 @@ def test_reconnect_with_new_login_restores_same_state(client, make_account, make
 def test_returning_player_is_present_again(client, make_account, make_game_work, clock):
     host, others, room, _ = started(client, make_account, make_game_work)
     game = client.app.state.games.get(room["번호"])
-    clock["now"] += 500
+    clock["now"] += over_grace(client)
     assert game.away(others[0].number)
     state(client, relogin(client, others[0]))
     assert not game.away(others[0].number)
