@@ -33,6 +33,24 @@ def 진행조건(카드):
     return 통과
 '''
 
+INTRO = '''
+def 실행(카드):
+    줄 = []
+    for 플레이어 in 플레이어들():
+        인물 = 플레이어.인물
+        if 인물 is None:
+            continue
+        제목 = 인물.이름
+        if 인물.직업:
+            제목 = 제목 + " (" + 인물.직업 + ")"
+        줄.append(제목 + " - " + 플레이어.이름)
+        if 인물.소개:
+            줄.append(인물.소개)
+        줄.append("")
+    모두.탭("자기소개", 글("자기소개", "\\n".join(줄)))
+    모두.보이기(글("안내", "한 사람씩 자기소개를 해 주세요."))
+'''
+
 PROFILE = '''
 def 실행(카드):
     공개 = 카드.설정.get("개인서사공개", {})
@@ -62,7 +80,10 @@ def make_scripted_game(client, make_account, db):
         wid = client.post("/api/works", headers=host.headers, json={"제목": "스크립트 시험", "공통스토리": story}).json()["번호"]
         for i in range(players):
             raw = narrative.join([Part(None, f"{i}번의 서사 하나"), Part(None, f"{i}번의 서사 둘")])
-            res = client.post(f"/api/works/{wid}/characters", headers=host.headers, json={"이름": f"인물{i}", "직업": "의사", "서사": raw, "비밀": f"비밀{i}"})
+            res = client.post(f"/api/works/{wid}/characters", headers=host.headers, json={
+                "이름": f"인물{i}", "직업": "의사", "서사": raw, "비밀": f"비밀{i}",
+                **({"소개": "안녕하세요, 저는 의사입니다."} if i == 0 else {}),         # 소개가 있는 인물과 없는 인물
+            })
             assert res.status_code == 201, res.text
         swaps = {}
         for position, (name, script, settings) in enumerate(cards, 1):
@@ -433,3 +454,31 @@ def test_confirmed_snapshot_carries_parsed_story_parts(client, make_scripted_gam
     person = game.snapshot["인물"][0]
     assert [p["본문"] for p in person["서사_부분"]] == [f"0번의 서사 하나", f"0번의 서사 둘"]
     assert all(len(p["ID"]) == 6 for p in person["서사_부분"])
+
+
+# ---- 자기소개 --------------------------------------------------------------------------------
+
+def test_intro_shows_each_character_with_the_intro_line_only_when_there_is_one(client, make_scripted_game):
+    host, others, _, _ = make_scripted_game([("캐릭터 선택", CHARACTER_SELECT, None), ("자기소개", INTRO, None)])
+    people = [host, *others]
+    all_pick(client, people)
+    assert advance(client, host).status_code == 200
+    for who in people:
+        view = state(client, who).json()
+        board = tab(view, "자기소개")
+        assert board is not None and block(view, "안내")["내용"] == "한 사람씩 자기소개를 해 주세요."
+        text = board["내용"]
+        assert text.count("안녕하세요, 저는 의사입니다.") == 1          # 소개가 있는 한 명만
+        assert "None" not in text
+        assert text.count("의사)") == 3                                  # 세 인물 모두 이름과 직업이 나온다
+    # 소개가 비어 있는 인물은 빈 값으로 두고 플레이어가 스스로 소개한다: 그 줄이 만들어지지 않는다
+    lines = [l for l in tab(state(client, host).json(), "자기소개")["내용"].split("\n") if l.strip()]
+    assert len(lines) == 4                                               # 제목 3줄 + 소개 1줄
+
+
+def test_intro_tab_stays_in_later_phases(client, make_scripted_game):
+    host, others, _, _ = make_scripted_game([("캐릭터 선택", CHARACTER_SELECT, None), ("자기소개", INTRO, None), ("빈", "", None)])
+    all_pick(client, [host, *others])
+    advance(client, host)
+    advance(client, host)
+    assert tab(state(client, others[0]).json(), "자기소개") is not None
