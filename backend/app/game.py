@@ -9,7 +9,9 @@ from pydantic import BaseModel
 
 from .auth import CurrentUser
 from .db import Conn
-from .engine import AssignError, Game, GameRegistry, Observer, Player, assign_character, view_for
+from .engine import (
+    AdvanceError, AssignError, Game, GameRegistry, Observer, Player, advance_phase, assign_character, set_paused, view_for,
+)
 from .rooms import find_my_room, registry
 
 router = APIRouter(prefix="/api/rooms", tags=["game"])
@@ -122,6 +124,13 @@ class CharacterOut(BaseModel):
     선택한_계정: int | None
 
 
+class TimeOut(BaseModel):
+    서버_시각: float
+    일시정지: bool
+    남은_초: int | None
+    시간_종료: bool
+
+
 class ProgressOut(BaseModel):
     완료: int
     전체: int
@@ -130,6 +139,7 @@ class ProgressOut(BaseModel):
 class GameStateOut(BaseModel):
     상태_버전: int
     나: MeOut
+    시간: TimeOut
     선택_완료: ProgressOut
     페이즈: PhaseOut
     플레이어: list[PlayerOut]
@@ -174,4 +184,48 @@ def confirm_character(body: ConfirmIn, conn: Conn, me: CurrentUser, request: Req
         assign_character(game, me.계정.번호, body.인물_순서, persist)
     except AssignError as err:
         raise HTTPException(ASSIGN_STATUS.get(err.code, status.HTTP_409_CONFLICT), err.message) from err
+    return view_for(game, me.계정.번호)
+
+
+ADVANCE_STATUS = {
+    "forbidden": status.HTTP_403_FORBIDDEN,
+    "last": status.HTTP_409_CONFLICT,
+    "condition": status.HTTP_409_CONFLICT,
+}
+
+
+def _my_game(request: Request, account_id: int) -> Game:
+    game = games(request).of_account(account_id)
+    if game is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "진행 중인 게임이 없습니다")
+    return game
+
+
+@state_router.post("/me/advance", response_model=GameStateOut)
+def advance(conn: Conn, me: CurrentUser, request: Request) -> dict:
+    """다음 단계로 넘어간다(진행 권한이 있는 사람만)."""
+    game = _my_game(request, me.계정.번호)
+
+    def persist(slot: int) -> None:
+        conn.execute('UPDATE "진행" SET "진행순서_순서" = %s WHERE "번호" = %s', (slot, game.id))
+
+    try:
+        advance_phase(game, me.계정.번호, persist)
+    except AdvanceError as err:
+        raise HTTPException(ADVANCE_STATUS.get(err.code, status.HTTP_409_CONFLICT), err.message) from err
+    return view_for(game, me.계정.번호)
+
+
+class PauseIn(BaseModel):
+    일시정지: bool
+
+
+@state_router.post("/me/pause", response_model=GameStateOut)
+def pause(body: PauseIn, me: CurrentUser, request: Request) -> dict:
+    """시간을 멈추거나 다시 흐르게 한다(진행 권한이 있는 사람만)."""
+    game = _my_game(request, me.계정.번호)
+    try:
+        set_paused(game, me.계정.번호, body.일시정지)
+    except AdvanceError as err:
+        raise HTTPException(ADVANCE_STATUS.get(err.code, status.HTTP_409_CONFLICT), err.message) from err
     return view_for(game, me.계정.번호)

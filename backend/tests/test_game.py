@@ -309,3 +309,113 @@ def test_all_players_can_confirm_distinct_characters(client, make_account, make_
         assert confirm_pick(client, who, slot).status_code == 200
     final = state(client, host).json()
     assert final["선택_완료"] == {"완료": 3, "전체": 3} and final["상태_버전"] == 4
+
+
+# ---- 페이즈 전환과 시간 (1-4) ---------------------------------------------------------------
+
+@pytest.fixture
+def clock(client):
+    reg = client.app.state.games
+    original = reg.clock
+    t = {"now": 1000.0}
+    reg.clock = lambda: t["now"]
+    yield t
+    reg.clock = original
+
+
+def advance(client, who):
+    return client.post("/api/game/me/advance", headers=who.headers)
+
+
+def pause(client, who, value):
+    return client.post("/api/game/me/pause", headers=who.headers, json={"일시정지": value})
+
+
+def started(client, make_account, make_game_work, **kw):
+    host, others, room, wid = full_room(client, make_account, make_game_work, **kw)
+    assert start(client, host).status_code == 200
+    return host, others, room, wid
+
+
+def test_advance_moves_to_next_phase_and_saves_it(client, make_account, make_game_work, db):
+    host, _, room, wid = started(client, make_account, make_game_work)
+    before = state(client, host).json()
+    res = advance(client, host)
+    assert res.status_code == 200, res.text
+    after = res.json()
+    assert after["페이즈"]["위치"] == 2 and after["상태_버전"] == before["상태_버전"] + 1
+    slots_ = [r[0] for r in db.execute('SELECT "순서" FROM "진행순서" WHERE "작품_번호" = %s ORDER BY "순서"', (wid,)).fetchall()]
+    saved = db.execute('SELECT "진행순서_순서" FROM "진행" WHERE "방_번호" = %s', (room["번호"],)).fetchone()[0]
+    assert saved == slots_[1]
+
+
+def test_only_authority_can_advance_or_pause(client, make_account, make_game_work):
+    host, others, _, _ = started(client, make_account, make_game_work)
+    assert advance(client, others[0]).status_code == 403
+    assert pause(client, others[0], True).status_code == 403
+    assert state(client, host).json()["페이즈"]["위치"] == 1
+
+
+def test_cannot_advance_past_last_phase(client, make_account, make_game_work):
+    host, _, _, _ = started(client, make_account, make_game_work, phases=2)
+    assert advance(client, host).status_code == 200
+    res = advance(client, host)
+    assert res.status_code == 409 and "마지막" in res.json()["detail"]
+
+
+def test_card_condition_blocks_advance_with_message(client, make_account, make_game_work):
+    host, others, room, _ = started(client, make_account, make_game_work)
+    game = client.app.state.games.get(room["번호"])
+    game.advance_conditions.append(
+        lambda g: "캐릭터 선택이 완료되지 않았습니다." if any(p.character is None for p in g.players.values()) else None
+    )
+    res = advance(client, host)
+    assert res.status_code == 409 and res.json()["detail"] == "캐릭터 선택이 완료되지 않았습니다."
+    assert state(client, host).json()["페이즈"]["위치"] == 1
+    for who, slot in zip([host, *others], slots(client, host)):
+        confirm_pick(client, who, slot)
+    assert advance(client, host).status_code == 200
+
+
+def test_time_runs_pauses_and_resets_on_advance(client, make_account, make_game_work, clock):
+    host, _, _, _ = started(client, make_account, make_game_work)
+    t0 = state(client, host).json()["시간"]
+    assert t0["남은_초"] == 1800 and t0["일시정지"] is False and t0["시간_종료"] is False and t0["서버_시각"] == 1000.0
+    clock["now"] += 100
+    assert state(client, host).json()["시간"]["남은_초"] == 1700
+    v = state(client, host).json()["상태_버전"]
+    res = pause(client, host, True)
+    assert res.json()["시간"]["일시정지"] is True and res.json()["상태_버전"] == v + 1
+    clock["now"] += 500                                              # 멈춘 동안은 흐르지 않는다
+    assert state(client, host).json()["시간"]["남은_초"] == 1700
+    assert pause(client, host, True).json()["상태_버전"] == v + 1    # 같은 값이면 버전이 오르지 않는다
+    pause(client, host, False)
+    clock["now"] += 100
+    assert state(client, host).json()["시간"]["남은_초"] == 1600
+    clock["now"] += 2000
+    expired = state(client, host).json()["시간"]
+    assert expired["남은_초"] == 0 and expired["시간_종료"] is True
+    assert state(client, host).json()["페이즈"]["위치"] == 1         # 시간이 끝나도 방장이 넘기기 전에는 넘어가지 않는다
+    nxt = advance(client, host).json()
+    assert nxt["페이즈"]["위치"] == 2 and nxt["시간"]["남은_초"] == 1800 and nxt["시간"]["시간_종료"] is False
+
+
+def test_early_advance_and_advance_while_paused_are_allowed(client, make_account, make_game_work):
+    host, _, _, _ = started(client, make_account, make_game_work)
+    assert advance(client, host).status_code == 200                  # 시간이 남아 있어도
+    pause(client, host, True)
+    res = advance(client, host)                                      # 일시정지 중이어도
+    assert res.status_code == 200 and res.json()["시간"]["일시정지"] is False   # 새 페이즈의 시간은 다시 흐른다
+
+
+def test_zero_minutes_means_no_time_limit(client, make_account, make_game_work, clock):
+    host = make_account()
+    wid = client.post("/api/works", headers=host.headers, json={"제목": "무제한"}).json()["번호"]
+    client.post(f"/api/works/{wid}/characters", headers=host.headers, json={"이름": "a"})
+    assert client.post(f"/api/works/{wid}/phases/insert", headers=host.headers, json={"position": 1, "진행시간": 0}).status_code == 201
+    assert client.post(f"/api/works/{wid}/confirm", headers=host.headers, json={}).status_code == 201
+    room = create_room(client, host, wid)
+    assert start(client, host).status_code == 200
+    clock["now"] += 99999
+    t = state(client, host).json()["시간"]
+    assert t["남은_초"] is None and t["시간_종료"] is False

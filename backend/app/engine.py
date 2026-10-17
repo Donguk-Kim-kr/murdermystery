@@ -8,6 +8,8 @@
 진행 중인 게임은 영향을 받지 않는다.
 """
 import threading
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -39,6 +41,12 @@ class Game:
     phase_index: int = 0             # 흐름 안의 위치(0부터)
     state_version: int = 1           # 상태가 바뀔 때마다 올라간다(화면이 오래된 응답을 거르는 데 쓴다)
     lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
+    clock: Callable[[], float] = time.time
+    # 시간: 지금 페이즈에서 흐른 시간 = elapsed_base + (달리는 중이면 지금 - running_since)
+    elapsed_base: float = 0.0
+    running_since: float | None = None
+    # 다음 단계로 넘어가려 할 때 묻는 조건들. 안내 메시지를 돌려주면 넘어가지 못한다(없으면 통과). 카드의 `진행조건` 이 채운다.
+    advance_conditions: list[Callable[["Game"], str | None]] = field(default_factory=list, repr=False)
 
     @property
     def phases(self) -> list[dict[str, Any]]:
@@ -51,6 +59,7 @@ class Game:
     def __post_init__(self) -> None:
         if not self.authority_id:
             self.authority_id = self.host_id
+        self.running_since = self.clock()
 
     @property
     def characters(self) -> list[dict[str, Any]]:
@@ -61,16 +70,42 @@ class Game:
         self.state_version += 1
         return self.state_version
 
+    # ---- 시간 ------------------------------------------------------------------------
+    @property
+    def paused(self) -> bool:
+        return self.running_since is None
+
+    @property
+    def duration(self) -> float | None:
+        """지금 페이즈의 제한 시간(초). 0분은 시간 제한이 없는 것으로 본다."""
+        minutes = self.phase["진행시간"]
+        return minutes * 60.0 if minutes else None
+
+    def elapsed(self) -> float:
+        return self.elapsed_base + (0.0 if self.running_since is None else self.clock() - self.running_since)
+
+    def remaining(self) -> float | None:
+        if self.duration is None:
+            return None
+        return max(0.0, self.duration - self.elapsed())
+
+    def restart_timer(self) -> None:
+        self.elapsed_base = 0.0
+        self.running_since = self.clock()
+
 
 class GameRegistry:
     """진행 중인 게임을 방 번호로 찾는다."""
 
-    def __init__(self) -> None:
+    def __init__(self, clock: Callable[[], float] = time.time) -> None:
+        self.clock = clock               # 테스트에서 시간을 흘려 보내기 위해 바꿀 수 있다
         self._lock = threading.RLock()
         self._games: dict[int, Game] = {}
 
     def add(self, game: Game) -> None:
         with self._lock:
+            game.clock = lambda: self.clock()   # 등록한 레지스트리의 시계를 따른다
+            game.restart_timer()
             self._games[game.room_id] = game
 
     def get(self, room_id: int) -> Game | None:
@@ -118,6 +153,7 @@ def view_for(game: Game, account_id: int) -> dict[str, Any]:
                 "이름": phase.get("표시이름"),
                 "진행시간": phase["진행시간"],
             },
+            "시간": _time_view(game),
             "선택_완료": {"완료": sum(1 for p in game.players.values() if p.character is not None), "전체": len(game.players)},
             "플레이어": [
                 {
@@ -172,3 +208,55 @@ def confirmed_count(game: Game) -> int:
     """캐릭터를 확인한 플레이어 수."""
     with game.lock:
         return sum(1 for p in game.players.values() if p.character is not None)
+
+
+class AdvanceError(Exception):
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code, self.message = code, message
+
+
+def _time_view(game: Game) -> dict[str, Any]:
+    now = game.clock()
+    remaining = game.remaining()
+    return {
+        "서버_시각": now,
+        "일시정지": game.paused,
+        "남은_초": None if remaining is None else int(remaining + 0.999),
+        "시간_종료": remaining is not None and remaining <= 0,
+    }
+
+
+def set_paused(game: Game, account_id: int, paused: bool) -> None:
+    """시간을 멈추거나 다시 흐르게 한다. 진행 권한이 있는 사람만 할 수 있다."""
+    with game.lock:
+        if account_id != game.authority_id:
+            raise AdvanceError("forbidden", "진행 권한이 있는 사람만 할 수 있습니다")
+        if paused == game.paused:
+            return
+        if paused:
+            game.elapsed_base = game.elapsed()
+            game.running_since = None
+        else:
+            game.running_since = game.clock()
+        game.bump()
+
+
+def advance_phase(game: Game, account_id: int, persist: Callable[[int], None]) -> None:
+    """다음 단계로 넘어간다. 진행 권한이 있는 사람만 할 수 있고, 카드의 진행 조건이 맞아야 한다.
+
+    시간이 남아 있어도(조기 진행), 일시정지 중이어도 넘길 수 있다. `persist(순서)` 는 새 페이즈를 DB 에 쓴다.
+    """
+    with game.lock:
+        if account_id != game.authority_id:
+            raise AdvanceError("forbidden", "진행 권한이 있는 사람만 넘길 수 있습니다")
+        if game.phase_index >= len(game.phases) - 1:
+            raise AdvanceError("last", "마지막 단계입니다")
+        for condition in game.advance_conditions:
+            message = condition(game)
+            if message:
+                raise AdvanceError("condition", message)
+        persist(game.phases[game.phase_index + 1]["순서"])
+        game.phase_index += 1
+        game.restart_timer()
+        game.bump()

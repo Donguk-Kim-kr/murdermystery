@@ -626,6 +626,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/game/me/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Character
+         * @description 고른 인물을 "확인"한다. 선착순으로 배정되고, 확인한 뒤에는 되돌릴 수 없다.
+         */
+        post: operations["confirm_character_api_game_me_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/game/me/advance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Advance
+         * @description 다음 단계로 넘어간다(진행 권한이 있는 사람만).
+         */
+        post: operations["advance_api_game_me_advance_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/game/me/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pause
+         * @description 시간을 멈추거나 다시 흐르게 한다(진행 권한이 있는 사람만).
+         */
+        post: operations["pause_api_game_me_pause_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -720,16 +780,13 @@ export interface components {
             /** Npc */
             NPC?: boolean | null;
         };
-        /** ConfirmIn */
-        ConfirmIn: {
-            /** 변경사항 */
-            "\uBCC0\uACBD\uC0AC\uD56D"?: string | null;
-        };
         /** GameStateOut */
         GameStateOut: {
             /** 상태 버전 */
             "\uC0C1\uD0DC_\uBC84\uC804": number;
             "\uB098": components["schemas"]["MeOut"];
+            "\uC2DC\uAC04": components["schemas"]["TimeOut"];
+            "\uC120\uD0DD_\uC644\uB8CC": components["schemas"]["ProgressOut"];
             "\uD398\uC774\uC988": components["schemas"]["PhaseOut"];
             /** 플레이어 */
             "\uD50C\uB808\uC774\uC5B4": components["schemas"]["PlayerOut"][];
@@ -824,6 +881,11 @@ export interface components {
             /** 플레이 */
             "\uD50C\uB808\uC774": boolean;
         };
+        /** PauseIn */
+        PauseIn: {
+            /** 일시정지 */
+            "\uC77C\uC2DC\uC815\uC9C0": boolean;
+        };
         /** PhaseOut */
         PhaseOut: {
             /** 위치 */
@@ -888,6 +950,13 @@ export interface components {
             "\uCD5C\uB300\uC778\uC6D0": number;
             /** 예상시간 */
             "\uC608\uC0C1\uC2DC\uAC04": string;
+        };
+        /** ProgressOut */
+        ProgressOut: {
+            /** 완료 */
+            "\uC644\uB8CC": number;
+            /** 전체 */
+            "\uC804\uCCB4": number;
         };
         /** RoomCreateIn */
         RoomCreateIn: {
@@ -979,6 +1048,17 @@ export interface components {
              * Format: date-time
              */
             "\uBD80\uC5EC\uC77C\uC2DC": string;
+        };
+        /** TimeOut */
+        TimeOut: {
+            /** 서버 시각 */
+            "\uC11C\uBC84_\uC2DC\uAC01": number;
+            /** 일시정지 */
+            "\uC77C\uC2DC\uC815\uC9C0": boolean;
+            /** 남은 초 */
+            "\uB0A8\uC740_\uCD08": number | null;
+            /** 시간 종료 */
+            "\uC2DC\uAC04_\uC885\uB8CC": boolean;
         };
         /** ValidationError */
         ValidationError: {
@@ -1120,6 +1200,11 @@ export interface components {
             /** 순서 */
             "\uC21C\uC11C": number;
         };
+        /** ConfirmIn */
+        app__confirm__ConfirmIn: {
+            /** 변경사항 */
+            "\uBCC0\uACBD\uC0AC\uD56D"?: string | null;
+        };
         /** CharacterOut */
         app__game__CharacterOut: {
             /** 순서 */
@@ -1134,6 +1219,11 @@ export interface components {
             "\uC131\uBCC4": string | null;
             /** 선택한 계정 */
             "\uC120\uD0DD\uD55C_\uACC4\uC815": number | null;
+        };
+        /** ConfirmIn */
+        app__game__ConfirmIn: {
+            /** 인물 순서 */
+            "\uC778\uBB3C_\uC21C\uC11C": number;
         };
     };
     responses: never;
@@ -2185,7 +2275,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["ConfirmIn"];
+                "application/json": components["schemas"]["app__confirm__ConfirmIn"];
             };
         };
         responses: {
@@ -2680,6 +2770,107 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_character_api_game_me_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__game__ConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    advance_api_game_me_advance_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pause_api_game_me_pause_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PauseIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
