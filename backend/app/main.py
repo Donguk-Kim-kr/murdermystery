@@ -17,7 +17,7 @@ from .play import router as play_router
 from .publishing import router as publishing_router
 from .roomstate import JoinLimiter, RoomRegistry
 from .engine import GameRegistry, auto_advance_if_due
-from .game import router as game_router, state_router as game_state_router
+from .game import pool_io, router as game_router, state_router as game_state_router
 from .rooms import expire_rooms, router as rooms_router
 from .static import mount_frontend
 from .testers import router as testers_router
@@ -47,11 +47,7 @@ def sweep_rooms(app: FastAPI) -> None:
 def tick_games(app: FastAPI) -> None:
     """시간이 끝난 게임을 자동 진행으로 넘긴다(방장이 자동 진행을 켠 게임만). 서버가 만료를 판정한다."""
     for game in app.state.games.all():
-        def persist(slot: int, game=game) -> None:
-            with app.state.pool.connection() as conn:   # 넘어갈 때만 연결을 빌린다
-                conn.execute('UPDATE "진행" SET "진행순서_순서" = %s WHERE "번호" = %s', (slot, game.id))
-
-        auto_advance_if_due(game, persist)
+        auto_advance_if_due(game, pool_io(app.state.pool, game))
 
 
 async def tick_loop(app: FastAPI, interval: float) -> None:

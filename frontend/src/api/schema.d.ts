@@ -626,7 +626,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/game/me/confirm": {
+    "/api/game/me/answer": {
         parameters: {
             query?: never;
             header?: never;
@@ -636,10 +636,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Confirm Character
-         * @description 고른 인물을 "확인"한다. 선착순으로 배정되고, 확인한 뒤에는 되돌릴 수 없다.
+         * Answer
+         * @description 화면의 질문(블록의 `질문ID`)에 답한다. 지금 받지 않는 질문이면 거부한다. 입력은 한 번에 하나씩 처리된다.
          */
-        post: operations["confirm_character_api_game_me_confirm_post"];
+        post: operations["answer_api_game_me_answer_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -881,6 +881,13 @@ export interface components {
             /** 변경사항 */
             "\uBCC0\uACBD\uC0AC\uD56D"?: string | null;
         };
+        /** GameAnswerIn */
+        GameAnswerIn: {
+            /** 질문Id */
+            "\uC9C8\uBB38ID": string;
+            /** 값 */
+            "\uAC12"?: unknown;
+        };
         /** GameAuthorityIn */
         GameAuthorityIn: {
             /** 계정 번호 */
@@ -909,11 +916,6 @@ export interface components {
             "\uC131\uBCC4": string | null;
             /** 선택한 계정 */
             "\uC120\uD0DD\uD55C_\uACC4\uC815": number | null;
-        };
-        /** GameConfirmIn */
-        GameConfirmIn: {
-            /** 인물 순서 */
-            "\uC778\uBB3C_\uC21C\uC11C": number;
         };
         /** GameMeOut */
         GameMeOut: {
@@ -987,6 +989,22 @@ export interface components {
         GameStateOut: {
             /** 상태 버전 */
             "\uC0C1\uD0DC_\uBC84\uC804": number;
+            /** 화면 */
+            "\uD654\uBA74": {
+                [key: string]: unknown;
+            }[];
+            /** 탭 */
+            "\uD0ED": {
+                [key: string]: unknown;
+            }[];
+            /** 알림 */
+            "\uC54C\uB9BC": {
+                [key: string]: unknown;
+            }[];
+            /** 오류 */
+            "\uC624\uB958": {
+                [key: string]: unknown;
+            }[];
             /** 종료 */
             "\uC885\uB8CC": boolean;
             "\uC124\uC815": components["schemas"]["GameSettingsOut"];
@@ -2884,7 +2902,7 @@ export interface operations {
             };
         };
     };
-    confirm_character_api_game_me_confirm_post: {
+    answer_api_game_me_answer_post: {
         parameters: {
             query?: never;
             header?: {
@@ -2895,7 +2913,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["GameConfirmIn"];
+                "application/json": components["schemas"]["GameAnswerIn"];
             };
         };
         responses: {

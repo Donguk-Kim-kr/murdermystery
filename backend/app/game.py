@@ -6,6 +6,7 @@
 """
 import asyncio
 import json
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
@@ -13,9 +14,11 @@ from pydantic import BaseModel
 
 from .auth import CurrentUser
 from .db import Conn
+from . import cards
+from .cards import AnswerError
 from .engine import (
-    AdvanceError, AssignError, Game, GameRegistry, Observer, Player, advance_phase, assign_character, hand_over_authority,
-    set_auto_advance, set_paused, view_for,
+    AdvanceError, Game, GameIO, GameRegistry, Observer, Player, advance_phase, hand_over_authority, set_auto_advance,
+    set_paused, view_for,
 )
 from .rooms import find_my_room, registry
 
@@ -25,6 +28,33 @@ state_router = APIRouter(prefix="/api/game", tags=["game"])
 
 def games(request: Request) -> GameRegistry:
     return request.app.state.games
+
+
+def conn_io(conn, game: Game) -> GameIO:
+    """요청의 DB 연결로 게임이 남길 기록을 쓴다(요청이 끝날 때 함께 확정된다)."""
+    return GameIO(
+        phase=lambda slot: conn.execute('UPDATE "진행" SET "진행순서_순서" = %s WHERE "번호" = %s', (slot, game.id)),
+        assign=lambda account, slot: conn.execute(
+            'UPDATE "참여" SET "인물_순서" = %s WHERE "진행_번호" = %s AND "계정_번호" = %s', (slot, game.id, account)
+        ),
+        end=lambda: conn.execute('UPDATE "진행" SET "상태" = \'종료\' WHERE "번호" = %s', (game.id,)),
+    )
+
+
+def pool_io(pool, game: Game) -> GameIO:
+    """요청 밖(주기 작업)에서 쓴다: 기록할 때마다 연결을 빌려 바로 확정한다."""
+
+    def run(sql_text: str, params: tuple) -> None:
+        with pool.connection() as conn:
+            conn.execute(sql_text, params)
+
+    return GameIO(
+        phase=lambda slot: run('UPDATE "진행" SET "진행순서_순서" = %s WHERE "번호" = %s', (slot, game.id)),
+        assign=lambda account, slot: run(
+            'UPDATE "참여" SET "인물_순서" = %s WHERE "진행_번호" = %s AND "계정_번호" = %s', (slot, game.id, account)
+        ),
+        end=lambda: run('UPDATE "진행" SET "상태" = \'종료\' WHERE "번호" = %s', (game.id,)),
+    )
 
 
 def _my_game(request: Request, account_id: int) -> Game:
@@ -100,6 +130,8 @@ def start_game(conn: Conn, me: CurrentUser, request: Request) -> StartOut:
         observers={m.account_id: Observer(m.account_id, m.nickname) for m in room.members.values() if not m.playing},
     )
     games(request).add(game)
+    with game.lock:
+        cards.start_phase(game, conn_io(conn, game))      # 첫 페이즈의 카드가 실행을 시작한다
     return StartOut(
         진행_번호=game.id, 방_번호=game.room_id, 현재_페이즈_순서=phases[0]["순서"],
         플레이어=[GameMemberRef(계정_번호=p.account_id, 닉네임=p.nickname) for p in game.players.values()],
@@ -164,6 +196,10 @@ class GameSettingsOut(BaseModel):
 
 class GameStateOut(BaseModel):
     상태_버전: int
+    화면: list[dict[str, Any]]
+    탭: list[dict[str, Any]]
+    알림: list[dict[str, Any]]
+    오류: list[dict[str, Any]]
     종료: bool
     설정: GameSettingsOut
     나: GameMeOut
@@ -182,35 +218,29 @@ def my_state(me: CurrentUser, request: Request) -> dict:
     return view_for(game, me.계정.번호)
 
 
-class GameConfirmIn(BaseModel):
-    인물_순서: int
+class GameAnswerIn(BaseModel):
+    질문ID: str
+    값: Any = None
 
 
-ASSIGN_STATUS = {
+ANSWER_STATUS = {
     "not_player": status.HTTP_403_FORBIDDEN,
-    "already": status.HTTP_409_CONFLICT,
-    "taken": status.HTTP_409_CONFLICT,
-    "unknown": status.HTTP_422_UNPROCESSABLE_CONTENT,
+    "stale": status.HTTP_409_CONFLICT,
     "ended": status.HTTP_409_CONFLICT,
+    "invalid": status.HTTP_422_UNPROCESSABLE_CONTENT,
 }
 
 
-@state_router.post("/me/confirm", response_model=GameStateOut)
-def confirm_character(body: GameConfirmIn, conn: Conn, me: CurrentUser, request: Request) -> dict:
-    """고른 인물을 "확인"한다. 선착순으로 배정되고, 확인한 뒤에는 되돌릴 수 없다."""
+@state_router.post("/me/answer", response_model=GameStateOut)
+def answer(body: GameAnswerIn, conn: Conn, me: CurrentUser, request: Request) -> dict:
+    """화면의 질문(블록의 `질문ID`)에 답한다. 지금 받지 않는 질문이면 거부한다. 입력은 한 번에 하나씩 처리된다."""
     game = _my_game(request, me.계정.번호)
-
-    def persist(account_id: int, character: int) -> None:
-        conn.execute(
-            'UPDATE "참여" SET "인물_순서" = %s WHERE "진행_번호" = %s AND "계정_번호" = %s',
-            (character, game.id, account_id),
-        )
-
-    try:
-        assign_character(game, me.계정.번호, body.인물_순서, persist)
-    except AssignError as err:
-        raise HTTPException(ASSIGN_STATUS.get(err.code, status.HTTP_409_CONFLICT), err.message) from err
-    return view_for(game, me.계정.번호)
+    with game.lock:
+        try:
+            cards.answer(game, me.계정.번호, body.질문ID, body.값, conn_io(conn, game))
+        except AnswerError as err:
+            raise HTTPException(ANSWER_STATUS.get(err.code, status.HTTP_409_CONFLICT), err.message) from err
+        return view_for(game, me.계정.번호)
 
 
 ADVANCE_STATUS = {
@@ -226,11 +256,8 @@ def advance(conn: Conn, me: CurrentUser, request: Request) -> dict:
     """다음 단계로 넘어간다(진행 권한이 있는 사람만)."""
     game = _my_game(request, me.계정.번호)
 
-    def persist(slot: int) -> None:
-        conn.execute('UPDATE "진행" SET "진행순서_순서" = %s WHERE "번호" = %s', (slot, game.id))
-
     try:
-        advance_phase(game, me.계정.번호, persist)
+        advance_phase(game, me.계정.번호, conn_io(conn, game))
     except AdvanceError as err:
         raise HTTPException(ADVANCE_STATUS.get(err.code, status.HTTP_409_CONFLICT), err.message) from err
     return view_for(game, me.계정.번호)

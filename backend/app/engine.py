@@ -16,6 +16,15 @@ from typing import Any
 
 
 @dataclass
+class GameIO:
+    """게임이 DB 에 남겨야 하는 일. 호출하는 쪽(요청이나 주기 작업)이 자기 DB 연결로 만들어 넘긴다."""
+
+    phase: Callable[[int], None]            # 새 페이즈의 칸 번호를 진행에 기록
+    assign: Callable[[int, int], None]      # (계정, 인물 순서) 를 참여에 기록
+    end: Callable[[], None]                 # 진행을 종료로 기록
+
+
+@dataclass
 class Player:
     account_id: int
     nickname: str
@@ -54,6 +63,16 @@ class Game:
     advance_conditions: list[Callable[["Game"], str | None]] = field(default_factory=list, repr=False)
     # 상태가 바뀌었다는 알림을 받는 연결들(SSE). 알림은 "바뀌었으니 다시 조회하라"는 신호이고 상태 자체를 싣지 않는다.
     _listeners: list[tuple[asyncio.AbstractEventLoop, asyncio.Queue]] = field(default_factory=list, repr=False)
+    # 카드 실행(app/cards.py): 지금 페이즈의 카드들, 카드가 건 진행 조건, 스크립트가 만든 탭·알림·읽기 확인 기록
+    runs: dict[str, Any] = field(default_factory=dict, repr=False)
+    card_conditions: list[Callable[["Game"], str | None]] = field(default_factory=list, repr=False)
+    end_requested: bool = False
+    tabs: dict[Any, dict[str, dict[str, Any]]] = field(default_factory=dict, repr=False)
+    notices: dict[int, list[dict[str, Any]]] = field(default_factory=dict, repr=False)
+    reads: dict[str, dict[str, set]] = field(default_factory=dict, repr=False)
+    programs: dict[Any, Any] = field(default_factory=dict, repr=False)
+    tab_counter: int = 0
+    notice_counter: int = 0
 
     @property
     def phases(self) -> list[dict[str, Any]]:
@@ -198,7 +217,10 @@ def view_for(game: Game, account_id: int) -> dict[str, Any]:
         phase = game.phase
         taken = {p.character: p for p in game.players.values() if p.character is not None}
         by_slot = {c["순서"]: c for c in game.characters}
+        from .cards import card_view
+
         return {
+            **card_view(game, account_id),
             "상태_버전": game.state_version,
             "나": {
                 "계정_번호": account_id,
@@ -252,7 +274,7 @@ def assign_character(game: Game, account_id: int, character: int, persist) -> No
     """플레이어에게 인물을 배정한다(선착순, 한 번에 하나씩). 확인한 뒤에는 되돌릴 수 없다.
 
     `persist(account_id, character)` 는 DB 에 쓰는 함수이고, 메모리를 바꾸기 전에 호출한다.
-    같은 인물을 둘이 고르면 먼저 들어온 요청만 성공한다.
+    같은 인물을 둘이 고르면 먼저 들어온 요청만 성공한다. 상태 버전은 호출하는 쪽이 올린다.
     """
     with game.lock:
         if game.ended:
@@ -268,7 +290,6 @@ def assign_character(game: Game, account_id: int, character: int, persist) -> No
             raise AssignError("taken", "이미 다른 사람이 고른 인물입니다")
         persist(account_id, character)
         player.character = character
-        game.bump()
 
 
 def confirmed_count(game: Game) -> int:
@@ -309,31 +330,37 @@ def set_paused(game: Game, account_id: int, paused: bool) -> None:
         game.bump()
 
 
-def _advance(game: Game, persist: Callable[[int], None]) -> None:
-    """권한과 상관없이 다음 단계로 넘어가는 핵심 동작. 호출하는 쪽이 `game.lock` 을 잡고 있어야 한다."""
+def _advance(game: Game, io: GameIO) -> None:
+    """권한과 상관없이 다음 단계로 넘어가는 핵심 동작. 호출하는 쪽이 `game.lock` 을 잡고 있어야 한다.
+
+    이전 페이즈의 카드와 대기는 끝나고, 새 페이즈의 카드가 실행을 시작한다.
+    """
     if game.ended:
         raise AdvanceError("last", "게임이 끝났습니다")
     if game.phase_index >= len(game.phases) - 1:
         raise AdvanceError("last", "마지막 단계입니다")
-    for condition in game.advance_conditions:
+    for condition in [*game.advance_conditions, *game.card_conditions]:
         message = condition(game)
         if message:
             raise AdvanceError("condition", message)
-    persist(game.phases[game.phase_index + 1]["순서"])
+    io.phase(game.phases[game.phase_index + 1]["순서"])
     game.phase_index += 1
     game.restart_timer()
+    from .cards import start_phase
+
+    start_phase(game, io)
     game.bump()
 
 
-def advance_phase(game: Game, account_id: int, persist: Callable[[int], None]) -> None:
+def advance_phase(game: Game, account_id: int, io: GameIO) -> None:
     """다음 단계로 넘어간다. 진행 권한이 있는 사람만 할 수 있고, 카드의 진행 조건이 맞아야 한다.
 
-    시간이 남아 있어도(조기 진행), 일시정지 중이어도 넘길 수 있다. `persist(순서)` 는 새 페이즈를 DB 에 쓴다.
+    시간이 남아 있어도(조기 진행), 일시정지 중이어도 넘길 수 있다.
     """
     with game.lock:
         if account_id != game.authority_id:
             raise AdvanceError("forbidden", "진행 권한이 있는 사람만 넘길 수 있습니다")
-        _advance(game, persist)
+        _advance(game, io)
 
 
 def set_auto_advance(game: Game, account_id: int, value: bool) -> None:
@@ -346,7 +373,7 @@ def set_auto_advance(game: Game, account_id: int, value: bool) -> None:
             game.bump()
 
 
-def auto_advance_if_due(game: Game, persist: Callable[[int], None]) -> bool:
+def auto_advance_if_due(game: Game, io: GameIO) -> bool:
     """자동 진행이 켜져 있고 시간이 끝났으면 다음 단계로 넘어간다. 진행 조건이 맞지 않거나 마지막 단계면 그대로 기다린다.
 
     일시정지 중이거나 시간 제한이 없는 단계는 넘어가지 않는다. 넘어갔으면 True.
@@ -358,7 +385,7 @@ def auto_advance_if_due(game: Game, persist: Callable[[int], None]) -> bool:
         if remaining is None or remaining > 0:
             return False
         try:
-            _advance(game, persist)
+            _advance(game, io)
         except AdvanceError:
             return False
         return True

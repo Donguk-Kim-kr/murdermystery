@@ -216,7 +216,32 @@ def test_state_version_is_stable_between_reads(client, make_account, make_game_w
 # ---- 캐릭터 배정 (1-3) --------------------------------------------------------------------
 
 def confirm_pick(client, who, slot):
-    return client.post("/api/game/me/confirm", headers=who.headers, json={"인물_순서": slot})
+    """엔진의 배정 명령을 직접 부른다(스크립트가 `배정` 을 부르는 것과 같은 동작). 응답 모양은 HTTP 처럼 흉내 낸다."""
+    from app.engine import AssignError, assign_character
+
+    class Fake:
+        def __init__(self, code, body):
+            self.status_code, self._body = code, body
+            self.text = str(body)
+
+        def json(self):
+            return self._body
+
+    game = client.app.state.games.of_account(who.number)
+    if game is None:
+        return Fake(404, {"detail": "진행 중인 게임이 없습니다"})
+    codes = {"not_player": 403, "already": 409, "taken": 409, "unknown": 422, "ended": 409}
+    with client.app.state.pool.connection() as conn:
+        def persist(account, character):
+            conn.execute('UPDATE "참여" SET "인물_순서" = %s WHERE "진행_번호" = %s AND "계정_번호" = %s', (character, game.id, account))
+
+        try:
+            with game.lock:
+                assign_character(game, who.number, slot, persist)
+                game.bump()
+        except AssignError as err:
+            return Fake(codes.get(err.code, 409), {"detail": err.message})
+    return Fake(200, state(client, who).json())
 
 
 def slots(client, who):
