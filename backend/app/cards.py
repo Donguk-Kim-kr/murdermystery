@@ -6,6 +6,7 @@
 * 스크립트가 하는 일은 모두 엔진 함수(`CardHost`)를 거친다. 상태를 바꾸고 권한을 확인하는 것은 엔진이다.
 * 화면 요청(`보이기`, `탭`, `알림`, `읽기`)은 게임에 쌓아 두었다가 `card_view` 가 보는 사람에게 허용된 것만 골라 돌려준다.
 """
+import functools
 import json
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -74,6 +75,7 @@ class CardHost:
         if name not in MUTATING:
             return fn
 
+        @functools.wraps(fn)
         def guarded(*args: Any, **kwargs: Any) -> Any:
             if self.readonly:
                 raise ScriptError(f"진행 조건 안에서는 '{name}' 을(를) 쓸 수 없습니다")
@@ -94,17 +96,17 @@ class CardHost:
     def fn_공통스토리(self) -> str:
         return ((self.game.snapshot.get("작품") or {}).get("공통스토리")) or ""
 
-    def fn_서사들(self, character: Any, numbers: Any) -> str:
-        if character is None:
+    def fn_서사들(self, 인물: Any, 번호들: Any) -> str:
+        if 인물 is None:
             return ""
-        slot = self._character_slot(character)
+        slot = self._character_slot(인물)
         row = self._character(slot)
-        if not isinstance(numbers, (list, tuple)):
+        if not isinstance(번호들, (list, tuple)):
             raise ScriptError("서사들() 의 두 번째 값은 번호 목록이어야 합니다(예: [1, 2])")
         parts = row.get("서사_부분")
         if isinstance(parts, list):                       # 확정할 때 해석해 둔 부분 목록
-            return narrative.pick([str(p.get("본문", "")) for p in parts], list(numbers))
-        return narrative.numbered(row.get("서사") or "", list(numbers))
+            return narrative.pick([str(p.get("본문", "")) for p in parts], list(번호들))
+        return narrative.numbered(row.get("서사") or "", list(번호들))
 
     def fn_배정된_플레이어수(self) -> int:
         return sum(1 for p in self.game.players.values() if p.character is not None)
@@ -113,55 +115,56 @@ class CardHost:
         return any(p.character is None for p in self.game.players.values())
 
     # -- 블록 만들기 --
-    def fn_글(self, content: Any, name: str = "글") -> dict[str, Any]:
-        return {"종류": "글", "이름": str(name), "내용": _text(content)}
+    def fn_글(self, 이름: str, 내용: Any) -> dict[str, Any]:
+        return {"종류": "글", "이름": str(이름), "내용": _text(내용)}
 
-    def fn_선택지(self, name: str, items: Any, 한사람당: int = 1, 확인필요: bool = False) -> dict[str, Any]:
-        if not isinstance(items, (list, tuple)):
+    def fn_선택지(self, 이름: str, 항목: Any, 한사람당: int = 1, 확인필요: bool = False) -> dict[str, Any]:
+        if not isinstance(항목, (list, tuple)):
             raise ScriptError("선택지의 항목은 목록이어야 합니다")
         return {
-            "종류": "선택지", "이름": str(name), "항목": list(items), "한사람당": 한사람당, "확인필요": bool(확인필요),
+            "종류": "선택지", "이름": str(이름), "항목": list(항목), "한사람당": 한사람당, "확인필요": bool(확인필요),
             "질문ID": f"{self.run.key}:확인",
         }
 
-    def fn_입력(self, name: str, prompt: Any, 글자수: int = 300) -> dict[str, Any]:
+    def fn_입력(self, 이름: str, 질문: Any, 글자수: int = 300) -> dict[str, Any]:
         """글자를 받는 칸. 플레이어가 보내면 `기다리기(이름)` 이 `{플레이어, 값}` 을 돌려준다."""
-        name = str(name)
+        name = str(이름)
         if ":" in name or name in ("확인", ""):
             raise ScriptError("입력의 이름은 비워 둘 수 없고 ':' 이나 '확인' 일 수 없습니다")
         if not isinstance(글자수, int) or isinstance(글자수, bool) or not 1 <= 글자수 <= MAX_INPUT_CHARS:
             raise ScriptError(f"입력의 글자수는 1 이상 {MAX_INPUT_CHARS} 이하여야 합니다")
-        return {"종류": "입력", "이름": name, "질문": _text(prompt), "글자수": 글자수, "질문ID": f"{self.run.key}:{name}"}
+        return {"종류": "입력", "이름": name, "질문": _text(질문), "글자수": 글자수, "질문ID": f"{self.run.key}:{name}"}
 
-    def fn_현황(self, name: str, 완료: int, 전체: int) -> dict[str, Any]:
-        return {"종류": "현황", "이름": str(name), "완료": int(완료), "전체": int(전체)}
+    def fn_현황(self, 이름: str, 완료: int, 전체: int) -> dict[str, Any]:
+        return {"종류": "현황", "이름": str(이름), "완료": int(완료), "전체": int(전체)}
 
-    def fn_거부(self, message: Any) -> dict[str, Any]:
-        return {"거부": _text(message)}
+    def fn_거부(self, 메시지: Any) -> dict[str, Any]:
+        return {"거부": _text(메시지)}
 
     # -- 엔진 명령 --
-    def fn_배정(self, player: Any, character: Any) -> bool:
+    def fn_배정(self, 플레이어: Any, 인물: Any) -> bool:
         from .engine import AssignError, assign_character
 
-        account = self._player_account(player)
-        slot = self._character_slot(character)
+        account = self._player_account(플레이어)
+        slot = self._character_slot(인물)
         try:
             assign_character(self.game, account, slot, lambda a, s: self.io.assign(a, s))
         except AssignError:
             return False
         return True
 
-    def fn_읽기(self, target: Any, name: str, content: Any) -> None:
+    def fn_읽기(self, 대상: Any, 이름: str, 내용: Any) -> None:
+        target, name = 대상, 이름
         accounts = self._target_accounts(target)
         qid = f"{self.run.key}:읽기:{name}"
         record = self.game.reads.setdefault(qid, {"필요": set(), "확인": set()})
         record["필요"].update(accounts)
-        block = {"종류": "읽기", "이름": str(name), "내용": _text(content), "질문ID": qid}
+        block = {"종류": "읽기", "이름": str(name), "내용": _text(내용), "질문ID": qid}
         for key in ([ALL] if target.kind == ALL else [target.key]):
             self.run.screens.setdefault(key, {})[str(name)] = block
 
-    def fn_기다리기(self, kind: str) -> Any:
-        raise Suspend({"종류": str(kind)})
+    def fn_기다리기(self, 종류: str) -> Any:
+        raise Suspend({"종류": str(종류)})
 
     def fn_단계_끝내기(self) -> bool:
         self.game.end_requested = True
@@ -212,7 +215,7 @@ class CardHost:
 
     def m_보이기(self, ref: Ref, block: Any) -> None:
         if not isinstance(block, dict) or "종류" not in block:
-            raise ScriptError("보이기() 에는 글(), 선택지(), 현황() 같은 블록을 넘겨야 합니다")
+            raise ScriptError("보이기() 에는 글(), 선택지(), 입력(), 현황() 같은 블록을 넘겨야 합니다")
         key = self._target_key(ref)
         self.run.screens.setdefault(key, {})[str(block.get("이름", "블록"))] = dict(block)
 

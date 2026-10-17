@@ -12,7 +12,7 @@ from test_game import advance, create_room, join, start, state
 
 PROLOGUE = '''
 def 실행(카드):
-    모두.탭("공통 스토리", 글(공통스토리(), "공통 스토리"))
+    모두.탭("공통 스토리", 글("공통 스토리", 공통스토리()))
     읽기(모두, "공통 스토리", 공통스토리())
 '''
 
@@ -41,7 +41,7 @@ def 실행(카드):
             continue
         번호들 = 공개.get(str(플레이어.인물.순서), [1])
         내용 = 서사들(플레이어.인물, 번호들)
-        플레이어.탭("개인 서사", 글(내용, "개인 서사"))
+        플레이어.탭("개인 서사", 글("개인 서사", 내용))
         읽기(플레이어, "개인 서사", 내용)
 '''
 
@@ -382,12 +382,12 @@ def test_script_cannot_do_things_it_is_not_given(client, make_scripted_game):
 
 def test_end_phase_command_moves_to_next_phase(client, make_scripted_game):
     host, _, _, _ = make_scripted_game([
-        ("바로끝", "def 실행(카드):\n    모두.보이기(글('첫 화면'))\n    단계_끝내기()", None),
+        ("바로끝", "def 실행(카드):\n    모두.보이기(글('첫 화면', '첫 화면입니다'))\n    단계_끝내기()", None),
         ("다음", PROLOGUE, None),
     ])
     view = state(client, host).json()
     assert view["페이즈"]["위치"] == 2 and block(view, "공통 스토리") is not None
-    assert block(view, "글") is None                                          # 이전 단계의 화면은 사라진다
+    assert block(view, "첫 화면") is None                                          # 이전 단계의 화면은 사라진다
 
 
 def test_end_phase_command_respects_progress_conditions(client, make_scripted_game):
@@ -399,15 +399,15 @@ def test_end_phase_command_respects_progress_conditions(client, make_scripted_ga
 
 
 def test_end_game_command_ends_the_game(client, make_scripted_game, db):
-    host, others, room, _ = make_scripted_game([("끝", "def 실행(카드):\n    게임_종료()\n    모두.보이기(글('전체 공개'))", None)])
+    host, others, room, _ = make_scripted_game([("끝", "def 실행(카드):\n    게임_종료()\n    모두.보이기(글('전체 공개', '전체 공개입니다'))", None)])
     view = state(client, host).json()
-    assert view["종료"] is True and block(view, "글") is not None
+    assert view["종료"] is True and block(view, "전체 공개") is not None
     assert db.execute('SELECT "상태" FROM "진행" WHERE "방_번호" = %s', (room["번호"],)).fetchone()[0] == "종료"
 
 
 def test_screens_reset_on_each_phase_and_notices_are_private(client, make_scripted_game):
     host, others, _, _ = make_scripted_game([
-        ("가", "def 실행(카드):\n    모두.보이기(글('공용', '공용 안내'))\n    플레이어들()[0].알림('첫 사람에게만')\n    플레이어들()[1].보이기(글('둘째에게만', '개인 안내'))", None),
+        ("가", "def 실행(카드):\n    모두.보이기(글('공용 안내', '공용'))\n    플레이어들()[0].알림('첫 사람에게만')\n    플레이어들()[1].보이기(글('개인 안내', '둘째에게만'))", None),
         ("나", "def 실행(카드):\n    pass", None),
     ])
     first, second, third = host, others[0], others[1]

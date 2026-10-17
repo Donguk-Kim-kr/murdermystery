@@ -4,6 +4,7 @@
 (`Suspend`) 그 자리에서 멈추고, 입력이 오면 `resume(값)` 으로 이어서 실행한다(docs/ENGINE_DESIGN.md 1-9, 선택지 A2).
 스크립트가 만지는 게임 쪽 대상(플레이어, 인물, 카드 등)은 `Ref` 로만 다룬다. 그 대상에 하는 일은 모두 `host` 가 정한다.
 """
+import inspect
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
 
@@ -302,7 +303,13 @@ class VM:
             self._push_frame(name, args, kwargs)
             return None
         if name in self.host.functions:
-            stack.append(self.host.functions[name](*args, **kwargs))
+            fn = self.host.functions[name]
+            try:
+                inspect.signature(fn).bind(*args, **kwargs)
+            except TypeError:
+                names = ", ".join(inspect.signature(fn).parameters)
+                raise ScriptError(f"'{name}' 을(를) 부르는 방법이 맞지 않습니다. 사용법: {name}({names})") from None
+            stack.append(fn(*args, **kwargs))
             return None
         if name in BUILTINS:
             if kwargs:

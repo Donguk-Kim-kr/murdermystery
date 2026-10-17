@@ -329,3 +329,14 @@ def test_scripts_cannot_reach_python_internals():
         run("def 실행():\n    x = 'a'.upper()")
     with pytest.raises(ScriptError):
         run("def 실행():\n    x = [].sort()")
+
+
+def test_host_call_with_wrong_arguments_explains_the_usage():
+    host = Host()
+    host.functions["글"] = lambda 이름, 내용: (이름, 내용)
+    program = compile_source("def 실행():\n    return 글('안녕')", {"글"})
+    vm = VM(program, host)
+    vm.start("실행", [])
+    with pytest.raises(ScriptError) as err:
+        vm.run()
+    assert "사용법: 글(이름, 내용)" in str(err.value) and "2번째 줄" in str(err.value)

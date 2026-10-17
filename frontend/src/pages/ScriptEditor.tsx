@@ -69,7 +69,7 @@ export function ScriptEditor({ value, onChange, onValid }: Props) {
           aria-label="스크립트"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={"def 실행(카드):\n    모두.보이기(글(\"안녕하세요\"))"}
+          placeholder={"def 실행(카드):\n    모두.보이기(글(\"안내\", \"안녕하세요\"))"}
         />
       </label>
       {failed && <p role="alert" className="error">스크립트를 검사하지 못했습니다. 네트워크를 확인해 주세요.</p>}

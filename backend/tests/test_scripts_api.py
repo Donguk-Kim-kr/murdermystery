@@ -8,7 +8,7 @@ def check(client, headers, source):
 
 
 def test_valid_script_reports_its_functions(client, headers):
-    result = check(client, headers, "def 실행(카드):\n    모두.보이기(글('안녕'))\n\ndef 진행조건(카드):\n    return 통과")
+    result = check(client, headers, "def 실행(카드):\n    모두.보이기(글('안내', '안녕'))\n\ndef 진행조건(카드):\n    return 통과")
     assert result == {"정상": True, "오류": None, "줄": None, "함수": ["실행", "진행조건"]}
 
 

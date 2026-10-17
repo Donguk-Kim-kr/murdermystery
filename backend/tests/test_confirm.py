@@ -160,7 +160,7 @@ def test_broken_phase_script_blocks_confirm_with_a_reason(client, headers):
 
 def test_working_scripts_and_cards_without_scripts_do_not_block_confirm(client, headers):
     w = ready(client, headers)
-    good = client.post("/api/library/phases", headers=headers, json={"이름": "정상", "설명": "x", "규칙": {"스크립트": "def 실행(카드):\n    모두.보이기(글('안녕'))"}}).json()
+    good = client.post("/api/library/phases", headers=headers, json={"이름": "정상", "설명": "x", "규칙": {"스크립트": "def 실행(카드):\n    모두.보이기(글('안내', '안녕'))"}}).json()
     plain = client.post("/api/library/phases", headers=headers, json={"이름": "스크립트 없음", "설명": "x", "규칙": {}}).json()
     post(client, headers, w, "phase-steps", 진행순서_순서=1, 진행단계_번호=good["번호"])
     post(client, headers, w, "phase-steps", 진행순서_순서=1, 진행단계_번호=plain["번호"])
