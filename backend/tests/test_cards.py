@@ -407,13 +407,13 @@ def test_end_game_command_ends_the_game(client, make_scripted_game, db):
 
 def test_screens_reset_on_each_phase_and_notices_are_private(client, make_scripted_game):
     host, others, _, _ = make_scripted_game([
-        ("가", "def 실행(카드):\n    모두.보이기(글('공용'))\n    플레이어들()[0].알림('첫 사람에게만')\n    플레이어들()[1].보이기(글('둘째에게만'))", None),
+        ("가", "def 실행(카드):\n    모두.보이기(글('공용', '공용 안내'))\n    플레이어들()[0].알림('첫 사람에게만')\n    플레이어들()[1].보이기(글('둘째에게만', '개인 안내'))", None),
         ("나", "def 실행(카드):\n    pass", None),
     ])
     first, second, third = host, others[0], others[1]
     assert [n["글"] for n in state(client, first).json()["알림"]] == ["첫 사람에게만"]
     assert state(client, second).json()["알림"] == [] and state(client, third).json()["알림"] == []
-    assert block(state(client, second).json(), "글") is not None
+    assert block(state(client, second).json(), "개인 안내") is not None
     names = lambda who: sorted(b["내용"] for b in state(client, who).json()["화면"])
     assert names(first) == ["공용"] and names(second) == ["공용", "둘째에게만"] and names(third) == ["공용"]
     advance(client, host)
