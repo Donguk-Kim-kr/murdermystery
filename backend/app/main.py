@@ -17,7 +17,7 @@ from .play import router as play_router
 from .publishing import router as publishing_router
 from .roomstate import JoinLimiter, RoomRegistry
 from .engine import GameRegistry
-from .game import router as game_router
+from .game import router as game_router, state_router as game_state_router
 from .rooms import expire_rooms, router as rooms_router
 from .static import mount_frontend
 from .testers import router as testers_router
@@ -84,6 +84,7 @@ app.include_router(publishing_router)
 app.include_router(testers_router)
 app.include_router(rooms_router)
 app.include_router(game_router)
+app.include_router(game_state_router)
 
 
 @app.get("/api/health")

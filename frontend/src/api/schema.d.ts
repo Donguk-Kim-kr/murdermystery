@@ -606,6 +606,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/game/me/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My State
+         * @description 내가 참여 중인 게임의 현재 상태. 내가 보아도 되는 것만 돌려준다.
+         */
+        get: operations["my_state_api_game_me_state_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -675,39 +695,6 @@ export interface components {
              */
             NPC?: boolean;
         };
-        /** CharacterOut */
-        CharacterOut: {
-            /** 이름 */
-            "\uC774\uB984": string;
-            /** 직업 */
-            "\uC9C1\uC5C5"?: string | null;
-            /** 나이 */
-            "\uB098\uC774"?: number | null;
-            /** 성별 */
-            "\uC131\uBCC4"?: string | null;
-            /** 서사 */
-            "\uC11C\uC0AC": string;
-            /** 타임라인 */
-            "\uD0C0\uC784\uB77C\uC778"?: string | null;
-            /** 능력 */
-            "\uB2A5\uB825"?: string | null;
-            /** 비밀 */
-            "\uBE44\uBC00"?: string | null;
-            /** 목표 */
-            "\uBAA9\uD45C"?: string | null;
-            /**
-             * 범인
-             * @default false
-             */
-            "\uBC94\uC778"?: boolean;
-            /**
-             * Npc
-             * @default false
-             */
-            NPC?: boolean;
-            /** 순서 */
-            "\uC21C\uC11C": number;
-        };
         /** CharacterPatch */
         CharacterPatch: {
             /** 이름 */
@@ -737,6 +724,17 @@ export interface components {
         ConfirmIn: {
             /** 변경사항 */
             "\uBCC0\uACBD\uC0AC\uD56D"?: string | null;
+        };
+        /** GameStateOut */
+        GameStateOut: {
+            /** 상태 버전 */
+            "\uC0C1\uD0DC_\uBC84\uC804": number;
+            "\uB098": components["schemas"]["MeOut"];
+            "\uD398\uC774\uC988": components["schemas"]["PhaseOut"];
+            /** 플레이어 */
+            "\uD50C\uB808\uC774\uC5B4": components["schemas"]["PlayerOut"][];
+            /** 인물 */
+            "\uC778\uBB3C": components["schemas"]["app__game__CharacterOut"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -785,6 +783,19 @@ export interface components {
             "\uB9CC\uB8CC\uC77C\uC2DC": string;
             "\uACC4\uC815": components["schemas"]["AccountOut"];
         };
+        /** MeOut */
+        MeOut: {
+            /** 계정 번호 */
+            "\uACC4\uC815_\uBC88\uD638": number;
+            /** 역할 */
+            "\uC5ED\uD560": string;
+            /** 인물 순서 */
+            "\uC778\uBB3C_\uC21C\uC11C": number | null;
+            /** 방장 */
+            "\uBC29\uC7A5": boolean;
+            /** 진행 권한 */
+            "\uC9C4\uD589_\uAD8C\uD55C": boolean;
+        };
         /** MemberOut */
         MemberOut: {
             /** 계정 번호 */
@@ -813,6 +824,19 @@ export interface components {
             /** 플레이 */
             "\uD50C\uB808\uC774": boolean;
         };
+        /** PhaseOut */
+        PhaseOut: {
+            /** 위치 */
+            "\uC704\uCE58": number;
+            /** 전체 */
+            "\uC804\uCCB4": number;
+            /** 순서 */
+            "\uC21C\uC11C": number;
+            /** 이름 */
+            "\uC774\uB984": string | null;
+            /** 진행시간 */
+            "\uC9C4\uD589\uC2DC\uAC04": number;
+        };
         /** PlayWorkOut */
         PlayWorkOut: {
             /** 번호 */
@@ -833,6 +857,17 @@ export interface components {
             "\uC81C\uC791\uC790": string;
             /** 비공개플레이 */
             "\uBE44\uACF5\uAC1C\uD50C\uB808\uC774": boolean;
+        };
+        /** PlayerOut */
+        PlayerOut: {
+            /** 계정 번호 */
+            "\uACC4\uC815_\uBC88\uD638": number;
+            /** 닉네임 */
+            "\uB2C9\uB124\uC784": string;
+            /** 인물 순서 */
+            "\uC778\uBB3C_\uC21C\uC11C": number | null;
+            /** 인물 이름 */
+            "\uC778\uBB3C_\uC774\uB984": string | null;
         };
         /**
          * PrivatePlayWorkOut
@@ -1051,6 +1086,54 @@ export interface components {
             "\uCD5C\uC18C\uC778\uC6D0"?: number | null;
             /** 공통스토리 */
             "\uACF5\uD1B5\uC2A4\uD1A0\uB9AC"?: string | null;
+        };
+        /** CharacterOut */
+        app__characters__CharacterOut: {
+            /** 이름 */
+            "\uC774\uB984": string;
+            /** 직업 */
+            "\uC9C1\uC5C5"?: string | null;
+            /** 나이 */
+            "\uB098\uC774"?: number | null;
+            /** 성별 */
+            "\uC131\uBCC4"?: string | null;
+            /** 서사 */
+            "\uC11C\uC0AC": string;
+            /** 타임라인 */
+            "\uD0C0\uC784\uB77C\uC778"?: string | null;
+            /** 능력 */
+            "\uB2A5\uB825"?: string | null;
+            /** 비밀 */
+            "\uBE44\uBC00"?: string | null;
+            /** 목표 */
+            "\uBAA9\uD45C"?: string | null;
+            /**
+             * 범인
+             * @default false
+             */
+            "\uBC94\uC778"?: boolean;
+            /**
+             * Npc
+             * @default false
+             */
+            NPC?: boolean;
+            /** 순서 */
+            "\uC21C\uC11C": number;
+        };
+        /** CharacterOut */
+        app__game__CharacterOut: {
+            /** 순서 */
+            "\uC21C\uC11C": number;
+            /** 이름 */
+            "\uC774\uB984": string | null;
+            /** 직업 */
+            "\uC9C1\uC5C5": string | null;
+            /** 나이 */
+            "\uB098\uC774": number | null;
+            /** 성별 */
+            "\uC131\uBCC4": string | null;
+            /** 선택한 계정 */
+            "\uC120\uD0DD\uD55C_\uACC4\uC815": number | null;
         };
     };
     responses: never;
@@ -1373,7 +1456,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CharacterOut"][];
+                    "application/json": components["schemas"]["app__characters__CharacterOut"][];
                 };
             };
             /** @description Validation Error */
@@ -1410,7 +1493,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CharacterOut"];
+                    "application/json": components["schemas"]["app__characters__CharacterOut"];
                 };
             };
             /** @description Validation Error */
@@ -1444,7 +1527,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CharacterOut"];
+                    "application/json": components["schemas"]["app__characters__CharacterOut"];
                 };
             };
             /** @description Validation Error */
@@ -1514,7 +1597,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CharacterOut"];
+                    "application/json": components["schemas"]["app__characters__CharacterOut"];
                 };
             };
             /** @description Validation Error */
@@ -2574,6 +2657,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_state_api_game_me_state_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameStateOut"];
                 };
             };
             /** @description Validation Error */

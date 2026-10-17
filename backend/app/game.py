@@ -9,10 +9,11 @@ from pydantic import BaseModel
 
 from .auth import CurrentUser
 from .db import Conn
-from .engine import Game, GameRegistry, Observer, Player
+from .engine import Game, GameRegistry, Observer, Player, view_for
 from .rooms import find_my_room, registry
 
 router = APIRouter(prefix="/api/rooms", tags=["game"])
+state_router = APIRouter(prefix="/api/game", tags=["game"])
 
 
 def games(request: Request) -> GameRegistry:
@@ -87,3 +88,52 @@ def start_game(conn: Conn, me: CurrentUser, request: Request) -> StartOut:
         플레이어=[MemberRef(계정_번호=p.account_id, 닉네임=p.nickname) for p in game.players.values()],
         관전자=[MemberRef(계정_번호=o.account_id, 닉네임=o.nickname) for o in game.observers.values()],
     )
+
+
+class MeOut(BaseModel):
+    계정_번호: int
+    역할: str
+    인물_순서: int | None
+    방장: bool
+    진행_권한: bool
+
+
+class PhaseOut(BaseModel):
+    위치: int
+    전체: int
+    순서: int
+    이름: str | None
+    진행시간: int
+
+
+class PlayerOut(BaseModel):
+    계정_번호: int
+    닉네임: str
+    인물_순서: int | None
+    인물_이름: str | None
+
+
+class CharacterOut(BaseModel):
+    순서: int
+    이름: str | None
+    직업: str | None
+    나이: int | None
+    성별: str | None
+    선택한_계정: int | None
+
+
+class GameStateOut(BaseModel):
+    상태_버전: int
+    나: MeOut
+    페이즈: PhaseOut
+    플레이어: list[PlayerOut]
+    인물: list[CharacterOut]
+
+
+@state_router.get("/me/state", response_model=GameStateOut)
+def my_state(me: CurrentUser, request: Request) -> dict:
+    """내가 참여 중인 게임의 현재 상태. 내가 보아도 되는 것만 돌려준다."""
+    game = games(request).of_account(me.계정.번호)
+    if game is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "진행 중인 게임이 없습니다")
+    return view_for(game, me.계정.번호)

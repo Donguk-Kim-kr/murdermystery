@@ -35,6 +35,7 @@ class Game:
     snapshot: dict[str, Any]
     players: dict[int, Player]       # 계정 번호 → 플레이어. 입장한 순서를 지킨다(dict 는 넣은 순서를 기억한다)
     observers: dict[int, Observer] = field(default_factory=dict)
+    authority_id: int = 0            # 진행 권한(다음 단계로 넘기기 등)을 가진 계정. 처음에는 방장이다
     phase_index: int = 0             # 흐름 안의 위치(0부터)
     state_version: int = 1           # 상태가 바뀔 때마다 올라간다(화면이 오래된 응답을 거르는 데 쓴다)
     lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
@@ -46,6 +47,15 @@ class Game:
     @property
     def phase(self) -> dict[str, Any]:
         return self.phases[self.phase_index]
+
+    def __post_init__(self) -> None:
+        if not self.authority_id:
+            self.authority_id = self.host_id
+
+    @property
+    def characters(self) -> list[dict[str, Any]]:
+        """플레이어가 맡는 인물(NPC 가 아닌 것)."""
+        return [c for c in (self.snapshot.get("인물") or []) if not c.get("NPC")]
 
     def bump(self) -> int:
         self.state_version += 1
@@ -77,3 +87,52 @@ class GameRegistry:
     def remove(self, room_id: int) -> None:
         with self._lock:
             self._games.pop(room_id, None)
+
+
+# 모든 보는 사람에게 보여도 되는 인물 정보. 서사·비밀·능력·목표·범인 같은 것은 여기에 없다.
+PUBLIC_CHARACTER_FIELDS = ("이름", "직업", "나이", "성별")
+
+
+def view_for(game: Game, account_id: int) -> dict[str, Any]:
+    """`account_id` 가 보아도 되는 게임 상태. 비공개 내용은 이 함수가 만드는 값에 들어가지 않는다."""
+    with game.lock:
+        player = game.players.get(account_id)
+        if player is None and account_id not in game.observers:
+            raise KeyError(account_id)
+        phase = game.phase
+        taken = {p.character: p for p in game.players.values() if p.character is not None}
+        by_slot = {c["순서"]: c for c in game.characters}
+        return {
+            "상태_버전": game.state_version,
+            "나": {
+                "계정_번호": account_id,
+                "역할": "플레이어" if player else "관전자",
+                "인물_순서": player.character if player else None,
+                "방장": account_id == game.host_id,
+                "진행_권한": account_id == game.authority_id,
+            },
+            "페이즈": {
+                "위치": game.phase_index + 1,
+                "전체": len(game.phases),
+                "순서": phase["순서"],
+                "이름": phase.get("표시이름"),
+                "진행시간": phase["진행시간"],
+            },
+            "플레이어": [
+                {
+                    "계정_번호": p.account_id,
+                    "닉네임": p.nickname,
+                    "인물_순서": p.character,
+                    "인물_이름": by_slot[p.character]["이름"] if p.character in by_slot else None,
+                }
+                for p in game.players.values()
+            ],
+            "인물": [
+                {
+                    "순서": c["순서"],
+                    **{f: c.get(f) for f in PUBLIC_CHARACTER_FIELDS},
+                    "선택한_계정": taken[c["순서"]].account_id if c["순서"] in taken else None,
+                }
+                for c in game.characters
+            ],
+        }
