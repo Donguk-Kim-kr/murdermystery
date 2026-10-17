@@ -706,6 +706,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/game/me/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Events
+         * @description 상태가 바뀌었음을 알리는 SSE 연결. 알림에는 상태 버전만 싣고, 화면은 그때 상태를 다시 조회한다.
+         *
+         *     인증은 일반 요청과 같은 `Authorization: Bearer` 헤더이다(화면은 `fetch` 로 이 스트림을 읽는다).
+         *     연결과 게임의 진행은 분리되어 있어서 연결이 끊겨도 게임은 계속 진행된다. 연결이 살아 있는 동안은 접속 중으로 본다.
+         */
+        get: operations["events_api_game_me_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -2951,6 +2974,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GameStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    events_api_game_me_events_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

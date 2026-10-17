@@ -499,3 +499,176 @@ def test_only_host_can_hand_over_and_only_to_players(client, make_account, make_
     host, others, _, _ = started(client, make_account, make_game_work)
     assert client.post("/api/game/me/authority", headers=others[0].headers, json={"계정_번호": others[1].number}).status_code == 403
     assert client.post("/api/game/me/authority", headers=host.headers, json={"계정_번호": 999999}).status_code == 422
+
+
+# ---- 실시간 알림 SSE (1-6) ------------------------------------------------------------------
+# TestClient 는 끝나지 않는 스트림을 다룰 수 없어서, 앱을 ASGI 로 직접 호출해 한 건씩 읽는다.
+
+import asyncio
+import json as _json
+
+
+class SseConnection:
+    """앱의 SSE 엔드포인트에 ASGI 로 직접 연결해 한 건씩 읽는 시험용 연결."""
+
+    def __init__(self, app, headers: dict, path: str = "/api/game/me/events"):
+        self.app, self.headers, self.path = app, headers, path
+        self.out: asyncio.Queue = asyncio.Queue()
+        self.disconnected = asyncio.Event()
+        self.sent_request = False
+        self.task = None
+        self.status = None
+        self.response_headers = {}
+        self.buffer = ""
+
+    async def receive(self):
+        if not self.sent_request:
+            self.sent_request = True
+            return {"type": "http.request", "body": b"", "more_body": False}
+        await self.disconnected.wait()
+        return {"type": "http.disconnect"}
+
+    async def send(self, message):
+        await self.out.put(message)
+
+    async def open(self):
+        scope = {
+            "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": "GET", "path": self.path,
+            "raw_path": self.path.encode(), "query_string": b"", "root_path": "", "scheme": "http",
+            "server": ("test", 80), "client": ("test", 1),
+            "headers": [(k.lower().encode(), v.encode()) for k, v in self.headers.items()],
+        }
+        self.task = asyncio.create_task(self.app(scope, self.receive, self.send))
+        start = await asyncio.wait_for(self.out.get(), 10)
+        assert start["type"] == "http.response.start"
+        self.status = start["status"]
+        self.response_headers = {k.decode(): v.decode() for k, v in start["headers"]}
+        return self
+
+    async def event(self, timeout: float = 10):
+        """다음 SSE 한 건 (이벤트 이름, 데이터). 신호용 주석(`: ping`)은 건너뛴다."""
+        while True:
+            while "\n\n" in self.buffer:
+                block, self.buffer = self.buffer.split("\n\n", 1)
+                name, data = None, None
+                for line in block.split("\n"):
+                    if line.startswith("event:"):
+                        name = line.split(":", 1)[1].strip()
+                    elif line.startswith("data:"):
+                        data = _json.loads(line.split(":", 1)[1].strip())
+                if name is not None:
+                    return name, data
+            msg = await asyncio.wait_for(self.out.get(), timeout)
+            if msg["type"] == "http.response.body":
+                self.buffer += msg.get("body", b"").decode()
+                if not msg.get("more_body", False) and "\n\n" not in self.buffer:
+                    raise AssertionError("스트림이 끝났다")
+
+    async def close(self):
+        self.disconnected.set()
+        try:
+            await asyncio.wait_for(self.task, 10)
+        except asyncio.TimeoutError:
+            self.task.cancel()
+            raise AssertionError("연결을 닫아도 스트림이 끝나지 않았다")
+
+
+def run(coro):
+    return asyncio.run(coro)
+
+
+def test_events_require_auth_and_game(client, make_account):
+    assert client.get("/api/game/me/events").status_code == 401
+    assert client.get("/api/game/me/events", headers=make_account().headers).status_code == 404
+
+
+def test_events_send_current_version_then_changes(client, make_account, make_game_work):
+    host, others, _, _ = started(client, make_account, make_game_work)
+    first = slots(client, host)[0]
+
+    async def scenario():
+        conn = await SseConnection(client.app, others[0].headers).open()
+        try:
+            assert conn.status == 200
+            assert conn.response_headers["content-type"].startswith("text/event-stream")
+            assert conn.response_headers["cache-control"] == "no-cache"
+            assert await conn.event() == ("version", {"상태_버전": 1})                  # 연결하자마자 지금 버전
+            await asyncio.to_thread(confirm_pick, client, host, first)                   # 다른 사람의 행동
+            assert await conn.event() == ("version", {"상태_버전": 2})
+            await asyncio.to_thread(advance, client, host)
+            assert await conn.event() == ("version", {"상태_버전": 3})
+        finally:
+            await conn.close()
+
+    run(scenario())
+
+
+def test_events_carry_only_the_version(client, make_account, make_game_work):
+    host, _, _, _ = started(client, make_account, make_game_work)
+
+    async def scenario():
+        conn = await SseConnection(client.app, host.headers).open()
+        try:
+            _, data = await conn.event()
+            assert set(data) == {"상태_버전"}
+        finally:
+            await conn.close()
+
+    run(scenario())
+
+
+def test_game_continues_and_listener_is_released_when_connection_closes(client, make_account, make_game_work):
+    host, others, room, _ = started(client, make_account, make_game_work)
+    game = client.app.state.games.get(room["번호"])
+
+    async def scenario():
+        for who in (others[0], host, others[1]):
+            conn = await SseConnection(client.app, who.headers).open()
+            await conn.event()
+            assert len(game._listeners) == 1
+            await conn.close()
+            assert game._listeners == []                                                 # 연결 정보가 정리된다
+
+    run(scenario())
+    assert advance(client, host).status_code == 200                                      # 연결이 없어도 게임은 진행된다
+
+
+def test_several_listeners_all_get_the_change(client, make_account, make_game_work):
+    host, others, _, _ = started(client, make_account, make_game_work)
+
+    async def scenario():
+        conns = [await SseConnection(client.app, w.headers).open() for w in (host, *others)]
+        try:
+            for c in conns:
+                assert await c.event() == ("version", {"상태_버전": 1})
+            await asyncio.to_thread(advance, client, host)
+            for c in conns:
+                assert await c.event() == ("version", {"상태_버전": 2})
+        finally:
+            for c in conns:
+                await c.close()
+
+    run(scenario())
+
+
+def test_open_connection_counts_as_present_and_closed_one_does_not(client, make_account, make_game_work, clock, monkeypatch):
+    import app.game as game_module
+
+    monkeypatch.setattr(game_module, "KEEPALIVE_SECONDS", 0.05)       # 신호를 자주 보내게 한다
+    host, others, room, _ = started(client, make_account, make_game_work)
+    game = client.app.state.games.get(room["번호"])
+
+    async def scenario():
+        conn = await SseConnection(client.app, others[0].headers).open()
+        try:
+            await conn.event()
+            for _ in range(3):
+                clock["now"] += 40                                    # 연결된 동안은 유예(45초)를 여러 번 넘겨도 접속 중이다
+                await asyncio.sleep(0.2)
+                assert not game.away(others[0].number)
+        finally:
+            await conn.close()
+        clock["now"] += 50                                            # 연결을 닫고 유예가 지나면 이탈이다
+        assert game.away(others[0].number)
+
+    run(scenario())

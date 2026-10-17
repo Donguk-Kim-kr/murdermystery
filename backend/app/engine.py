@@ -7,6 +7,7 @@
 확정 스냅샷(`버전.시나리오`)을 게임이 시작될 때 한 번 읽어 와서 `snapshot` 에 들고 있는다. 이후 제작용 콘텐츠가 바뀌어도
 진행 중인 게임은 영향을 받지 않는다.
 """
+import asyncio
 import threading
 import time
 from collections.abc import Callable
@@ -49,6 +50,8 @@ class Game:
     running_since: float | None = None
     # 다음 단계로 넘어가려 할 때 묻는 조건들. 안내 메시지를 돌려주면 넘어가지 못한다(없으면 통과). 카드의 `진행조건` 이 채운다.
     advance_conditions: list[Callable[["Game"], str | None]] = field(default_factory=list, repr=False)
+    # 상태가 바뀌었다는 알림을 받는 연결들(SSE). 알림은 "바뀌었으니 다시 조회하라"는 신호이고 상태 자체를 싣지 않는다.
+    _listeners: list[tuple[asyncio.AbstractEventLoop, asyncio.Queue]] = field(default_factory=list, repr=False)
 
     @property
     def phases(self) -> list[dict[str, Any]]:
@@ -72,7 +75,24 @@ class Game:
 
     def bump(self) -> int:
         self.state_version += 1
-        return self.state_version
+        version = self.state_version
+        for loop, queue in list(self._listeners):
+            try:
+                loop.call_soon_threadsafe(queue.put_nowait, version)
+            except RuntimeError:        # 연결의 이벤트 루프가 이미 닫혔다
+                self.unsubscribe(queue)
+        return version
+
+    def subscribe(self, loop: asyncio.AbstractEventLoop) -> asyncio.Queue:
+        """상태가 바뀔 때마다 새 상태 버전을 받는 대기열을 만든다. 쓰고 나면 `unsubscribe` 로 해제한다."""
+        queue: asyncio.Queue = asyncio.Queue()
+        with self.lock:
+            self._listeners.append((loop, queue))
+        return queue
+
+    def unsubscribe(self, queue: asyncio.Queue) -> None:
+        with self.lock:
+            self._listeners[:] = [(l, q) for l, q in self._listeners if q is not queue]
 
     # ---- 접속과 진행 권한 ----------------------------------------------------------------
     def touch(self, account_id: int) -> None:

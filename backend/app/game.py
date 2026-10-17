@@ -4,7 +4,11 @@
 시작 조건: **대기실의 플레이어 수가 플레이어 캐릭터 수(NPC 가 아닌 인물 수)와 같을 때**.
 플레이어가 아닌 방장은 관전자가 된다(지금은 일반 관전 하나뿐이고 GM 관전·자리 지정은 아직 없다).
 """
+import asyncio
+import json
+
 from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from .auth import CurrentUser
@@ -253,3 +257,48 @@ def give_authority(body: AuthorityIn, me: CurrentUser, request: Request) -> dict
     except AdvanceError as err:
         raise HTTPException(ADVANCE_STATUS.get(err.code, status.HTTP_409_CONFLICT), err.message) from err
     return view_for(game, me.계정.번호)
+
+
+# ---- 실시간 알림(SSE) ----------------------------------------------------------------------
+
+KEEPALIVE_SECONDS = 15.0     # 이 시간마다 연결이 살아 있다는 신호를 보내고, 그때 접속 확인(이탈 판단)도 갱신한다
+
+
+def sse_message(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@state_router.get("/me/events")
+async def events(request: Request, me: CurrentUser) -> StreamingResponse:
+    """상태가 바뀌었음을 알리는 SSE 연결. 알림에는 상태 버전만 싣고, 화면은 그때 상태를 다시 조회한다.
+
+    인증은 일반 요청과 같은 `Authorization: Bearer` 헤더이다(화면은 `fetch` 로 이 스트림을 읽는다).
+    연결과 게임의 진행은 분리되어 있어서 연결이 끊겨도 게임은 계속 진행된다. 연결이 살아 있는 동안은 접속 중으로 본다.
+    """
+    account_id = me.계정.번호
+    game = _my_game(request, account_id)
+    queue = game.subscribe(asyncio.get_running_loop())
+
+    async def stream():
+        try:
+            yield sse_message("version", {"상태_버전": game.state_version})
+            while not await request.is_disconnected():
+                try:
+                    version = await asyncio.wait_for(queue.get(), timeout=KEEPALIVE_SECONDS)
+                    while not queue.empty():            # 밀린 알림은 가장 새 버전 하나로 합친다
+                        version = queue.get_nowait()
+                    game.touch(account_id)
+                    yield sse_message("version", {"상태_버전": version})
+                except asyncio.TimeoutError:
+                    game.touch(account_id)
+                    if games(request).get(game.room_id) is not game:
+                        yield sse_message("closed", {})
+                        return
+                    yield ": ping\n\n"
+        finally:
+            game.unsubscribe(queue)
+
+    return StreamingResponse(
+        stream(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
