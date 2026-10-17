@@ -770,6 +770,31 @@
 - `ix_획득_진행`: `CREATE INDEX "ix_획득_진행" ON public."획득" USING btree ("진행_번호")`
 - `ix_획득_참여`: `CREATE INDEX "ix_획득_참여" ON public."획득" USING btree ("참여_번호")`
 
+
+## 공개
+
+게임 중 단서를 다른 참가자에게 보여 준 기록. 대상이 비어 있으면 전체 공개이고, 취소일시가 비어 있으면 유효하다(0021).
+
+| 순번 | 컬럼 | 타입 | NULL | 기본값 / 특성 |
+|---|---|---|---|---|
+| 1 | 번호 | integer | 불가 | IDENTITY (GENERATED ALWAYS) |
+| 2 | 작품_번호 | integer | 불가 |  |
+| 3 | 진행_번호 | integer | 불가 |  |
+| 4 | 획득_번호 | integer | 불가 |  |
+| 5 | 대상_참여_번호 | integer | 가능 |  |
+| 6 | 공개일시 | timestamp with time zone | 불가 | CURRENT_TIMESTAMP |
+| 7 | 취소일시 | timestamp with time zone | 가능 |  |
+
+**제약조건**
+
+| 종류 | 이름 | 정의 |
+|---|---|---|
+| PK | `pk_공개` | `PRIMARY KEY ("번호")` |
+| FK | `fk_공개_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE RESTRICT` |
+| FK | `fk_공개_진행` | `FOREIGN KEY ("진행_번호") REFERENCES "진행"("번호") ON DELETE CASCADE` |
+| FK | `fk_공개_획득` | `FOREIGN KEY ("획득_번호") REFERENCES "획득"("번호") ON DELETE CASCADE` |
+| FK | `fk_공개_참여` | `FOREIGN KEY ("대상_참여_번호") REFERENCES "참여"("번호") ON DELETE CASCADE` |
+
 ## 테스터
 
 | 순번 | 컬럼 | 타입 | NULL | 기본값 / 특성 |

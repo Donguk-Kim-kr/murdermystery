@@ -697,3 +697,5 @@ textarea.code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, mono
 .clue-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.6rem; }
 .clue-card { display: grid; gap: 0.35rem; align-content: start; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 0.7rem 0.85rem; }
 .clue-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.clue-actions { display: grid; gap: 0.5rem; margin-top: 0.25rem; }
+.clue-panel { display: grid; gap: 0.35rem; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; }

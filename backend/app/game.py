@@ -42,18 +42,71 @@ def acquire_sql(kind: str) -> str:
     )
 
 
-def conn_io(conn, game: Game) -> GameIO:
-    """요청의 DB 연결로 게임이 남길 기록을 쓴다(요청이 끝날 때 함께 확정된다)."""
+def _own_row(column: str = "g") -> str:
+    """(진행, 계정, 단서 순서) 로 지금 보유 중인 획득 행을 고르는 조건. 앞의 세 값이 순서대로 파라미터이다."""
+    return (
+        f'{column}."진행_번호" = %s AND {column}."보유여부" AND {column}."단서_순서" = %s AND '
+        f'{column}."참여_번호" = (SELECT "번호" FROM "참여" WHERE "진행_번호" = %s AND "계정_번호" = %s)'
+    )
+
+
+def transfer_statements(game_id: int, giver: int, taker: int, order: int, slot: int) -> list[tuple[str, tuple]]:
+    """양도: 그 단서에 걸린 공개를 취소하고, 준 사람의 획득을 끄고, 받은 사람의 획득을 새로 남긴다."""
+    own = _own_row("g")
+    own_args = (game_id, order, game_id, giver)
+    return [
+        (
+            'UPDATE "공개" SET "취소일시" = CURRENT_TIMESTAMP WHERE "취소일시" IS NULL AND "획득_번호" IN '
+            f'(SELECT g."번호" FROM "획득" g WHERE {own})',
+            own_args,
+        ),
+        (f'UPDATE "획득" g SET "보유여부" = FALSE WHERE {own}', own_args),
+        (
+            'INSERT INTO "획득" ("작품_번호", "진행_번호", "참여_번호", "단서_순서", "진행순서_순서", "획득방법") '
+            'SELECT "작품_번호", "진행_번호", "번호", %s, %s, \'양도\' FROM "참여" WHERE "진행_번호" = %s AND "계정_번호" = %s',
+            (order, slot, game_id, taker),
+        ),
+    ]
+
+
+def reveal_statement(game_id: int, owner: int, order: int, target: int | None) -> tuple[str, tuple]:
+    own = _own_row("g")
+    return (
+        'INSERT INTO "공개" ("작품_번호", "진행_번호", "획득_번호", "대상_참여_번호") '
+        f'SELECT g."작품_번호", g."진행_번호", g."번호", (SELECT "번호" FROM "참여" WHERE "진행_번호" = %s AND "계정_번호" = %s) '
+        f'FROM "획득" g WHERE {own}',
+        (game_id, target, game_id, order, game_id, owner),
+    )
+
+
+def unreveal_statement(game_id: int, owner: int, order: int, target: int | None) -> tuple[str, tuple]:
+    own = _own_row("g")
+    return (
+        'UPDATE "공개" SET "취소일시" = CURRENT_TIMESTAMP WHERE "취소일시" IS NULL AND '
+        f'"대상_참여_번호" IS NOT DISTINCT FROM (SELECT "번호" FROM "참여" WHERE "진행_번호" = %s AND "계정_번호" = %s) AND '
+        f'"획득_번호" IN (SELECT g."번호" FROM "획득" g WHERE {own})',
+        (game_id, target, game_id, order, game_id, owner),
+    )
+
+
+def build_io(game: Game, run) -> GameIO:
+    """`run(문장, 값)` 으로 DB 에 쓰는 GameIO. 요청 안에서는 요청의 연결로, 요청 밖에서는 연결을 빌려서 쓴다."""
     return GameIO(
-        phase=lambda slot: conn.execute('UPDATE "진행" SET "진행순서_순서" = %s WHERE "번호" = %s', (slot, game.id)),
-        assign=lambda account, slot: conn.execute(
+        phase=lambda slot: run('UPDATE "진행" SET "진행순서_순서" = %s WHERE "번호" = %s', (slot, game.id)),
+        assign=lambda account, slot: run(
             'UPDATE "참여" SET "인물_순서" = %s WHERE "진행_번호" = %s AND "계정_번호" = %s', (slot, game.id, account)
         ),
-        end=lambda: conn.execute('UPDATE "진행" SET "상태" = \'종료\' WHERE "번호" = %s', (game.id,)),
-        acquire=lambda account, kind, order, slot, method: conn.execute(
-            acquire_sql(kind), (order, slot, method, game.id, account)
-        ),
+        end=lambda: run('UPDATE "진행" SET "상태" = \'종료\' WHERE "번호" = %s', (game.id,)),
+        acquire=lambda account, kind, order, slot, method: run(acquire_sql(kind), (order, slot, method, game.id, account)),
+        transfer=lambda giver, taker, order, slot: [run(*st) for st in transfer_statements(game.id, giver, taker, order, slot)],
+        reveal=lambda owner, order, target: run(*reveal_statement(game.id, owner, order, target)),
+        unreveal=lambda owner, order, target: run(*unreveal_statement(game.id, owner, order, target)),
     )
+
+
+def conn_io(conn, game: Game) -> GameIO:
+    """요청의 DB 연결로 게임이 남길 기록을 쓴다(요청이 끝날 때 함께 확정된다)."""
+    return build_io(game, lambda sql_text, params: conn.execute(sql_text, params))
 
 
 def pool_io(pool, game: Game) -> GameIO:
@@ -63,16 +116,7 @@ def pool_io(pool, game: Game) -> GameIO:
         with pool.connection() as conn:
             conn.execute(sql_text, params)
 
-    return GameIO(
-        phase=lambda slot: run('UPDATE "진행" SET "진행순서_순서" = %s WHERE "번호" = %s', (slot, game.id)),
-        assign=lambda account, slot: run(
-            'UPDATE "참여" SET "인물_순서" = %s WHERE "진행_번호" = %s AND "계정_번호" = %s', (slot, game.id, account)
-        ),
-        end=lambda: run('UPDATE "진행" SET "상태" = \'종료\' WHERE "번호" = %s', (game.id,)),
-        acquire=lambda account, kind, order, slot, method: run(
-            acquire_sql(kind), (order, slot, method, game.id, account)
-        ),
-    )
+    return build_io(game, run)
 
 
 def _my_game(request: Request, account_id: int) -> Game:

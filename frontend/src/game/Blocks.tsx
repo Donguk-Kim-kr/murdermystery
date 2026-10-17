@@ -23,6 +23,12 @@ interface Card {
   이름: string;
   내용: string;
   장소: string;
+  /** 단서만: 단서 번호, 지금 누구에게 공개했는지("전체" 또는 계정 번호 목록), 양도할 수 있는지 */
+  순서?: number;
+  공개?: "전체" | number[];
+  양도가능?: boolean;
+  /** 공개된 단서: 누가 보여 준 것인지 */
+  주인?: string;
 }
 
 interface Props {
@@ -45,7 +51,7 @@ export function BlockView({ block, state, onAnswer }: Props) {
     case "입력":
       return <InputBlock block={block} onAnswer={onAnswer} isPlayer={state.나.역할 === "플레이어"} />;
     case "카드목록":
-      return <CardsBlock block={block} />;
+      return <CardsBlock block={block} state={state} onAnswer={onAnswer} />;
     case "현황":
       return <ProgressBlock block={block} />;
     default:
@@ -67,26 +73,115 @@ function TextBlock({ block }: { block: Block }) {
   );
 }
 
-/** 단서·증언 카드를 앞면이 보이게 늘어놓는다. 위에는 어느 장소에서 얻었는지, 종류가 보인다. */
-function CardsBlock({ block }: { block: Block }) {
+/** 단서·증언 카드를 앞면이 보이게 늘어놓는다. 위에는 어느 장소에서 얻었는지, 종류가 보인다. 동작이 있으면 카드마다 버튼이 생긴다. */
+function CardsBlock({ block, state, onAnswer }: { block: Block; state: GameState; onAnswer: Props["onAnswer"] }) {
   const cards = (block.항목 as Card[] | undefined) ?? [];
+  const actions = (block.동작 as string[] | undefined) ?? [];
+  const canAct = state.나.역할 === "플레이어" && actions.length > 0 && typeof block.질문ID === "string";
   return (
     <section className="block" aria-label={text(block.이름)}>
       <Title block={block} />
       {cards.length === 0 && <p className="muted">아직 얻은 것이 없습니다.</p>}
       <ul className="clue-cards">
         {cards.map((c, i) => (
-          <li key={i} className="clue-card">
+          <li key={`${c.종류}-${c.순서 ?? i}`} className="clue-card">
             <span className="clue-meta">
               <span className="chip">{c.종류}</span>
               {c.장소 && <span className="muted">{c.장소}</span>}
+              {c.주인 && <span className="chip accent">{c.주인}</span>}
             </span>
             <strong>{c.이름}</strong>
             <p className="prose">{c.내용}</p>
+            {c.공개 !== undefined && <SharedWith card={c} state={state} />}
+            {canAct && c.순서 !== undefined && c.공개 !== undefined && (
+              <CardActions card={c} actions={actions} state={state} onSend={(value) => onAnswer(text(block.질문ID), value)} />
+            )}
           </li>
         ))}
       </ul>
     </section>
+  );
+}
+
+const nickname = (state: GameState, account: number) => state.플레이어.find((p) => p.계정_번호 === account)?.닉네임 ?? "알 수 없음";
+
+function SharedWith({ card, state }: { card: Card; state: GameState }) {
+  if (card.공개 === "전체") return <span className="muted">모두에게 공개 중</span>;
+  if (!card.공개 || card.공개.length === 0) return <span className="muted">공개하지 않음</span>;
+  return <span className="muted">공개 대상: {card.공개.map((a) => nickname(state, a)).join(", ")}</span>;
+}
+
+function CardActions({ card, actions, state, onSend }: {
+  card: Card; actions: string[]; state: GameState; onSend: (value: unknown) => Promise<boolean>;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const others = state.플레이어.filter((p) => p.계정_번호 !== state.나.계정_번호);
+  const [shown, setShown] = useState<number[]>(Array.isArray(card.공개) ? card.공개 : []);
+  const [everyone, setEveryone] = useState(card.공개 === "전체");
+  const [receiver, setReceiver] = useState<number | null>(null);
+
+  async function send(value: unknown) {
+    setBusy(true);
+    const ok = await onSend(value);
+    setBusy(false);
+    if (ok) setOpen(null);
+  }
+
+  return (
+    <div className="clue-actions">
+      <div className="row start">
+        {actions.includes("보여주기") && (
+          <button type="button" className="small secondary" aria-pressed={open === "보여주기"} onClick={() => setOpen(open === "보여주기" ? null : "보여주기")}>
+            보여 주기
+          </button>
+        )}
+        {actions.includes("양도") && card.양도가능 !== false && (
+          <button type="button" className="small secondary" aria-pressed={open === "양도"} onClick={() => setOpen(open === "양도" ? null : "양도")}>
+            양도
+          </button>
+        )}
+      </div>
+      {open === "보여주기" && (
+        <fieldset className="clue-panel">
+          <legend>{card.이름}을(를) 볼 수 있는 사람</legend>
+          <label className="check">
+            <input type="checkbox" checked={everyone} onChange={(e) => setEveryone(e.target.checked)} />
+            모두
+          </label>
+          {others.map((p) => (
+            <label key={p.계정_번호} className="check">
+              <input
+                type="checkbox"
+                disabled={everyone}
+                checked={everyone || shown.includes(p.계정_번호)}
+                onChange={(e) => setShown(e.target.checked ? [...shown, p.계정_번호] : shown.filter((a) => a !== p.계정_번호))}
+              />
+              {p.닉네임}
+            </label>
+          ))}
+          <p className="muted">아무도 고르지 않고 적용하면 공개를 취소합니다.</p>
+          <button type="button" className="small" disabled={busy} onClick={() => void send({ 동작: "보여주기", 단서: card.순서, 대상: everyone ? "전체" : shown })}>
+            적용
+          </button>
+        </fieldset>
+      )}
+      {open === "양도" && (
+        <fieldset className="clue-panel">
+          <legend>{card.이름}을(를) 넘길 사람</legend>
+          {others.map((p) => (
+            <label key={p.계정_번호} className="check">
+              <input type="radio" name={`receiver-${card.순서}`} checked={receiver === p.계정_번호} onChange={() => setReceiver(p.계정_번호)} />
+              {p.닉네임}
+            </label>
+          ))}
+          <p className="muted">넘기면 바로 상대의 단서가 되고, 이 단서에 걸린 공개는 사라집니다.</p>
+          <button type="button" className="small" disabled={busy || receiver === null} onClick={() => void send({ 동작: "양도", 단서: card.순서, 대상: [receiver] })}>
+            넘기기
+          </button>
+        </fieldset>
+      )}
+    </div>
   );
 }
 

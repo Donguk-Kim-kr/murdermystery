@@ -50,15 +50,16 @@ class CardRun:
 
 # ---- 호스트(스크립트가 부르는 엔진 기능) -------------------------------------------------------
 
-MUTATING = {"배정", "조사", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
+MUTATING = {"배정", "조사", "양도", "공개설정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
 FUNCTION_NAMES = {
     "플레이어들", "플레이어수", "인물들", "공통스토리", "서사들", "배정된_플레이어수", "인물_없는_플레이어가_있다",
-    "글", "선택지", "입력", "카드목록", "현황", "거부", "배정", "조사", "장소들", "보유목록", "읽기", "기다리기",
+    "글", "선택지", "입력", "카드목록", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "보유목록", "받은공개", "읽기", "기다리기",
     "단계_끝내기", "게임_종료",
 }
 CONSTANT_NAMES = {"통과", ALL}
 MAX_INPUT_CHARS = 2000
 MAX_CARDS = 200
+CARD_ACTIONS = ("보여주기", "양도")
 
 
 def known_names() -> set[str]:
@@ -118,6 +119,10 @@ class CardHost:
         """이 플레이어가 지금 가진 단서·증언(얻은 순서). 각 항목은 {종류, 이름, 내용, 장소}."""
         return clues.holdings_of(self.game, self._player_account(플레이어))
 
+    def fn_받은공개(self, 플레이어: Any) -> list[dict[str, Any]]:
+        """다른 사람이 이 플레이어에게(또는 전체에게) 보여 준 단서. 각 항목은 {종류, 이름, 내용, 장소, 주인}."""
+        return clues.revealed_to(self.game, self._player_account(플레이어))
+
     def fn_배정된_플레이어수(self) -> int:
         return sum(1 for p in self.game.players.values() if p.character is not None)
 
@@ -145,16 +150,37 @@ class CardHost:
             raise ScriptError(f"입력의 글자수는 1 이상 {MAX_INPUT_CHARS} 이하여야 합니다")
         return {"종류": "입력", "이름": name, "질문": _text(질문), "글자수": 글자수, "질문ID": f"{self.run.key}:{name}"}
 
-    def fn_카드목록(self, 이름: str, 항목: Any) -> dict[str, Any]:
-        """단서·증언 같은 카드를 앞면이 보이도록 늘어놓는 블록. 항목은 `보유목록()` 이 돌려준 목록이다."""
+    def fn_카드목록(self, 이름: str, 항목: Any, 동작: Any = None) -> dict[str, Any]:
+        """단서·증언 같은 카드를 앞면이 보이도록 늘어놓는 블록. 항목은 `보유목록()`·`받은공개()` 가 돌려준 목록이다.
+
+        `동작` 에 ["보여주기", "양도"] 중 쓸 것을 넘기면 카드마다 그 버튼이 생기고, 누르면 `기다리기(이름)` 이
+        `{플레이어, 값: {동작, 단서, 대상}}` 을 돌려준다(대상은 "전체" 이거나 계정 번호 목록).
+        """
+        name = str(이름)
         if not isinstance(항목, (list, tuple)):
             raise ScriptError("카드목록의 항목은 목록이어야 합니다")
+        actions = [] if 동작 is None else list(동작)
+        if any(a not in CARD_ACTIONS for a in actions):
+            raise ScriptError(f"카드목록의 동작은 {', '.join(CARD_ACTIONS)} 중에서 골라야 합니다")
+        if actions and (":" in name or name in ("확인", "")):
+            raise ScriptError("동작이 있는 카드목록의 이름은 비워 둘 수 없고 ':' 이나 '확인' 일 수 없습니다")
         cards = []
         for item in list(항목)[:MAX_CARDS]:
             if not isinstance(item, dict):
                 raise ScriptError("카드목록의 항목은 보유목록() 이 돌려준 카드여야 합니다")
-            cards.append({k: _text(item.get(k)) for k in ("종류", "이름", "내용", "장소")})
-        return {"종류": "카드목록", "이름": str(이름), "항목": cards}
+            card = {k: _text(item.get(k)) for k in ("종류", "이름", "내용", "장소", "주인")}
+            if isinstance(item.get("순서"), int):
+                card["순서"] = item["순서"]
+            if isinstance(item.get("양도가능"), bool):
+                card["양도가능"] = item["양도가능"]
+            shared = item.get("공개")
+            if shared == "전체" or isinstance(shared, list):
+                card["공개"] = shared if shared == "전체" else [t for t in shared if isinstance(t, int)]
+            cards.append(card)
+        block = {"종류": "카드목록", "이름": name, "항목": cards}
+        if actions:
+            block.update({"동작": actions, "질문ID": f"{self.run.key}:{name}"})
+        return block
 
     def fn_현황(self, 이름: str, 완료: int, 전체: int) -> dict[str, Any]:
         return {"종류": "현황", "이름": str(이름), "완료": int(완료), "전체": int(전체)}
@@ -170,6 +196,23 @@ class CardHost:
         if not isinstance(slot, int) or isinstance(slot, bool):         # 플레이어가 보낸 값이라 잘못되어도 카드가 멈추지 않는다
             return None
         return clues.investigate(self.game, account, slot, self.io)
+
+    def fn_양도(self, 플레이어: Any, 받는사람: Any, 단서: Any) -> bool:
+        """단서를 다른 플레이어에게 바로 넘긴다(수락이 필요 없다). 성공하면 True. 그 단서에 걸린 공개는 사라진다."""
+        giver = self._player_account(플레이어)
+        taker = 받는사람.key if isinstance(받는사람, Ref) and 받는사람.kind == "플레이어" else 받는사람
+        if not (_is_int(taker) and _is_int(단서)):
+            return False
+        return clues.transfer(self.game, giver, taker, 단서, self.io)
+
+    def fn_공개설정(self, 플레이어: Any, 단서: Any, 대상: Any) -> bool:
+        """단서를 볼 수 있는 사람을 바꾸어 놓는다. 대상은 "전체", 플레이어(계정 번호) 목록이며 빈 목록이면 공개를 모두 취소한다."""
+        owner = self._player_account(플레이어)
+        if not _is_int(단서):
+            return False
+        if isinstance(대상, (list, tuple)):
+            대상 = [t.key if isinstance(t, Ref) and t.kind == "플레이어" else t for t in 대상]
+        return clues.set_reveal(self.game, owner, 단서, 대상, self.io)
 
     def fn_배정(self, 플레이어: Any, 인물: Any) -> bool:
         from .engine import AssignError, assign_character
@@ -304,6 +347,10 @@ class CardHost:
         return [ref.key]
 
 
+def _is_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
 def _text(value: Any) -> str:
     if isinstance(value, dict) and "내용" in value:
         return str(value["내용"])
@@ -399,6 +446,29 @@ def _condition(run: CardRun) -> Callable[[Any], str | None]:
 
 # ---- 입력 ------------------------------------------------------------------------------------
 
+def _card_action_block(game, run, name: str) -> dict[str, Any] | None:
+    """이 카드가 보여 주는 동작이 있는 카드목록 블록(탭이든 화면이든)."""
+    candidates = [b for per in run.screens.values() for b in per.values()]
+    candidates += [t["내용"] for per in game.tabs.values() for t in per.values() if t["카드"] == run.key]
+    return next((b for b in candidates if b.get("종류") == "카드목록" and b.get("동작") and b.get("이름") == name), None)
+
+
+def _clean_card_action(game, account_id: int, block: dict[str, Any], value: Any) -> dict[str, Any]:
+    """카드의 버튼에서 온 값을 검사해 `{동작, 단서, 대상}` 로 돌려준다. 모양이 맞지 않으면 거부한다(스크립트가 잘못된 값에 멈추지 않게)."""
+    bad = AnswerError("invalid", "보낸 값을 읽을 수 없습니다")
+    if not isinstance(value, dict) or value.get("동작") not in block["동작"] or not _is_int(value.get("단서")):
+        raise bad
+    targets = value.get("대상")
+    if targets != "전체":
+        if not isinstance(targets, list) or len(targets) > len(game.players):
+            raise bad
+        if any(not _is_int(t) or t not in game.players or t == account_id for t in targets):
+            raise bad
+    if value["동작"] == "양도" and (targets == "전체" or len(targets) != 1):
+        raise bad
+    return {"동작": value["동작"], "단서": value["단서"], "대상": targets}
+
+
 def answer(game, account_id: int, qid: str, value: Any, io) -> None:
     """플레이어의 입력을 받는다. 질문 ID 가 지금 받는 것이 아니면 거부한다. 호출하는 쪽이 `game.lock` 을 잡는다."""
     if game.ended:
@@ -425,6 +495,9 @@ def answer(game, account_id: int, qid: str, value: Any, io) -> None:
     vm = run.vm
     if vm is None or vm.waiting is None or vm.waiting.get("종류") != rest:
         raise AnswerError("stale", "지금은 받지 않는 질문입니다")
+    action_block = _card_action_block(game, run, rest)
+    if action_block is not None:
+        value = _clean_card_action(game, account_id, action_block, value)
     block = next((b for t in run.screens.values() for b in t.values() if b.get("종류") == "입력" and b.get("이름") == rest), None)
     if block is not None:
         if not isinstance(value, str) or not value.strip():
@@ -492,10 +565,13 @@ def card_view(game, viewer: int) -> dict[str, Any]:
         for name, tab in game.tabs.get(target, {}).items():
             if tab["유지"] or tab["위치"] == game.phase_index:
                 merged[name] = tab
-    tabs = [
-        {**_block(game, viewer, tab["내용"]), "이름": name, "카드": tab["카드"]}
-        for name, tab in sorted(merged.items(), key=lambda kv: kv[1]["순번"])
-    ]
+    tabs = []
+    for name, tab in sorted(merged.items(), key=lambda kv: kv[1]["순번"]):
+        shown = {**_block(game, viewer, tab["내용"]), "이름": name, "카드": tab["카드"]}
+        if tab["카드"] not in game.runs or (viewer not in game.players):
+            shown.pop("동작", None)                  # 이전 단계에서 남은 탭의 버튼은 더 이상 받지 않는다(관전자에게도 없다)
+            shown.pop("질문ID", None)
+        tabs.append(shown)
     errors = []
     if viewer in (game.host_id, game.authority_id):
         errors = [{"카드": r.title, "메시지": r.error} for r in game.runs.values() if r.error]

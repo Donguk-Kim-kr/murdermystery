@@ -24,7 +24,7 @@ class TestApplyOnEmptyDatabase(PgTestCase):
         created = {r[0] for r in self.db.rows(
             "SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename<>'schema_migrations'")}
         self.assertEqual(created, set(spec_table_names()))
-        self.assertEqual(len(created), 32)
+        self.assertEqual(len(created), 33)
 
     def test_history_records_every_file(self):
         files = sorted(p.name for p in MIGRATIONS_DIR.glob("*.sql"))

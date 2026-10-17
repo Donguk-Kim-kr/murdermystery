@@ -24,6 +24,11 @@ class GameIO:
     end: Callable[[], None]                 # 진행을 종료로 기록
     # (계정, "단서"/"증언", 순서, 진행순서 칸, 획득방법) 을 획득에 기록
     acquire: Callable[[int, str, int, int, str], None] = lambda *args: None
+    # (줌, 받음, 단서 순서, 진행순서 칸): 단서를 양도하고 그 단서에 걸린 공개를 모두 취소해 기록
+    transfer: Callable[[int, int, int, int], None] = lambda *args: None
+    # (주인, 단서 순서, 대상 계정 또는 None=전체): 공개를 기록하거나 취소해 기록
+    reveal: Callable[[int, int, int | None], None] = lambda *args: None
+    unreveal: Callable[[int, int, int | None], None] = lambda *args: None
 
 
 @dataclass
@@ -77,6 +82,8 @@ class Game:
     notice_counter: int = 0
     # 계정 → 얻은 항목 목록([{종류, 순서, 방법, 위치, 보유}]). 조사로 얻은 단서·증언이 쌓인다(app/clues.py)
     holdings: dict[int, list[dict[str, Any]]] = field(default_factory=dict, repr=False)
+    # (주인 계정, 단서 순서) → 볼 수 있는 대상. 계정 번호들의 집합이거나 "전체" 가 들어 있으면 모두에게 공개
+    reveals: dict[tuple[int, int], set] = field(default_factory=dict, repr=False)
 
     @property
     def phases(self) -> list[dict[str, Any]]:

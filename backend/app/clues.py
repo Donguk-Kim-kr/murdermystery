@@ -69,17 +69,88 @@ def investigate(game, account: int, place_slot: int, io) -> dict[str, Any] | Non
 def describe(game, kind: str, row: dict[str, Any]) -> dict[str, Any]:
     place = place_path(game, row["장소_순서"]) if row.get("장소_순서") is not None else ""
     if kind == "단서":
-        return {"종류": "단서", "이름": row.get("이름") or "", "내용": row.get("내용") or "", "장소": place}
-    return {"종류": "증언", "이름": f"{row.get('화자') or ''}의 증언", "내용": row.get("내용") or "", "장소": place}
+        return {"종류": "단서", "순서": row["순서"], "이름": row.get("이름") or "", "내용": row.get("내용") or "", "장소": place}
+    return {"종류": "증언", "순서": row["순서"], "이름": f"{row.get('화자') or ''}의 증언", "내용": row.get("내용") or "", "장소": place}
 
 
 def holdings_of(game, account: int) -> list[dict[str, Any]]:
-    """이 플레이어가 지금 가진 항목(얻은 순서)."""
+    """이 플레이어가 지금 가진 항목(얻은 순서). 단서에는 지금 누구에게 공개했는지(`공개`)와 양도할 수 있는지가 붙는다."""
     out = []
     for h in game.holdings.get(account, []):
         if not h["보유"]:
             continue
         row = next((r for r in _rows(game, h["종류"]) if r["순서"] == h["순서"]), None)
-        if row is not None:
-            out.append(describe(game, h["종류"], row))
+        if row is None:
+            continue
+        item = describe(game, h["종류"], row)
+        item["양도가능"] = h["종류"] == "단서"                  # 증언은 들은 기억이라 보여 주기·양도가 안 된다
+        if h["종류"] == "단서":
+            targets = game.reveals.get((account, h["순서"]), set())
+            item["공개"] = "전체" if ALL in targets else sorted(t for t in targets if isinstance(t, int))
+        out.append(item)
+    return out
+
+
+ALL = "전체"
+
+
+def _holds_clue(game, account: int, order: int) -> bool:
+    return held(game, account, "단서", order)
+
+
+def transfer(game, giver: int, taker: int, order: int, io) -> bool:
+    """단서를 바로 넘긴다(받는 사람의 수락은 필요 없다). 그 단서에 걸린 공개는 모두 사라진다. 호출하는 쪽이 `game.lock` 을 잡는다."""
+    if giver == taker or taker not in game.players or giver not in game.players or not _holds_clue(game, giver, order):
+        return False
+    slot = game.phase["순서"]
+    io.transfer(giver, taker, order, slot)
+    for h in game.holdings.get(giver, []):
+        if h["종류"] == "단서" and h["순서"] == order and h["보유"]:
+            h["보유"] = False
+    game.holdings.setdefault(taker, []).append({"종류": "단서", "순서": order, "방법": "양도", "위치": slot, "보유": True})
+    game.reveals.pop((giver, order), None)
+    return True
+
+
+def set_reveal(game, owner: int, order: int, targets: Any, io) -> bool:
+    """단서를 볼 수 있는 사람을 지정한다(바꾸어 놓는다). `targets` 는 "전체" 이거나 계정 번호들이고, 비우면 공개를 모두 취소한다."""
+    if owner not in game.players or not _holds_clue(game, owner, order):
+        return False
+    if targets == ALL:
+        wanted: set = {ALL}
+    elif isinstance(targets, (list, tuple, set)):
+        wanted = set()
+        for t in targets:
+            if not isinstance(t, int) or isinstance(t, bool) or t == owner or t not in game.players:
+                return False
+            wanted.add(t)
+    else:
+        return False
+    current = game.reveals.get((owner, order), set())
+    for token in sorted(current - wanted, key=str):
+        io.unreveal(owner, order, None if token == ALL else token)
+    for token in sorted(wanted - current, key=str):
+        io.reveal(owner, order, None if token == ALL else token)
+    if wanted:
+        game.reveals[(owner, order)] = wanted
+    else:
+        game.reveals.pop((owner, order), None)
+    return True
+
+
+def revealed_to(game, viewer: int) -> list[dict[str, Any]]:
+    """다른 사람이 나에게(또는 전체에게) 보여 준 단서."""
+    by_slot = {c["순서"]: c for c in game.snapshot.get("인물") or []}
+    out = []
+    for (owner, order), targets in game.reveals.items():
+        if owner == viewer or not (ALL in targets or viewer in targets):
+            continue
+        row = next((r for r in _rows(game, "단서") if r["순서"] == order), None)
+        player = game.players.get(owner)
+        if row is None or player is None:
+            continue
+        item = describe(game, "단서", row)
+        character = by_slot.get(player.character)
+        item["주인"] = f"{character['이름']} ({player.nickname})" if character else player.nickname
+        out.append(item)
     return out

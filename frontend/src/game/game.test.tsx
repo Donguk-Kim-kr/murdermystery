@@ -381,3 +381,89 @@ describe("조사 블록", () => {
     expect(screen.getByText("아직 얻은 것이 없습니다.")).toBeInTheDocument();
   });
 });
+
+describe("단서 보여 주기·양도", () => {
+  const me = { 계정_번호: 1, 역할: "플레이어", 인물_순서: 10, 방장: true, 진행_권한: true } as const;
+  const base = () => ({
+    나: me,
+    플레이어: [
+      { 계정_번호: 1, 닉네임: "탐정", 인물_순서: 10, 인물_이름: "의사", 접속중: true },
+      { 계정_번호: 2, 닉네임: "조수", 인물_순서: 11, 인물_이름: "집사", 접속중: true },
+      { 계정_번호: 3, 닉네임: "하녀", 인물_순서: 12, 인물_이름: "하녀", 접속중: true },
+    ],
+  });
+  const tabWith = (items: unknown[], extra: Record<string, unknown> = {}) => ({
+    종류: "카드목록", 이름: "내 단서", 카드: "토론", 동작: ["보여주기", "양도"], 질문ID: "1:5:내 단서", 항목: items, ...extra,
+  });
+  const clue = { 종류: "단서", 순서: 4, 이름: "찢어진 편지", 내용: "편지 내용", 장소: "저택 › 서재", 양도가능: true, 공개: [] as unknown };
+  const testimony = { 종류: "증언", 순서: 1, 이름: "집사의 증언", 내용: "봤습니다", 장소: "주방", 양도가능: false };
+
+  async function openTab() {
+    render(<GamePage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "내 단서" }));
+    return user;
+  }
+
+  it("단서 카드에는 보여 주기·양도 버튼이 있고 증언에는 없다", async () => {
+    state = makeState({ ...base(), 탭: [tabWith([clue, testimony])] });
+    await openTab();
+    const cards = screen.getAllByRole("listitem");
+    expect(within(cards[0]).getByRole("button", { name: "보여 주기" })).toBeInTheDocument();
+    expect(within(cards[0]).getByRole("button", { name: "양도" })).toBeInTheDocument();
+    expect(within(cards[1]).queryByRole("button")).toBeNull();
+    expect(within(cards[0]).getByText("공개하지 않음")).toBeInTheDocument();
+  });
+
+  it("여러 명을 골라 보여 주면 대상 목록으로 보내고, 모두를 고르면 전체로 보낸다", async () => {
+    state = makeState({ ...base(), 탭: [tabWith([clue])] });
+    const user = await openTab();
+    await user.click(screen.getByRole("button", { name: "보여 주기" }));
+    await user.click(screen.getByRole("checkbox", { name: "조수" }));
+    await user.click(screen.getByRole("checkbox", { name: "하녀" }));
+    await user.click(screen.getByRole("button", { name: "적용" }));
+    await waitFor(() => expect(posts.at(-1)).toEqual({ path: "/api/game/me/answer", body: { 질문ID: "1:5:내 단서", 값: { 동작: "보여주기", 단서: 4, 대상: [2, 3] } } }));
+    await user.click(screen.getByRole("button", { name: "보여 주기" }));
+    await user.click(screen.getByRole("checkbox", { name: "모두" }));
+    await user.click(screen.getByRole("button", { name: "적용" }));
+    await waitFor(() => expect(posts.at(-1)?.body).toEqual({ 질문ID: "1:5:내 단서", 값: { 동작: "보여주기", 단서: 4, 대상: "전체" } }));
+  });
+
+  it("지금 공개 중인 대상이 미리 골라져 있고, 모두 해제하고 적용하면 취소다", async () => {
+    state = makeState({ ...base(), 탭: [tabWith([{ ...clue, 공개: [2] }])] });
+    const user = await openTab();
+    expect(screen.getByText("공개 대상: 조수")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "보여 주기" }));
+    expect(screen.getByRole("checkbox", { name: "조수" })).toBeChecked();
+    await user.click(screen.getByRole("checkbox", { name: "조수" }));
+    await user.click(screen.getByRole("button", { name: "적용" }));
+    await waitFor(() => expect(posts.at(-1)?.body).toEqual({ 질문ID: "1:5:내 단서", 값: { 동작: "보여주기", 단서: 4, 대상: [] } }));
+  });
+
+  it("양도는 한 명을 골라야 보낼 수 있다", async () => {
+    state = makeState({ ...base(), 탭: [tabWith([clue])] });
+    const user = await openTab();
+    await user.click(screen.getByRole("button", { name: "양도" }));
+    const send = screen.getByRole("button", { name: "넘기기" });
+    expect(send).toBeDisabled();
+    expect(screen.queryByRole("radio", { name: "탐정" })).toBeNull();           // 나 자신은 고를 수 없다
+    await user.click(screen.getByRole("radio", { name: "하녀" }));
+    await user.click(send);
+    await waitFor(() => expect(posts.at(-1)?.body).toEqual({ 질문ID: "1:5:내 단서", 값: { 동작: "양도", 단서: 4, 대상: [3] } }));
+  });
+
+  it("동작이 없는 탭(지난 단계에서 남은 것)에는 버튼이 없다", async () => {
+    state = makeState({ ...base(), 탭: [tabWith([clue], { 동작: undefined, 질문ID: undefined })] });
+    await openTab();
+    expect(screen.queryByRole("button", { name: "보여 주기" })).toBeNull();
+    expect(screen.getByText("찢어진 편지")).toBeInTheDocument();
+  });
+
+  it("다른 사람이 보여 준 단서에는 보여 준 사람이 표시된다", async () => {
+    state = makeState({ ...base(), 탭: [{ 종류: "카드목록", 이름: "공개된 단서", 카드: "토론", 항목: [{ ...clue, 공개: undefined, 주인: "집사 (조수)" }] }] });
+    render(<GamePage />);
+    await userEvent.setup().click(await screen.findByRole("tab", { name: "공개된 단서" }));
+    expect(screen.getByText("집사 (조수)")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "양도" })).toBeNull();
+  });
+});
