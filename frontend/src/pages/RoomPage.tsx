@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { api, errorMessage } from "../api/client";
+import { GamePage } from "../game/GamePage";
 import { useRoom } from "../rooms/RoomContext";
 
 export function RoomPage() {
@@ -12,7 +13,10 @@ export function RoomPage() {
   // 체크박스는 누르면 바로 바뀌고, 서버가 거부하면 원래대로 돌아간다 (서버 응답을 기다리면 반응이 느려 보인다).
   const [pending, setPending] = useState<boolean | null>(null);
 
+  const [starting, setStarting] = useState(false);
+
   if (room === undefined) return <p className="center">불러오는 중…</p>;
+  if (room !== null && room.상태 !== "대기") return <GamePage />;
   if (room === null)
     return (
       <main className="page narrow">
@@ -44,6 +48,15 @@ export function RoomPage() {
     }
     await refresh();
     navigate("/");
+  }
+
+  async function startGame() {
+    setError(null);
+    setStarting(true);
+    const { error } = await api.POST("/api/rooms/me/start");
+    if (error) setError(errorMessage(error, "게임을 시작하지 못했습니다"));
+    await refresh();
+    setStarting(false);
   }
 
   async function togglePlaying(playing: boolean) {
@@ -97,7 +110,7 @@ export function RoomPage() {
           ))}
         </ul>
         <p className="muted">
-          최소 {room.작품.최소인원}명이 모여야 시작할 수 있습니다. 배역 선택과 게임 시작은 아직 준비 중입니다.
+          플레이어 수가 캐릭터 수({room.작품.최대인원}명)와 같아야 시작할 수 있습니다.
         </p>
         {room.내가_방장 && (
           <label className="check">
@@ -107,6 +120,11 @@ export function RoomPage() {
         )}
         {error && <p role="alert" className="error">{error}</p>}
         <div className="row start">
+          {room.내가_방장 && (
+            <button type="button" disabled={starting} onClick={() => void startGame()}>
+              게임 시작
+            </button>
+          )}
           <button type="button" className="secondary" onClick={() => void leave()}>
             {room.내가_방장 ? "방 닫기" : "나가기"}
           </button>
