@@ -601,17 +601,17 @@ describe("진행 탭", () => {
       await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));
       await pickCard("1차 조사");
       const first = within(editor().getByRole("group", { name: "1차 조사 수정" }));
-      expect(first.getByLabelText(/다음 페이즈에도 남기기/)).toBeChecked();
-      await userEvent.click(first.getByLabelText(/다음 페이즈에도 남기기/));
+      expect(first.getByLabelText(/내용 유지/)).toBeChecked();
+      await userEvent.click(first.getByLabelText(/내용 유지/));
       await userEvent.click(first.getByRole("button", { name: "설정 저장" }));
       expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: { 탭유지: false } });
 
       await userEvent.click(tile(2));
       await pickCard("2차 조사");
       const second = within(editor().getByRole("group", { name: "2차 조사 수정" }));
-      expect(second.getByLabelText(/다음 페이즈에도 남기기/)).not.toBeChecked();
+      expect(second.getByLabelText(/내용 유지/)).not.toBeChecked();
       expect(second.getByLabelText(/JSON/)).toHaveValue(JSON.stringify({ 횟수: 3 }, null, 2));
-      await userEvent.click(second.getByLabelText(/다음 페이즈에도 남기기/));
+      await userEvent.click(second.getByLabelText(/내용 유지/));
       await userEvent.clear(second.getByLabelText(/JSON/));
       await userEvent.click(second.getByRole("button", { name: "설정 저장" }));
       expect(await sent("PATCH /api/works/7/content/phase-steps/10")[0].req.json()).toEqual({ 설정: null });

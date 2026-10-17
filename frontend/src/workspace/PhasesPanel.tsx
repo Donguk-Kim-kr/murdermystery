@@ -573,7 +573,7 @@ const asObject = (v: unknown): Record<string, unknown> =>
 
 /**
  * 카드·기믹을 이 페이즈에 놓을 때만 적용하는 세부 설정. 비우면 정의의 기본값을 쓴다.
- * 카드에는 "다음 페이즈에도 탭 남기기"를 따로 보여 준다(기본: 남김). 나머지는 JSON 으로 직접 쓴다(내부 구조는 엔진 설계에서 정함).
+ * 카드에는 "내용 유지"(이 페이즈가 끝나도 내용을 남겨 계속 볼 수 있게 함)를 따로 보여 준다(기본: 남김). 상세 설명 글은 아직 두지 않는다. 나머지는 JSON 으로 직접 쓴다(내부 구조는 엔진 설계에서 정함).
  */
 function SettingsEditor({ resource, id, value, showTab, call }: {
   resource: string; id: number; value: unknown; showTab: boolean; call: Call;
@@ -606,7 +606,7 @@ function SettingsEditor({ resource, id, value, showTab, call }: {
       {showTab && (
         <label className="check">
           <input type="checkbox" checked={keepTab} onChange={(e) => setKeepTab(e.target.checked)} />
-          이 카드가 만든 탭을 다음 페이즈에도 남기기
+          내용 유지
         </label>
       )}
       <label>
