@@ -3,32 +3,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from test_cards import answer, block, db, make_scripted_game, players_of, state, tab  # noqa: F401  (픽스처 포함)
+from app.default_phases import INVESTIGATE
 
-INVESTIGATE = '''
-def 실행(카드):
-    횟수 = 카드.설정.get("횟수", 3)
-    남음 = {}
-    for 플레이어 in 플레이어들():
-        남음[플레이어.계정] = 횟수
-        플레이어.탭("내 단서", 카드목록("내 단서", []))
-        플레이어.보이기(현황("조사 횟수", 0, 횟수))
-    모두.보이기(선택지("조사할 장소", 장소들(), 1, False))
-    while True:
-        받음 = 기다리기("확인")
-        나 = 받음.플레이어
-        if 남음[나.계정] <= 0:
-            나.알림("조사 횟수를 모두 사용했습니다.")
-            continue
-        얻음 = 조사(나, 받음.값)
-        if 얻음 is None:
-            나.알림("이 장소에서는 더 얻을 것이 없습니다.")
-            continue
-        남음[나.계정] = 남음[나.계정] - 1
-        나.탭("내 단서", 카드목록("내 단서", 보유목록(나)))
-        나.보이기(글("조사 결과", 얻음["이름"] + ": " + 얻음["내용"]))
-        나.보이기(현황("조사 횟수", 횟수 - 남음[나.계정], 횟수))
-'''
+from test_cards import answer, block, db, make_scripted_game, players_of, state, tab  # noqa: F401  (픽스처 포함)
 
 
 def build(client, host, wid):

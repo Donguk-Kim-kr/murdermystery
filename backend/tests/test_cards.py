@@ -6,62 +6,10 @@ import pytest
 from psycopg.types.json import Jsonb
 
 from app import narrative
+from app.default_phases import PROLOGUE, CHARACTER_SELECT, PROFILE, INTRO
 from app.narrative import Part
 
 from test_game import advance, create_room, join, start, state
-
-PROLOGUE = '''
-def 실행(카드):
-    모두.탭("공통 스토리", 글("공통 스토리", 공통스토리()))
-    읽기(모두, "공통 스토리", 공통스토리())
-'''
-
-CHARACTER_SELECT = '''
-def 실행(카드):
-    모두.보이기(선택지("캐릭터 선택", 인물들(), 1, True))
-    모두.보이기(현황("선택 완료", 배정된_플레이어수(), 플레이어수()))
-    while 인물_없는_플레이어가_있다():
-        입력 = 기다리기("확인")
-        if 배정(입력.플레이어, 입력.값):
-            모두.보이기(현황("선택 완료", 배정된_플레이어수(), 플레이어수()))
-        else:
-            입력.플레이어.알림("이미 다른 사람이 고른 인물입니다")
-
-def 진행조건(카드):
-    if 인물_없는_플레이어가_있다():
-        return 거부("캐릭터 선택이 완료되지 않았습니다.")
-    return 통과
-'''
-
-INTRO = '''
-def 실행(카드):
-    줄 = []
-    for 플레이어 in 플레이어들():
-        인물 = 플레이어.인물
-        if 인물 is None:
-            continue
-        제목 = 인물.이름
-        if 인물.직업:
-            제목 = 제목 + " (" + 인물.직업 + ")"
-        줄.append(제목 + " - " + 플레이어.이름)
-        if 인물.소개:
-            줄.append(인물.소개)
-        줄.append("")
-    모두.탭("자기소개", 글("자기소개", "\\n".join(줄)))
-    모두.보이기(글("안내", "한 사람씩 자기소개를 해 주세요."))
-'''
-
-PROFILE = '''
-def 실행(카드):
-    공개 = 카드.설정.get("개인서사공개", {})
-    for 플레이어 in 플레이어들():
-        if 플레이어.인물 is None:
-            continue
-        번호들 = 공개.get(str(플레이어.인물.순서), [1])
-        내용 = 서사들(플레이어.인물, 번호들)
-        플레이어.탭("개인 서사", 글("개인 서사", 내용))
-        읽기(플레이어, "개인 서사", 내용)
-'''
 
 
 @pytest.fixture
@@ -496,3 +444,27 @@ def test_bad_character_values_do_not_break_character_select(client, make_scripte
     assert [n["글"] for n in res.json()["알림"]] == ["이미 다른 사람이 고른 인물입니다"]
     slot = block(state(client, host).json(), "캐릭터 선택")["항목"][0]["값"]
     assert pick(client, host, slot).json()["나"]["인물_순서"] == slot            # 이후에도 정상 동작한다
+
+
+# ---- 밀담·추리 발표와 기본 진행단계 목록 ------------------------------------------------------------
+
+def test_secret_talk_and_deduction_show_their_announcement_and_settings_replace_it(client, make_scripted_game):
+    from app.default_phases import DEDUCTION, SECRET_TALK
+
+    host, others, _, _ = make_scripted_game([
+        ("밀담", SECRET_TALK, None), ("추리 발표", DEDUCTION, {"안내": "한 사람당 1분씩 발표합니다."}),
+    ])
+    assert "밀담을 할 수 있는 단계" in block(state(client, others[0]).json(), "밀담")["내용"]
+    assert advance(client, host).status_code == 200
+    assert block(state(client, others[0]).json(), "추리 발표")["내용"] == "한 사람당 1분씩 발표합니다."
+
+
+def test_every_common_phase_script_passes_the_same_check_as_confirm():
+    from app.cards import known_names
+    from app.default_phases import COMMON_PHASES
+    from app.script import compile_source
+
+    names = [name for name, *_ in COMMON_PHASES]
+    assert len(names) == len(set(names))
+    for name, description, source, _settings in COMMON_PHASES:
+        assert description and "실행" in compile_source(source, known_names()).funcs, name

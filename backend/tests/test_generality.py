@@ -99,7 +99,7 @@ def test_resubmitting_replaces_the_players_earlier_answer(client, make_scripted_
 
 
 def test_the_new_phase_composes_with_the_default_ones(client, make_scripted_game):
-    from test_cards import PROLOGUE
+    from app.default_phases import PROLOGUE
 
     host, others, _, _ = make_scripted_game([("프롤로그", PROLOGUE, None), ("한 줄 답변", SIMULTANEOUS, None)])
     assert advance(client, host).status_code == 200

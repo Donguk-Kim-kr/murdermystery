@@ -1,40 +1,11 @@
 """토론: 얻은 단서를 보여 주고 양도한다 (app/clues.py, 토론 단계의 결정)."""
 import pytest
 
+from app.default_phases import DISCUSSION
+
 from test_cards import answer, block, db, make_scripted_game, players_of, state, tab  # noqa: F401  (픽스처 포함)
 from test_game import advance
 from test_investigation import INVESTIGATE, build
-
-DISCUSSION = '''
-def 새로고침(동작들):
-    for 플레이어 in 플레이어들():
-        플레이어.탭("내 단서", 카드목록("내 단서", 보유목록(플레이어), 동작들))
-        플레이어.탭("공개된 단서", 카드목록("공개된 단서", 받은공개(플레이어)))
-
-def 실행(카드):
-    동작들 = []
-    if 카드.설정.get("보여주기허용", True):
-        동작들.append("보여주기")
-    if 카드.설정.get("양도허용", True):
-        동작들.append("양도")
-    새로고침(동작들)
-    while True:
-        받음 = 기다리기("내 단서")
-        나 = 받음.플레이어
-        값 = 받음.값
-        if 값["동작"] == "보여주기":
-            if not 공개설정(나, 값["단서"], 값["대상"]):
-                나.알림("보여 줄 수 없는 단서입니다.")
-        else:
-            받는 = 값["대상"][0]
-            if 양도(나, 받는, 값["단서"]):
-                for 플레이어 in 플레이어들():
-                    if 플레이어.계정 == 받는:
-                        플레이어.알림(나.이름 + "님이 단서를 넘겨주었습니다.")
-            else:
-                나.알림("넘겨 줄 수 없는 단서입니다.")
-        새로고침(동작들)
-'''
 
 
 def start(client, make_scripted_game, settings=None):
