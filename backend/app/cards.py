@@ -17,7 +17,7 @@ MAX_ANSWER_BYTES = 2000
 MAX_NOTICES = 20
 ALL = "모두"
 PUBLIC_FIELDS = ("이름", "직업", "나이", "성별")
-CHARACTER_FIELDS = ("이름", "직업", "나이", "성별", "타임라인", "능력", "비밀", "목표", "범인", "NPC")
+CHARACTER_FIELDS = ("이름", "직업", "나이", "성별", "타임라인", "능력", "비밀", "목표", "범인", "NPC", "소개")
 
 
 class AnswerError(Exception):

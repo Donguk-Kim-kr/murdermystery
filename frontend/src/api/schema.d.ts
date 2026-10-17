@@ -817,6 +817,8 @@ export interface components {
              * @default false
              */
             NPC?: boolean;
+            /** 소개 */
+            "\uC18C\uAC1C"?: string | null;
         };
         /** CharacterOut */
         CharacterOut: {
@@ -848,6 +850,8 @@ export interface components {
              * @default false
              */
             NPC?: boolean;
+            /** 소개 */
+            "\uC18C\uAC1C"?: string | null;
             /** 순서 */
             "\uC21C\uC11C": number;
         };
@@ -875,6 +879,8 @@ export interface components {
             "\uBC94\uC778"?: boolean | null;
             /** Npc */
             NPC?: boolean | null;
+            /** 소개 */
+            "\uC18C\uAC1C"?: string | null;
         };
         /** ConfirmIn */
         ConfirmIn: {

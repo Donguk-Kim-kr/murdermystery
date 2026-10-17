@@ -5,8 +5,8 @@ import type { components } from "../api/schema";
 
 export type Character = components["schemas"]["CharacterOut"];
 
-const TEXT_FIELDS = ["직업", "성별", "타임라인", "능력", "비밀", "목표"] as const;
-const LONG = new Set<string>(["타임라인", "능력", "비밀", "목표"]);
+const TEXT_FIELDS = ["직업", "성별", "소개", "타임라인", "능력", "비밀", "목표"] as const;
+const LONG = new Set<string>(["소개", "타임라인", "능력", "비밀", "목표"]);
 
 /** 빈 칸은 null(값 없음)로 보낸다. */
 const orNull = (s: string) => (s.trim() === "" ? null : s);
@@ -41,6 +41,7 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
       서사: story,
       직업: orNull(texts.직업),
       성별: orNull(texts.성별),
+      소개: orNull(texts.소개),
       타임라인: orNull(texts.타임라인),
       능력: orNull(texts.능력),
       비밀: orNull(texts.비밀),

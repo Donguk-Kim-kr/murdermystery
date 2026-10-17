@@ -155,3 +155,17 @@ def test_other_users_cannot_delete_a_character(client, new_user):
     wid = client.post("/api/works", headers=owner, json={"제목": "w"}).json()["번호"]
     c = client.post(f"/api/works/{wid}/characters", headers=owner, json={"이름": "A"}).json()["순서"]
     assert client.delete(f"/api/works/{wid}/characters/{c}", headers=other).status_code == 404
+
+
+def test_intro_line_is_optional_editable_and_clearable(client, make_account):
+    headers = make_account().headers
+    work = client.post("/api/works", headers=headers, json={"제목": "소개"}).json()
+    wid = work["번호"]
+    made = client.post(f"/api/works/{wid}/characters", headers=headers, json={"이름": "의사", "서사": "과거"})
+    assert made.status_code == 201 and made.json()["소개"] is None
+    res = client.patch(f"/api/works/{wid}/characters/1", headers=headers, json={"소개": "마을의 의사입니다."})
+    assert res.status_code == 200 and res.json()["소개"] == "마을의 의사입니다."
+    assert client.get(f"/api/works/{wid}/characters/1", headers=headers).json()["소개"] == "마을의 의사입니다."
+    assert client.patch(f"/api/works/{wid}/characters/1", headers=headers, json={"소개": None}).json()["소개"] is None
+    too_long = client.patch(f"/api/works/{wid}/characters/1", headers=headers, json={"소개": "가" * 1001})
+    assert too_long.status_code == 422

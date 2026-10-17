@@ -14,7 +14,7 @@ from .works import lock_work, not_found
 
 router = APIRouter(prefix="/api/works/{work_id}/characters", tags=["characters"])
 
-COLUMNS = '"순서", "이름", "직업", "나이", "성별", "서사", "타임라인", "능력", "비밀", "목표", "범인", "NPC"'
+COLUMNS = '"순서", "이름", "직업", "나이", "성별", "서사", "타임라인", "능력", "비밀", "목표", "범인", "NPC", "소개"'
 
 
 class CharacterIn(BaseModel):
@@ -29,6 +29,7 @@ class CharacterIn(BaseModel):
     목표: str | None = Field(default=None, max_length=2000)
     범인: bool = False
     NPC: bool = False
+    소개: str | None = Field(default=None, max_length=1000)
 
 
 class CharacterPatch(BaseModel):
@@ -43,6 +44,7 @@ class CharacterPatch(BaseModel):
     목표: str | None = Field(default=None, max_length=2000)
     범인: bool | None = None
     NPC: bool | None = None
+    소개: str | None = Field(default=None, max_length=1000)
 
 
 class CharacterOut(CharacterIn):
