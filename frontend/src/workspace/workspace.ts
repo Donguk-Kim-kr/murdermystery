@@ -37,6 +37,8 @@ export interface LibraryRef {
   버전: number;
   설명: string | null;
   삭제됨: boolean;
+  /** 스크립트가 읽는 카드 설정 이름(설정 화면이 보여 줄 입력을 정한다). 기믹에는 없다. */
+  사용설정?: string[];
 }
 
 export interface Bundle {

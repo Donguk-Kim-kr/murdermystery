@@ -145,3 +145,50 @@ def test_next_version_uses_the_numeric_part_not_text_order(client, headers, conf
     confirm(w, "9.0")
     confirm(w, "10.0")  # 글자 순으로는 "9.0" 이 더 크다
     assert check(client, headers, w)["다음버전"] == "11.0"
+
+
+def test_broken_phase_script_blocks_confirm_with_a_reason(client, headers):
+    w = ready(client, headers)
+    lib = client.post("/api/library/phases", headers=headers, json={"이름": "깨진 카드", "설명": "x", "규칙": {"스크립트": "def 실행(카드):\n    몰라()"}})
+    assert lib.status_code == 201, lib.text
+    post(client, headers, w, "phase-steps", 진행순서_순서=1, 진행단계_번호=lib.json()["번호"])
+    result = check(client, headers, w)
+    assert len(result["errors"]) == 1
+    assert "깨진 카드" in result["errors"][0] and "알 수 없는 이름" in result["errors"][0] and "2번째 줄" in result["errors"][0]
+    assert confirm(client, headers, w).status_code == 422
+
+
+def test_working_scripts_and_cards_without_scripts_do_not_block_confirm(client, headers):
+    w = ready(client, headers)
+    good = client.post("/api/library/phases", headers=headers, json={"이름": "정상", "설명": "x", "규칙": {"스크립트": "def 실행(카드):\n    모두.보이기(글('안녕'))"}}).json()
+    plain = client.post("/api/library/phases", headers=headers, json={"이름": "스크립트 없음", "설명": "x", "규칙": {}}).json()
+    post(client, headers, w, "phase-steps", 진행순서_순서=1, 진행단계_번호=good["번호"])
+    post(client, headers, w, "phase-steps", 진행순서_순서=1, 진행단계_번호=plain["번호"])
+    assert check(client, headers, w)["errors"] == []
+    assert confirm(client, headers, w).status_code == 201
+
+
+def test_warns_when_a_card_picks_a_story_part_a_character_does_not_have(client, headers):
+    w = ready(client, headers)
+    client.patch(f"/api/works/{w}/characters/1", headers=headers, json={"서사_부분": [{"본문": "하나"}]})
+    lib = client.post("/api/library/phases", headers=headers, json={"이름": "프로필", "설명": "x", "규칙": {}}).json()
+    step = post(client, headers, w, "phase-steps", 진행순서_순서=1, 진행단계_번호=lib["번호"], 설정={"개인서사공개": {"1": [1, 3]}})
+    result = check(client, headers, w)
+    assert result["errors"] == []
+    assert any("서사 3" in text and "서사는 1개" in text for text in result["warnings"])
+    # 고르지 않은 번호이거나 있는 번호만 고르면 경고하지 않는다
+    client.patch(f"/api/works/{w}/content/phase-steps/{step['번호']}", headers=headers, json={"설정": {"개인서사공개": {"1": [1]}}})
+    assert not any("서사 3" in text for text in check(client, headers, w)["warnings"])
+
+
+def test_content_bundle_tells_which_settings_a_card_script_uses_and_story_counts(client, headers):
+    w = ready(client, headers)
+    client.patch(f"/api/works/{w}/characters/1", headers=headers, json={"서사_부분": [{"본문": "하나"}, {"본문": "둘"}]})
+    lib = client.post("/api/library/phases", headers=headers, json={
+        "이름": "프로필", "설명": "x", "규칙": {"스크립트": "def 실행(카드):\n    공개 = 카드.설정.get('개인서사공개', {})"},
+    }).json()
+    post(client, headers, w, "phase-steps", 진행순서_순서=1, 진행단계_번호=lib["번호"])
+    bundle = client.get(f"/api/works/{w}/content", headers=headers).json()
+    ref = bundle["library"]["phases"][str(lib["번호"])]
+    assert ref["사용설정"] == ["개인서사공개"] and "규칙" not in ref
+    assert bundle["characters"][0]["서사_부분수"] == 2 and "서사" not in bundle["characters"][0]

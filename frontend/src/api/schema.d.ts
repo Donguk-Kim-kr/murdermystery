@@ -348,6 +348,43 @@ export interface paths {
         patch: operations["update_item_api_library__kind___item_id__patch"];
         trace?: never;
     };
+    "/api/scripts/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Script */
+        post: operations["check_script_api_scripts_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scripts/reference": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Script Reference
+         * @description 스크립트에서 부를 수 있는 이름들(편집기의 도움말용).
+         */
+        get: operations["script_reference_api_scripts_reference_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/works/{work_id}/confirm/check": {
         parameters: {
             query?: never;
@@ -1219,6 +1256,31 @@ export interface components {
             "\uCD5C\uC18C\uC778\uC6D0": number;
             /** 최대인원 */
             "\uCD5C\uB300\uC778\uC6D0": number;
+        };
+        /** ScriptCheckIn */
+        ScriptCheckIn: {
+            /** 스크립트 */
+            "\uC2A4\uD06C\uB9BD\uD2B8": string;
+        };
+        /** ScriptCheckOut */
+        ScriptCheckOut: {
+            /** 정상 */
+            "\uC815\uC0C1": boolean;
+            /** 오류 */
+            "\uC624\uB958": string | null;
+            /** 줄 */
+            "\uC904": number | null;
+            /** 함수 */
+            "\uD568\uC218": string[];
+        };
+        /** ScriptReferenceOut */
+        ScriptReferenceOut: {
+            /** 함수 */
+            "\uD568\uC218": string[];
+            /** 상수 */
+            "\uC0C1\uC218": string[];
+            /** 기본 함수 */
+            "\uAE30\uBCF8_\uD568\uC218": string[];
         };
         /** SignupIn */
         SignupIn: {
@@ -2357,6 +2419,72 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_script_api_scripts_check_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScriptCheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    script_reference_api_scripts_reference_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScriptReferenceOut"];
                 };
             };
             /** @description Validation Error */

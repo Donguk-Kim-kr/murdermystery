@@ -21,6 +21,7 @@ type Call = (method: string, path: string, body?: unknown) => Promise<boolean>;
 
 /** 칸에 놓은 카드·기믹의 세부 설정(`설정`)에서 다음 페이즈에도 탭을 남길지를 가리키는 키. 이름은 임시이며 엔진 설계에서 확정한다. */
 const KEEP_TAB = "내용유지";
+const STORY_PICKS = "개인서사공개";
 
 /**
  * 게임 흐름 화면: 맨 위에 페이즈 카드가 왼쪽에서 오른쪽으로 놓이고, 아래에 진행카드(불러온 진행단계·기믹)가 있다.
@@ -507,7 +508,8 @@ function PhaseEditor({ ws, phase, index, total, call, onNavigate, onClose }: {
         </button>
       </div>
       <AttachedCards key={`step:${no}`} title="진행단계" empty="붙은 진행단계가 없습니다. 아래 진행카드를 이 페이즈에 끌어다 놓으세요." rows={steps}
-        lib={ws.bundle.library.phases} libCol="진행단계_번호" resource="phase-steps" call={call} />
+        lib={ws.bundle.library.phases} libCol="진행단계_번호" resource="phase-steps" call={call}
+        characters={(ws.bundle.characters as Row[] | undefined) ?? []} />
       {uses.length > 0 && (
         <AttachedCards key={`gimmick:${no}`} title="기믹" empty="" rows={uses} lib={ws.bundle.library.gimmicks} libCol="기믹_번호" resource="gimmick-uses"
           call={call} />
@@ -517,8 +519,9 @@ function PhaseEditor({ ws, phase, index, total, call, onNavigate, onClose }: {
 }
 
 /** 페이즈에 붙은 진행단계(또는 기믹) 목록. 하나를 골라야 그 카드의 수정 항목과 삭제 버튼이 나타난다(다시 누르면 접힌다). */
-function AttachedCards({ title, empty, rows, lib, libCol, resource, call }: {
+function AttachedCards({ title, empty, rows, lib, libCol, resource, call, characters = [] }: {
   title: string; empty: string; rows: Row[]; lib: Record<string, LibraryRef>; libCol: string; resource: string; call: Call;
+  characters?: Row[];
 }) {
   const [selected, setSelected] = useState<number | null>(null);
   const isCard = resource === "phase-steps";
@@ -561,7 +564,7 @@ function AttachedCards({ title, empty, rows, lib, libCol, resource, call }: {
             </button>
           </div>
           <SettingsEditor key={`${selected}:${JSON.stringify(current.설정 ?? null)}`} resource={resource} id={current[idCol] as number}
-            value={current.설정} showTab={isCard} call={call} />
+            value={current.설정} showTab={isCard} call={call} characters={characters} settingKeys={ref?.사용설정 ?? []} />
         </div>
       )}
     </div>
@@ -575,13 +578,17 @@ const asObject = (v: unknown): Record<string, unknown> =>
  * 카드·기믹을 이 페이즈에 놓을 때만 적용하는 세부 설정. 비우면 정의의 기본값을 쓴다.
  * 카드에는 "내용 유지"(이 페이즈가 끝나도 내용을 남겨 계속 볼 수 있게 함)를 따로 보여 준다(기본: 남김). 상세 설명 글은 아직 두지 않는다. 나머지는 JSON 으로 직접 쓴다(내부 구조는 엔진 설계에서 정함).
  */
-function SettingsEditor({ resource, id, value, showTab, call }: {
-  resource: string; id: number; value: unknown; showTab: boolean; call: Call;
+function SettingsEditor({ resource, id, value, showTab, call, characters, settingKeys }: {
+  resource: string; id: number; value: unknown; showTab: boolean; call: Call; characters: Row[]; settingKeys: string[];
 }) {
   const current = asObject(value);
-  const { [KEEP_TAB]: keepRaw, ...rest } = current;
+  const showPicks = settingKeys.includes(STORY_PICKS);
+  const { [KEEP_TAB]: keepRaw, [STORY_PICKS]: picksRaw, ...restAll } = current;
+  // 개인 서사 공개를 전용 입력으로 다룰 때만 JSON 칸에서 뺀다(스크립트가 쓰지 않는 카드에서는 값을 그대로 둔다).
+  const rest = showPicks ? restAll : { ...restAll, ...(picksRaw === undefined ? {} : { [STORY_PICKS]: picksRaw }) };
   const [keepTab, setKeepTab] = useState(keepRaw !== false);
   const [text, setText] = useState(Object.keys(rest).length ? JSON.stringify(rest, null, 2) : "");
+  const [picked, setPicked] = useState<Record<string, number[]>>(() => storyPicks(picksRaw));
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
@@ -596,7 +603,12 @@ function SettingsEditor({ resource, id, value, showTab, call }: {
         return;
       }
     }
-    const next = showTab && !keepTab ? { ...extra, [KEEP_TAB]: false } : extra;
+    // 기본(서사 1)과 같은 선택은 따로 저장하지 않는다.
+    const changed = Object.fromEntries(
+      Object.entries(picked).filter(([, nums]) => !(nums.length === 1 && nums[0] === 1)),
+    );
+    let next: Record<string, unknown> = showPicks && Object.keys(changed).length ? { ...extra, [STORY_PICKS]: changed } : extra;
+    if (showTab && !keepTab) next = { ...next, [KEEP_TAB]: false };
     setError(null);
     await call("PATCH", `${resource}/${id}`, { 설정: Object.keys(next).length ? next : null });
   }
@@ -609,6 +621,7 @@ function SettingsEditor({ resource, id, value, showTab, call }: {
           내용 유지
         </label>
       )}
+      {showPicks && <StoryPicks characters={characters} picked={picked} onChange={setPicked} />}
       <label>
         그 밖의 세부 설정 (JSON)
         <textarea rows={4} value={text} placeholder="비우면 정의의 기본값을 씁니다" onChange={(e) => setText(e.target.value)} />
@@ -618,5 +631,61 @@ function SettingsEditor({ resource, id, value, showTab, call }: {
         <button type="button" className="small" onClick={() => void save()}>설정 저장</button>
       </div>
     </div>
+  );
+}
+
+/** 저장된 `개인서사공개`({"인물 순서": [서사 번호, …]})를 읽는다. 모양이 다른 값은 건너뛴다. */
+function storyPicks(raw: unknown): Record<string, number[]> {
+  const out: Record<string, number[]> = {};
+  for (const [key, nums] of Object.entries(asObject(raw))) {
+    if (Array.isArray(nums)) out[key] = nums.filter((n): n is number => Number.isInteger(n) && n >= 1).sort((a, b) => a - b);
+  }
+  return out;
+}
+
+/** 프로필 숙지 카드: 인물마다 이 카드가 보여 줄 서사를 고른다(여러 개 가능, 기본은 서사 1). */
+function StoryPicks({ characters, picked, onChange }: {
+  characters: Row[]; picked: Record<string, number[]>; onChange: (next: Record<string, number[]>) => void;
+}) {
+  const players = characters.filter((c) => c.NPC !== true);
+  return (
+    <fieldset className="story-picks">
+      <legend>개인 서사 공개</legend>
+      <p className="muted">이 카드가 인물마다 보여 줄 서사를 고릅니다. 고르지 않으면 서사 1을 보여 줍니다.</p>
+      {players.length === 0 && <p className="muted">플레이할 수 있는 인물이 없습니다.</p>}
+      {players.map((c) => {
+        const key = String(c.순서);
+        const total = Number(c.서사_부분수 ?? 0);
+        const chosen = picked[key] ?? [1];
+        const slots = Array.from({ length: Math.max(total, 1) }, (_, i) => i + 1);
+        const missing = chosen.filter((n) => n > total);
+        return (
+          <div key={key} className="story-pick" role="group" aria-label={`${String(c.이름)}의 개인 서사 공개`}>
+            <strong>{String(c.이름)}</strong>
+            {total === 0 ? (
+              <span className="muted">서사가 없습니다</span>
+            ) : (
+              slots.map((n) => (
+                <label key={n} className="check">
+                  <input
+                    type="checkbox"
+                    checked={chosen.includes(n)}
+                    onChange={(e) =>
+                      onChange({ ...picked, [key]: (e.target.checked ? [...chosen, n] : chosen.filter((m) => m !== n)).sort((a, b) => a - b) })
+                    }
+                  />
+                  서사 {n}
+                </label>
+              ))
+            )}
+            {missing.length > 0 && total > 0 && (
+              <span role="status" className="error">
+                {missing.map((n) => `서사 ${n}`).join(", ")}은(는) 없습니다(서사 {total}개)
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </fieldset>
   );
 }

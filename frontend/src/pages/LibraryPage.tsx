@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { errorMessage, http } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { ScriptEditor } from "./ScriptEditor";
 
 interface Item {
   번호: number;
@@ -49,6 +50,8 @@ function KindSection({ kind }: { kind: (typeof KINDS)[number] }) {
   const [draft, setDraft] = useState<{ 이름: string; 설명: string; 변경내역: string; 공통: boolean; [c: string]: string | boolean }>(
     blank(kind),
   );
+  // 진행단계만 스크립트 입력칸이 있다. 검사가 끝나 오류가 없을 때만 만들 수 있다.
+  const [scriptOk, setScriptOk] = useState(true);
   const [renaming, setRenaming] = useState<{ id: number; name: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -87,14 +90,30 @@ function KindSection({ kind }: { kind: (typeof KINDS)[number] }) {
       setError("JSON 형식이 올바르지 않습니다. 예: {}");
       return;
     }
+    if (kind.key === "phases") {
+      const script = String(draft.스크립트 ?? "");
+      if (script.trim() !== "") {
+        if (typeof body.규칙 !== "object" || body.규칙 === null || Array.isArray(body.규칙)) {
+          setError("규칙은 JSON 객체여야 스크립트와 함께 저장할 수 있습니다. 예: {}");
+          return;
+        }
+        body.규칙 = { ...(body.규칙 as object), 스크립트: script };
+      }
+    }
     if (await act("POST", `/api/library/${kind.key}`, body)) setDraft(blank(kind));
   }
 
-  const newVersionFrom = (i: Item) =>
-    setDraft({
-      이름: i.이름, 설명: i.설명 ?? "", 변경내역: "", 공통: i.공통,
-      ...Object.fromEntries(kind.content.map((c) => [c, JSON.stringify(i[c])])),
-    });
+  const newVersionFrom = (i: Item) => {
+    const values = Object.fromEntries(kind.content.map((c) => [c, JSON.stringify(i[c])]));
+    let script = "";
+    if (kind.key === "phases" && typeof i.규칙 === "object" && i.규칙 !== null && !Array.isArray(i.규칙)) {
+      // 스크립트는 따로 입력칸에서 고치고, 규칙(JSON)에는 나머지만 남긴다.
+      const { 스크립트, ...rest } = i.규칙 as Record<string, unknown>;
+      script = typeof 스크립트 === "string" ? 스크립트 : "";
+      values.규칙 = JSON.stringify(rest);
+    }
+    setDraft({ 이름: i.이름, 설명: i.설명 ?? "", 변경내역: "", 공통: i.공통, ...values, 스크립트: script });
+  };
 
   return (
     <section className="card" aria-label={kind.label}>
@@ -143,7 +162,8 @@ function KindSection({ kind }: { kind: (typeof KINDS)[number] }) {
                       {v.변경내역 && <span className="muted">변경: {v.변경내역}</span>}
                       <details>
                         <summary>내용 보기</summary>
-                        {kind.content.map((c) => <pre key={c}>{c}: {JSON.stringify(v[c], null, 1)}</pre>)}
+                        {kind.content.map((c) => <pre key={c}>{c}: {JSON.stringify(c === "규칙" ? withoutScript(v[c]) : v[c], null, 1)}</pre>)}
+                        {kind.key === "phases" && scriptOf(v) && <pre aria-label="스크립트">{scriptOf(v)}</pre>}
                       </details>
                     </span>
                     {mayChange && !v.삭제일시 && (
@@ -182,13 +202,16 @@ function KindSection({ kind }: { kind: (typeof KINDS)[number] }) {
             </label>
           ))}
         </div>
+        {kind.key === "phases" && (
+          <ScriptEditor value={String(draft.스크립트 ?? "")} onChange={(v) => setDraft({ ...draft, 스크립트: v })} onValid={setScriptOk} />
+        )}
         {operator && (
           <label className="check">
             <input type="checkbox" checked={draft.공통} onChange={(e) => setDraft({ ...draft, 공통: e.target.checked })} />
             공통 항목으로 만들기 (모든 제작자에게 보입니다)
           </label>
         )}
-        <div className="row start"><button type="submit">만들기</button></div>
+        <div className="row start"><button type="submit" disabled={kind.key === "phases" && !scriptOk}>만들기</button></div>
       </form>
       {error && <p role="alert" className="error">{error}</p>}
     </section>
@@ -196,5 +219,18 @@ function KindSection({ kind }: { kind: (typeof KINDS)[number] }) {
 }
 
 function blank(kind: (typeof KINDS)[number]) {
-  return { 이름: "", 설명: "", 변경내역: "", 공통: false, ...Object.fromEntries(kind.content.map((c) => [c, "{}"])) };
+  return { 이름: "", 설명: "", 변경내역: "", 공통: false, 스크립트: "", ...Object.fromEntries(kind.content.map((c) => [c, "{}"])) };
+}
+
+function scriptOf(item: Item): string {
+  const rule = item.규칙;
+  return typeof rule === "object" && rule !== null && typeof (rule as { 스크립트?: unknown }).스크립트 === "string"
+    ? (rule as { 스크립트: string }).스크립트
+    : "";
+}
+
+function withoutScript(rule: unknown): unknown {
+  if (typeof rule !== "object" || rule === null || Array.isArray(rule)) return rule;
+  const { 스크립트: _script, ...rest } = rule as Record<string, unknown>;
+  return rest;
 }

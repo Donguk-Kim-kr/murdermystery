@@ -617,6 +617,50 @@ describe("진행 탭", () => {
       expect(await sent("PATCH /api/works/7/content/phase-steps/10")[0].req.json()).toEqual({ 설정: null });
     });
 
+    it("스크립트가 개인 서사 공개를 쓰는 카드는 인물마다 보여 줄 서사를 고르고, 기본(서사 1)이면 저장하지 않는다", async () => {
+      routes["PATCH /api/works/7/content/phase-steps/9"] = () => json({});
+      twoPhases();
+      (bundle.library as { phases: Record<string, object> }).phases[5] = { 번호: 5, 이름: "프로필 숙지", 버전: 1, 설명: "d", 삭제됨: false, 사용설정: ["개인서사공개"] };
+      bundle.characters = [
+        { 순서: 1, 이름: "의사", 직업: null, NPC: false, 범인: false, 서사_부분수: 2 },
+        { 순서: 2, 이름: "집사", 직업: null, NPC: false, 범인: false, 서사_부분수: 1 },
+        { 순서: 3, 이름: "피해자", 직업: null, NPC: true, 범인: false, 서사_부분수: 1 },
+      ];
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));
+      await pickCard("1차 조사");
+      const card = within(editor().getByRole("group", { name: "1차 조사 수정" }));
+      expect(card.queryByRole("group", { name: "피해자의 개인 서사 공개" })).not.toBeInTheDocument();   // NPC 는 고르지 않는다
+      const doctor = within(card.getByRole("group", { name: "의사의 개인 서사 공개" }));
+      expect(doctor.getByLabelText("서사 1")).toBeChecked();
+      expect(doctor.getByLabelText("서사 2")).not.toBeChecked();
+      await userEvent.click(doctor.getByLabelText("서사 2"));
+      await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: { 개인서사공개: { 1: [1, 2] } } });
+    });
+
+    it("개인 서사 공개를 쓰지 않는 카드에는 서사 선택이 없고, 없는 서사를 고른 설정은 경고한다", async () => {
+      twoPhases();
+      (bundle.library as { phases: Record<string, object> }).phases[5] = { 번호: 5, 이름: "프로필 숙지", 버전: 1, 설명: "d", 삭제됨: false, 사용설정: ["개인서사공개"] };
+      bundle.characters = [{ 순서: 1, 이름: "의사", 직업: null, NPC: false, 범인: false, 서사_부분수: 1 }];
+      (bundle["phase-steps"] as { 설정: unknown }[])[0].설정 = { 개인서사공개: { 1: [1, 3] } };
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));
+      await pickCard("1차 조사");
+      const doctor = within(editor().getByRole("group", { name: "의사의 개인 서사 공개" }));
+      expect(doctor.getByRole("status")).toHaveTextContent("서사 3은(는) 없습니다(서사 1개)");
+    });
+
+    it("스크립트가 개인 서사 공개를 쓰지 않는 카드에는 서사 선택이 없다", async () => {
+      twoPhases();
+      bundle.characters = [{ 순서: 1, 이름: "의사", 직업: null, NPC: false, 범인: false, 서사_부분수: 2 }];
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));
+      await pickCard("1차 조사");
+      expect(editor().getByRole("group", { name: "1차 조사 수정" })).toBeInTheDocument();
+      expect(editor().queryByText("개인 서사 공개")).not.toBeInTheDocument();
+    });
+
     it("고른 진행단계를 삭제하면 확인 없이 바로 지우고 수정 항목이 사라진다(복사·떼기 버튼은 없다)", async () => {
       routes["DELETE /api/works/7/content/phase-steps/9"] = () => new Response(null, { status: 204 });
       renderApp("/works/7?tab=phases");
@@ -760,6 +804,7 @@ describe("라이브러리", () => {
   beforeEach(() => {
     routes["GET /api/library/phases"] = () => json([item({ 번호: 2, 버전: 2, 변경내역: "시간 연장" }), item({}), item({ 번호: 3, 이름: "토론", 공통: true })]);
     routes["GET /api/library/gimmicks"] = () => json([]);
+    routes["POST /api/scripts/check"] = () => json({ 정상: true, 오류: null, 줄: null, 함수: [] });
   });
 
   it("계열별로 묶어 버전과 변경내역을 보여 준다", async () => {
@@ -799,6 +844,39 @@ describe("라이브러리", () => {
     expect(await sent("POST /api/library/phases")[0].req.json()).toEqual({
       이름: "나만의 조사", 설명: "", 변경내역: "", 공통: false, 규칙: { 시간: 900 },
     });
+  });
+
+  it("스크립트를 입력하면 검사 결과를 보여 주고, 오류가 있으면 만들 수 없다", async () => {
+    routes["POST /api/library/phases"] = () => json(item({ 버전: 3 }), 201);
+    routes["POST /api/scripts/check"] = async (req) => {
+      const { 스크립트 } = (await req.json()) as { 스크립트: string };
+      return json(스크립트.includes("몰라") ? { 정상: false, 오류: "알 수 없는 이름 '몰라'", 줄: 2, 함수: [] } : { 정상: true, 오류: null, 줄: null, 함수: ["실행"] });
+    };
+    renderApp("/make/library");
+    const form = await screen.findByRole("form", { name: "진행단계 만들기" });
+    await userEvent.type(within(form).getByLabelText("이름"), "새 카드");
+    const editor = within(form).getByLabelText("스크립트");
+    await userEvent.click(editor);
+    await userEvent.paste("def 실행(카드):\n    몰라()");
+    expect(await within(form).findByText(/2번째 줄: 알 수 없는 이름/)).toBeInTheDocument();
+    expect(within(form).getByRole("button", { name: "만들기" })).toBeDisabled();
+    await userEvent.clear(editor);
+    await userEvent.click(editor);
+    await userEvent.paste("def 실행(카드):\n    pass");
+    expect(await within(form).findByText(/검사 통과 · 정의한 함수: 실행/)).toBeInTheDocument();
+    await waitFor(() => expect(within(form).getByRole("button", { name: "만들기" })).toBeEnabled());
+    await userEvent.click(within(form).getByRole("button", { name: "만들기" }));
+    await waitFor(() => expect(sent("POST /api/library/phases")).toHaveLength(1));
+    expect(await sent("POST /api/library/phases")[0].req.json()).toMatchObject({ 이름: "새 카드", 규칙: { 스크립트: "def 실행(카드):\n    pass" } });
+  });
+
+  it("스크립트가 있는 버전으로 새 버전을 만들면 스크립트가 입력칸으로 옮겨진다", async () => {
+    routes["GET /api/library/phases"] = () => json([item({ 규칙: { 스크립트: "def 실행(카드):\n    pass", 시간: 5 } })]);
+    renderApp("/make/library");
+    await userEvent.click(await screen.findByRole("button", { name: "이 버전으로 새 버전 만들기" }));
+    const form = screen.getByRole("form", { name: "진행단계 만들기" });
+    expect(within(form).getByLabelText("스크립트")).toHaveValue("def 실행(카드):\n    pass");
+    expect(within(form).getByLabelText("규칙 (JSON)")).toHaveValue('{"시간":5}');
   });
 
   it("운영자에게는 '공통 항목으로 만들기' 선택이 보인다", async () => {

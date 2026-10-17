@@ -117,7 +117,58 @@ def check_work(conn: Connection, work_id: int) -> dict:
             warnings.append(
                 f"페이즈 {row['phase']}에 연결된 {word} '{row['이름']}' v{row['버전']}은(는) 삭제되어 확정 내용에서 빠집니다."
             )
+    errors.extend(script_errors(conn, work_id))
+    warnings.extend(story_selection_warnings(conn, work_id))
     return {"errors": errors, "warnings": warnings, "다음버전": next_version(conn, work_id)}
+
+
+def story_selection_warnings(conn: Connection, work_id: int) -> list[str]:
+    """프로필 숙지 카드가 고른 서사 번호가 인물의 서사 수를 넘으면 알린다(서사를 지우거나 줄여 번호가 밀린 경우)."""
+    counts = {
+        r["순서"]: (r["이름"], len(narrative.split(r["서사"])))
+        for r in conn.execute('SELECT "순서", "이름", "서사" FROM "인물" WHERE "작품_번호" = %s', (work_id,)).fetchall()
+    }
+    found = []
+    rows = conn.execute(
+        'SELECT s."진행순서_순서" AS phase, l."이름" AS card, s."설정" FROM "진행구성" s JOIN "진행단계" l ON l."번호" = s."진행단계_번호" '
+        'WHERE s."작품_번호" = %s AND s."설정" IS NOT NULL ORDER BY s."진행순서_순서", s."번호"', (work_id,)
+    ).fetchall()
+    for row in rows:
+        picks = row["설정"].get("개인서사공개") if isinstance(row["설정"], dict) else None
+        if not isinstance(picks, dict):
+            continue
+        for key, numbers in picks.items():
+            if not (isinstance(key, str) and key.isdigit() and int(key) in counts and isinstance(numbers, list)):
+                continue
+            name, total = counts[int(key)]
+            missing = sorted(n for n in numbers if isinstance(n, int) and n > total)
+            if missing:
+                nums = ", ".join(f"서사 {n}" for n in missing)
+                found.append(f"페이즈 {row['phase']}의 '{row['card']}'이(가) 인물 '{name}'의 {nums}을(를) 보여 주도록 했지만 그 서사가 없습니다(서사는 {total}개).")
+    return found
+
+
+def script_errors(conn: Connection, work_id: int) -> list[str]:
+    """이 작품의 페이즈에 놓인 진행단계의 스크립트를 검사한다(문법, 허용되지 않은 코드, 없는 이름). 같은 진행단계는 한 번만 본다."""
+    from .cards import known_names
+    from .script import ScriptError, compile_source
+
+    rows = conn.execute(
+        'SELECT DISTINCT l."번호", l."이름", l."버전", l."규칙" FROM "진행구성" s JOIN "진행단계" l ON l."번호" = s."진행단계_번호" '
+        'WHERE s."작품_번호" = %s AND l."삭제일시" IS NULL ORDER BY l."번호"', (work_id,)
+    ).fetchall()
+    names = known_names()
+    found = []
+    for row in rows:
+        rule = row["규칙"]
+        source = rule.get("스크립트") if isinstance(rule, dict) else None
+        if not isinstance(source, str) or not source.strip():
+            continue
+        try:
+            compile_source(source, names)
+        except ScriptError as err:
+            found.append(f"진행단계 '{row['이름']}' v{row['버전']}의 스크립트에 오류가 있습니다: {err}")
+    return found
 
 
 def build_snapshot(conn: Connection, work_id: int) -> dict[str, Any]:

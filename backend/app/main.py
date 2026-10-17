@@ -12,6 +12,7 @@ from .confirm import router as confirm_router
 from .content import router as content_router, schema_router as content_schema_router
 from .db import Conn, create_pool
 from .library import router as library_router
+from .scripts import router as scripts_router
 from .phases import router as phases_router
 from .play import router as play_router
 from .publishing import router as publishing_router
@@ -96,6 +97,7 @@ app.include_router(content_router)
 app.include_router(phases_router)
 app.include_router(play_router)
 app.include_router(library_router)
+app.include_router(scripts_router)
 app.include_router(confirm_router)
 app.include_router(publishing_router)
 app.include_router(testers_router)

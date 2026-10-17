@@ -16,6 +16,7 @@ from fastapi import APIRouter, Body, HTTPException, status
 from psycopg import Connection, errors, sql
 from psycopg.types.json import Jsonb
 
+from . import narrative
 from .auth import CurrentUser
 from .db import Conn
 from .ordering import next_order
@@ -361,20 +362,31 @@ def phase_display_names(phases: list[dict], cards: list[dict]) -> dict[int, str 
     return out
 
 
+KNOWN_SETTINGS = ("개인서사공개", "내용유지")
+
+
+def used_settings(rule: Any) -> list[str]:
+    """진행단계 스크립트가 글자로 가리키는 알려진 카드 설정 이름. 스크립트를 실행하지 않고 글에서 찾는다."""
+    source = rule.get("스크립트") if isinstance(rule, dict) else None
+    return [key for key in KNOWN_SETTINGS if isinstance(source, str) and key in source]
+
+
 @router.get("")
 def content_bundle(work_id: int, conn: Conn, me: CurrentUser) -> dict:
     """작품의 모든 콘텐츠를 한 번에 돌려준다. 화면이 서로 가리키는 항목의 이름을 보여 주는 데 쓴다."""
     ensure_mine(conn, work_id, me.계정.번호)
     out: dict[str, Any] = {r.key: select_rows(conn, r, work_id) for r in RESOURCES}
     out["characters"] = conn.execute(
-        'SELECT "순서", "이름", "직업", "NPC", "범인" FROM "인물" WHERE "작품_번호" = %s ORDER BY "순서"', (work_id,)
+        'SELECT "순서", "이름", "직업", "NPC", "범인", "서사" FROM "인물" WHERE "작품_번호" = %s ORDER BY "순서"', (work_id,)
     ).fetchall()
+    for person in out["characters"]:
+        person["서사_부분수"] = len(narrative.split(person.pop("서사")))      # 프로필 숙지 설정 화면이 고를 번호를 알려면 개수가 필요하다
     # 이 작품이 연결한 라이브러리 항목의 이름·버전·삭제 여부 (삭제된 항목은 '삭제된 항목'으로 표시하려고)
     out["library"] = {
         "phases": {
             row["번호"]: row
             for row in conn.execute(
-                'SELECT "번호", "이름", "버전", "설명", "삭제일시" IS NOT NULL AS "삭제됨" FROM "진행단계" '
+                'SELECT "번호", "이름", "버전", "설명", "삭제일시" IS NOT NULL AS "삭제됨", "규칙" FROM "진행단계" '
                 'WHERE "번호" IN (SELECT "진행단계_번호" FROM "진행구성" WHERE "작품_번호" = %s)', (work_id,)
             ).fetchall()
         },
@@ -386,6 +398,9 @@ def content_bundle(work_id: int, conn: Conn, me: CurrentUser) -> dict:
             ).fetchall()
         },
     }
+    for row in out["library"]["phases"].values():
+        # 스크립트가 읽는 카드 설정의 이름. 설정 화면이 어떤 입력을 보여 줄지 정하는 데 쓴다.
+        row["사용설정"] = used_settings(row.pop("규칙"))
     names = {n: row["이름"] for n, row in out["library"]["phases"].items()}
     shown = card_display_names(out["phase-steps"], names)
     for card in out["phase-steps"]:
