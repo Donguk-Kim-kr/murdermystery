@@ -16,6 +16,8 @@ from .phases import router as phases_router
 from .play import router as play_router
 from .publishing import router as publishing_router
 from .roomstate import JoinLimiter, RoomRegistry
+from .engine import GameRegistry
+from .game import router as game_router
 from .rooms import expire_rooms, router as rooms_router
 from .static import mount_frontend
 from .testers import router as testers_router
@@ -27,6 +29,7 @@ def sweep_rooms(app: FastAPI) -> None:
     with app.state.pool.connection() as conn:
         for room_id in expire_rooms(conn):
             app.state.rooms.remove_room(room_id)
+            app.state.games.remove(room_id)
         open_ids = app.state.rooms.room_ids()
         if open_ids:
             alive = {
@@ -38,6 +41,7 @@ def sweep_rooms(app: FastAPI) -> None:
             for room_id in open_ids:
                 if room_id not in alive:
                     app.state.rooms.remove_room(room_id)
+                    app.state.games.remove(room_id)
 
 
 async def sweep_loop(app: FastAPI, interval: float) -> None:
@@ -56,6 +60,7 @@ async def lifespan(app: FastAPI):
     pool.open(wait=True, timeout=10)
     app.state.pool = pool
     app.state.rooms = RoomRegistry(settings.room_member_timeout_seconds)
+    app.state.games = GameRegistry()
     app.state.join_limiter = JoinLimiter(settings.room_join_fail_limit, settings.room_join_fail_window_seconds)
     sweeper = asyncio.create_task(sweep_loop(app, settings.room_sweep_seconds))
     try:
@@ -78,6 +83,7 @@ app.include_router(confirm_router)
 app.include_router(publishing_router)
 app.include_router(testers_router)
 app.include_router(rooms_router)
+app.include_router(game_router)
 
 
 @app.get("/api/health")

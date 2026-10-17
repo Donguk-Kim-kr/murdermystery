@@ -124,6 +124,7 @@ def expire_stale(request: Request) -> None:
         expired = expire_rooms(separate)
     for room_id in expired:
         registry(request).remove_room(room_id)
+        request.app.state.games.remove(room_id)
 
 
 def build_room_out(row: dict, room: WaitingRoom, me_id: int) -> RoomOut:

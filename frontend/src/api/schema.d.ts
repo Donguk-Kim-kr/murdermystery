@@ -586,6 +586,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/rooms/me/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Game
+         * @description 내 방의 게임을 시작한다. 방장만 할 수 있다.
+         */
+        post: operations["start_game_api_rooms_me_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -776,6 +796,13 @@ export interface components {
             /** 플레이 */
             "\uD50C\uB808\uC774": boolean;
         };
+        /** MemberRef */
+        MemberRef: {
+            /** 계정 번호 */
+            "\uACC4\uC815_\uBC88\uD638": number;
+            /** 닉네임 */
+            "\uB2C9\uB124\uC784": string;
+        };
         /** MoveBody */
         MoveBody: {
             /** Position */
@@ -885,6 +912,19 @@ export interface components {
             "\uD328\uC2A4\uC6CC\uB4DC": string;
             /** 닉네임 */
             "\uB2C9\uB124\uC784": string;
+        };
+        /** StartOut */
+        StartOut: {
+            /** 진행 번호 */
+            "\uC9C4\uD589_\uBC88\uD638": number;
+            /** 방 번호 */
+            "\uBC29_\uBC88\uD638": number;
+            /** 현재 페이즈 순서 */
+            "\uD604\uC7AC_\uD398\uC774\uC988_\uC21C\uC11C": number;
+            /** 플레이어 */
+            "\uD50C\uB808\uC774\uC5B4": components["schemas"]["MemberRef"][];
+            /** 관전자 */
+            "\uAD00\uC804\uC790": components["schemas"]["MemberRef"][];
         };
         /** TesterIn */
         TesterIn: {
@@ -2504,6 +2544,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_game_api_rooms_me_start_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartOut"];
+                };
             };
             /** @description Validation Error */
             422: {
