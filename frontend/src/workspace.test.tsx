@@ -273,7 +273,7 @@ describe("진행 탭", () => {
     (bundle.library as { phases: object }).phases = { 5: { 번호: 5, 이름: "조사", 버전: 2, 설명: "d", 삭제됨: false } };
     bundle["phase-steps"] = [
       { 번호: 9, 진행순서_순서: 1, 진행단계_번호: 5, 설정: null, 표시이름: "1차 조사" },
-      { 번호: 10, 진행순서_순서: 2, 진행단계_번호: 5, 설정: { 탭유지: false, 횟수: 3 }, 표시이름: "2차 조사" },
+      { 번호: 10, 진행순서_순서: 2, 진행단계_번호: 5, 설정: { 내용유지: false, 횟수: 3 }, 표시이름: "2차 조사" },
     ];
   };
   const editor = () => within(screen.getByRole("region", { name: "페이즈 편집" }));
@@ -604,7 +604,7 @@ describe("진행 탭", () => {
       expect(first.getByLabelText(/내용 유지/)).toBeChecked();
       await userEvent.click(first.getByLabelText(/내용 유지/));
       await userEvent.click(first.getByRole("button", { name: "설정 저장" }));
-      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: { 탭유지: false } });
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: { 내용유지: false } });
 
       await userEvent.click(tile(2));
       await pickCard("2차 조사");

@@ -34,7 +34,7 @@ def 진행조건(카드):
 
 PROFILE = '''
 def 실행(카드):
-    공개 = 카드.설정.get("공개", {})
+    공개 = 카드.설정.get("개인서사공개", {})
     for 플레이어 in 플레이어들():
         if 플레이어.인물 is None:
             continue
@@ -156,7 +156,7 @@ def test_story_tab_stays_by_default_and_can_be_dropped_by_setting(client, make_s
     assert advance(client, host).status_code == 200
     assert tab(state(client, others[0]).json(), "공통 스토리") is not None          # 내용 유지(기본)
 
-    host, others, _, _ = make_scripted_game([("프롤로그", PROLOGUE, {"탭유지": False}), ("빈", "", None)])
+    host, others, _, _ = make_scripted_game([("프롤로그", PROLOGUE, {"내용유지": False}), ("빈", "", None)])
     assert tab(state(client, host).json(), "공통 스토리") is not None             # 그 단계에서는 보인다
     assert advance(client, host).status_code == 200
     assert tab(state(client, host).json(), "공통 스토리") is None                 # 다음 단계에서는 사라진다
@@ -296,7 +296,7 @@ def test_profile_card_setting_chooses_parts_per_character(client, make_scripted_
     slots = [c["순서"] for c in game.characters]
     # 카드 설정을 바꾼 새 게임을 만들 수 없으므로, 실행 중 카드의 설정만 바꿔서 다음 단계를 시험한다.
     row = next(r for r in game.snapshot["진행구성"] if r["진행순서_순서"] == game.phases[1]["순서"])
-    row["설정"] = {"공개": {str(slots[0]): [1, 2], str(slots[1]): [2]}}
+    row["설정"] = {"개인서사공개": {str(slots[0]): [1, 2], str(slots[1]): [2]}}
     assert advance(client, host).status_code == 200
     texts = {}
     for who in people:

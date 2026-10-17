@@ -20,7 +20,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
 type Call = (method: string, path: string, body?: unknown) => Promise<boolean>;
 
 /** 칸에 놓은 카드·기믹의 세부 설정(`설정`)에서 다음 페이즈에도 탭을 남길지를 가리키는 키. 이름은 임시이며 엔진 설계에서 확정한다. */
-const KEEP_TAB = "탭유지";
+const KEEP_TAB = "내용유지";
 
 /**
  * 게임 흐름 화면: 맨 위에 페이즈 카드가 왼쪽에서 오른쪽으로 놓이고, 아래에 진행카드(불러온 진행단계·기믹)가 있다.

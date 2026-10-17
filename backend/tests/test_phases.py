@@ -41,8 +41,8 @@ def test_phase_name_and_settings_are_saved_and_optional(client, headers):
     card = library_phase(client, headers, "토론 카드")
     step = add(client, headers, w, "phase-steps", 진행순서_순서=1, 진행단계_번호=card)
     assert step["설정"] is None
-    res = client.patch(url(w, "phase-steps", step["번호"]), headers=headers, json={"설정": {"탭유지": False}})
-    assert res.status_code == 200 and res.json()["설정"] == {"탭유지": False}
+    res = client.patch(url(w, "phase-steps", step["번호"]), headers=headers, json={"설정": {"내용유지": False}})
+    assert res.status_code == 200 and res.json()["설정"] == {"내용유지": False}
     res = client.patch(url(w, "phase-steps", step["번호"]), headers=headers, json={"설정": None})
     assert res.json()["설정"] is None                      # 비우면 정의의 기본값을 쓴다
     assert client.patch(url(w, "phase-steps", step["번호"]), headers=headers, json={"설정": "문자"}).status_code == 422
@@ -160,7 +160,7 @@ def test_only_the_owner_can_reorder(client, new_user):
 
 def test_snapshot_carries_names_settings_and_display_names(client, headers, test_dbname):
     w, ids = setup(client, headers)
-    add(client, headers, w, "phase-steps", 진행순서_순서=3, 진행단계_번호=ids["A"], 설정={"탭유지": False})
+    add(client, headers, w, "phase-steps", 진행순서_순서=3, 진행단계_번호=ids["A"], 설정={"내용유지": False})
     client.post(f"/api/works/{w}/characters", headers=headers, json={"이름": "A"})
     res = client.post(f"/api/works/{w}/confirm", headers=headers, json={})
     assert res.status_code == 201, res.text
@@ -169,7 +169,7 @@ def test_snapshot_carries_names_settings_and_display_names(client, headers, test
     assert [p["이름"] for p in snap["진행순서"]] == ["도입", "조사", "결말"]
     cards = {(c["진행순서_순서"], c["진행단계_번호"]): c for c in snap["진행구성"]}
     assert cards[(1, ids["A"])]["표시이름"] == "1차 카드A" and cards[(3, ids["A"])]["표시이름"] == "2차 카드A"
-    assert cards[(3, ids["A"])]["설정"] == {"탭유지": False} and cards[(2, ids["B"])]["표시이름"] == "카드B"
+    assert cards[(3, ids["A"])]["설정"] == {"내용유지": False} and cards[(2, ids["B"])]["표시이름"] == "카드B"
 
 
 def bundle(client, headers, w):

@@ -209,7 +209,7 @@ class CardHost:
         self.game.tab_counter += 1
         self.game.tabs.setdefault(key, {})[str(name)] = {
             "내용": dict(block), "카드": self.run.key, "위치": self.game.phase_index,
-            "유지": bool(self.run.settings.get("탭유지", True)), "순번": self.game.tab_counter,
+            "유지": bool(self.run.settings.get("내용유지", True)), "순번": self.game.tab_counter,
         }
 
     def m_알림(self, ref: Ref, text: Any) -> None:
