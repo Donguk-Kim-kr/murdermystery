@@ -672,3 +672,222 @@ def test_open_connection_counts_as_present_and_closed_one_does_not(client, make_
         assert game.away(others[0].number)
 
     run(scenario())
+
+
+# ---- 재접속 (1-7) -----------------------------------------------------------------------------
+
+def relogin(client, who):
+    """같은 계정으로 새로 로그인한다(브라우저를 껐다 켠 것처럼 새 토큰을 쓴다)."""
+    token = client.post("/api/auth/login", json={"아이디": who.login_id, "패스워드": "password123", "접속환경": "PC"}).json()["토큰"]
+    return type(who)({"Authorization": f"Bearer {token}"}, who.number, who.login_id)
+
+
+def test_reconnect_with_new_login_restores_same_state(client, make_account, make_game_work, clock):
+    host, others, _, _ = started(client, make_account, make_game_work)
+    slot = slots(client, host)[1]
+    confirm_pick(client, others[0], slot)
+    advance(client, host)
+    clock["now"] += 123
+    pause(client, host, True)
+    before = state(client, others[0]).json()
+    again = relogin(client, others[0])
+    after = state(client, again).json()
+    assert after == before                                              # 같은 상태 그대로
+    assert after["나"]["인물_순서"] == slot and after["페이즈"]["위치"] == 2 and after["시간"]["일시정지"] is True
+
+
+def test_returning_player_is_present_again(client, make_account, make_game_work, clock):
+    host, others, room, _ = started(client, make_account, make_game_work)
+    game = client.app.state.games.get(room["번호"])
+    clock["now"] += 500
+    assert game.away(others[0].number)
+    state(client, relogin(client, others[0]))
+    assert not game.away(others[0].number)
+
+
+def test_events_after_missed_changes_start_at_latest_version(client, make_account, make_game_work):
+    host, others, _, _ = started(client, make_account, make_game_work)
+    slot = slots(client, host)[0]
+
+    async def scenario():
+        conn = await SseConnection(client.app, others[0].headers).open()
+        assert await conn.event() == ("version", {"상태_버전": 1})
+        await conn.close()                                              # 화면이 꺼져 연결이 끊겼다
+        await asyncio.to_thread(confirm_pick, client, host, slot)       # 그동안 두 번 바뀌었다
+        await asyncio.to_thread(advance, client, host)
+        conn = await SseConnection(client.app, others[0].headers).open()   # 다시 연결
+        try:
+            assert await conn.event() == ("version", {"상태_버전": 3})   # 놓친 변화 없이 최신 버전부터
+            assert state(client, others[0]).json()["상태_버전"] == 3
+        finally:
+            await conn.close()
+
+    run(scenario())
+
+
+def test_state_version_only_increases(client, make_account, make_game_work):
+    host, others, _, _ = started(client, make_account, make_game_work)
+    seen = [state(client, host).json()["상태_버전"]]
+    for slot, who in zip(slots(client, host), [host, *others]):
+        confirm_pick(client, who, slot)
+        seen.append(state(client, host).json()["상태_버전"])
+    advance(client, host)
+    seen.append(state(client, host).json()["상태_버전"])
+    assert seen == sorted(seen) and len(set(seen)) == len(seen)
+
+
+def test_failed_actions_do_not_change_version(client, make_account, make_game_work):
+    host, others, _, _ = started(client, make_account, make_game_work)
+    v = state(client, host).json()["상태_버전"]
+    assert confirm_pick(client, others[0], 99999).status_code == 422
+    assert advance(client, others[0]).status_code == 403
+    assert client.post("/api/game/me/authority", headers=others[0].headers, json={"계정_번호": host.number}).status_code == 403
+    assert state(client, host).json()["상태_버전"] == v
+
+
+# ---- 게임 종료와 방 종료 (1-8) ------------------------------------------------------------------
+
+def end_now(client, room_id):
+    from app.engine import end_game
+
+    game = client.app.state.games.get(room_id)
+    with client.app.state.pool.connection() as conn:
+        end_game(game, lambda: conn.execute('UPDATE "진행" SET "상태" = \'종료\' WHERE "번호" = %s', (game.id,)))
+
+
+def room_state(db, room_id):
+    return db.execute('SELECT "상태" FROM "방" WHERE "번호" = %s', (room_id,)).fetchone()[0]
+
+
+def test_end_game_marks_progress_ended_and_changes_state(client, make_account, make_game_work, db):
+    host, _, room, _ = started(client, make_account, make_game_work)
+    v = state(client, host).json()["상태_버전"]
+    assert state(client, host).json()["종료"] is False
+    end_now(client, room["번호"])
+    after = state(client, host).json()
+    assert after["종료"] is True and after["상태_버전"] == v + 1
+    end_now(client, room["번호"])                                         # 두 번 불러도 한 번만 바뀐다
+    assert state(client, host).json()["상태_버전"] == v + 1
+    prog = db.execute('SELECT "상태", "종료일시" FROM "진행" WHERE "방_번호" = %s', (room["번호"],)).fetchone()
+    assert prog[0] == "종료" and prog[1] is not None
+    assert room_state(db, room["번호"]) == "진행"                          # 방은 바로 닫히지 않는다
+
+
+def test_actions_are_rejected_after_game_ends(client, make_account, make_game_work):
+    host, others, room, _ = started(client, make_account, make_game_work)
+    end_now(client, room["번호"])
+    assert advance(client, host).status_code == 409
+    assert confirm_pick(client, others[0], slots(client, host)[0]).status_code == 409
+
+
+def test_room_closes_six_hours_after_game_ends(client, make_account, make_game_work, db):
+    from app.main import sweep_rooms
+
+    host, _, room, _ = started(client, make_account, make_game_work)
+    end_now(client, room["번호"])
+    sweep_rooms(client.app)
+    assert room_state(db, room["번호"]) == "진행"                          # 방금 끝났다
+    db.execute('UPDATE "진행" SET "종료일시" = CURRENT_TIMESTAMP - interval \'5 hours\' WHERE "방_번호" = %s', (room["번호"],))
+    sweep_rooms(client.app)
+    assert room_state(db, room["번호"]) == "진행"                          # 5시간: 아직
+    db.execute('UPDATE "진행" SET "종료일시" = CURRENT_TIMESTAMP - interval \'7 hours\' WHERE "방_번호" = %s', (room["번호"],))
+    sweep_rooms(client.app)
+    assert room_state(db, room["번호"]) == "종료"                          # 6시간 지났다
+    assert client.app.state.games.get(room["번호"]) is None                # 메모리의 게임도 정리된다
+    assert state(client, host).status_code == 404
+
+
+def test_unfinished_game_room_has_twelve_hour_cap(client, make_account, make_game_work, db):
+    from app.main import sweep_rooms
+
+    host, _, room, _ = started(client, make_account, make_game_work)
+    db.execute('UPDATE "방" SET "상태변경일시" = CURRENT_TIMESTAMP - interval \'11 hours\' WHERE "번호" = %s', (room["번호"],))
+    sweep_rooms(client.app)
+    assert room_state(db, room["번호"]) == "진행"
+    db.execute('UPDATE "방" SET "상태변경일시" = CURRENT_TIMESTAMP - interval \'13 hours\' WHERE "번호" = %s', (room["번호"],))
+    sweep_rooms(client.app)
+    assert room_state(db, room["번호"]) == "종료"
+
+
+# ---- 시간이 끝난 뒤 자동 진행 (1-4b) ---------------------------------------------------------------
+
+def set_auto(client, who, value):
+    return client.post("/api/game/me/settings", headers=who.headers, json={"자동_진행": value})
+
+
+def tick(client):
+    from app.main import tick_games
+
+    tick_games(client.app)
+
+
+def test_auto_advance_is_off_by_default(client, make_account, make_game_work, clock):
+    host, _, _, _ = started(client, make_account, make_game_work)
+    assert state(client, host).json()["설정"] == {"자동_진행": False}
+    clock["now"] += 99999
+    tick(client)
+    assert state(client, host).json()["페이즈"]["위치"] == 1            # 시간이 지나도 방장이 넘기기 전에는 넘어가지 않는다
+
+
+def test_only_host_can_change_auto_advance(client, make_account, make_game_work):
+    host, others, _, _ = started(client, make_account, make_game_work)
+    assert set_auto(client, others[0], True).status_code == 403
+    res = set_auto(client, host, True)
+    assert res.status_code == 200 and res.json()["설정"] == {"자동_진행": True}
+
+
+def test_auto_advance_moves_on_when_time_is_up(client, make_account, make_game_work, clock, db):
+    host, _, room, wid = started(client, make_account, make_game_work)
+    set_auto(client, host, True)
+    v = state(client, host).json()["상태_버전"]
+    clock["now"] += 1799
+    tick(client)
+    assert state(client, host).json()["페이즈"]["위치"] == 1            # 아직 1초 남았다
+    clock["now"] += 2
+    tick(client)
+    after = state(client, host).json()
+    assert after["페이즈"]["위치"] == 2 and after["시간"]["남은_초"] == 1800 and after["상태_버전"] == v + 1
+    saved = db.execute('SELECT "진행순서_순서" FROM "진행" WHERE "방_번호" = %s', (room["번호"],)).fetchone()[0]
+    assert saved == [r[0] for r in db.execute('SELECT "순서" FROM "진행순서" WHERE "작품_번호" = %s ORDER BY "순서"', (wid,)).fetchall()][1]
+
+
+def test_auto_advance_waits_while_paused(client, make_account, make_game_work, clock):
+    host, _, _, _ = started(client, make_account, make_game_work)
+    set_auto(client, host, True)
+    clock["now"] += 1700
+    pause(client, host, True)
+    clock["now"] += 99999
+    tick(client)
+    assert state(client, host).json()["페이즈"]["위치"] == 1
+    pause(client, host, False)
+    clock["now"] += 101
+    tick(client)
+    assert state(client, host).json()["페이즈"]["위치"] == 2
+
+
+def test_auto_advance_respects_card_condition_and_last_phase(client, make_account, make_game_work, clock):
+    host, others, room, _ = started(client, make_account, make_game_work, phases=2)
+    game = client.app.state.games.get(room["번호"])
+    game.advance_conditions.append(
+        lambda g: "캐릭터 선택이 완료되지 않았습니다." if any(p.character is None for p in g.players.values()) else None
+    )
+    set_auto(client, host, True)
+    clock["now"] += 2000
+    tick(client)
+    assert state(client, host).json()["페이즈"]["위치"] == 1            # 조건이 맞지 않으면 계속 기다린다
+    for who, slot in zip([host, *others], slots(client, host)):
+        confirm_pick(client, who, slot)
+    tick(client)
+    assert state(client, host).json()["페이즈"]["위치"] == 2            # 조건이 맞으면 넘어간다
+    clock["now"] += 2000
+    tick(client)
+    assert state(client, host).json()["페이즈"]["위치"] == 2            # 마지막 단계에서는 넘어가지 않는다
+
+
+def test_auto_advance_ignores_unlimited_phase_and_ended_game(client, make_account, make_game_work, clock):
+    host, _, room, _ = started(client, make_account, make_game_work)
+    set_auto(client, host, True)
+    end_now(client, room["번호"])
+    clock["now"] += 99999
+    tick(client)
+    assert state(client, host).json()["페이즈"]["위치"] == 1            # 끝난 게임은 넘기지 않는다

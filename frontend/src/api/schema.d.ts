@@ -729,6 +729,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/game/me/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change Settings
+         * @description 시간이 끝나면 저절로 다음 단계로 넘어갈지 고른다(방장만). 기본은 방장이 넘기기 전에는 넘어가지 않는 것이다.
+         */
+        post: operations["change_settings_api_game_me_settings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -841,6 +861,9 @@ export interface components {
         GameStateOut: {
             /** 상태 버전 */
             "\uC0C1\uD0DC_\uBC84\uC804": number;
+            /** 종료 */
+            "\uC885\uB8CC": boolean;
+            "\uC124\uC815": components["schemas"]["SettingsOut"];
             "\uB098": components["schemas"]["MeOut"];
             "\uAD8C\uD55C": components["schemas"]["AuthorityOut"];
             "\uC2DC\uAC04": components["schemas"]["TimeOut"];
@@ -1067,6 +1090,16 @@ export interface components {
             "\uCD5C\uC18C\uC778\uC6D0": number;
             /** 최대인원 */
             "\uCD5C\uB300\uC778\uC6D0": number;
+        };
+        /** SettingsIn */
+        SettingsIn: {
+            /** 자동 진행 */
+            "\uC790\uB3D9_\uC9C4\uD589": boolean;
+        };
+        /** SettingsOut */
+        SettingsOut: {
+            /** 자동 진행 */
+            "\uC790\uB3D9_\uC9C4\uD589": boolean;
         };
         /** SignupIn */
         SignupIn: {
@@ -3005,6 +3038,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_settings_api_game_me_settings_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameStateOut"];
                 };
             };
             /** @description Validation Error */

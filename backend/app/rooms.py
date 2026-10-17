@@ -103,12 +103,15 @@ ROOM_SELECT = (
 
 
 def expire_rooms(conn: Connection) -> list[int]:
-    """오래된 방을 종료한다 (B25: 대기 6시간, 진행 12시간). 종료일시는 DB 트리거가 기록한다."""
+    """오래된 방을 종료한다 (B25: 대기 6시간, 진행 12시간 상한. 게임이 끝났으면 그로부터 6시간 뒤). 종료일시는 DB 트리거가 기록한다."""
     rows = conn.execute(
         """
         UPDATE "방" SET "상태" = '종료'
         WHERE ("상태" = '대기' AND "상태변경일시" < CURRENT_TIMESTAMP - interval '6 hours')
            OR ("상태" = '진행' AND "상태변경일시" < CURRENT_TIMESTAMP - interval '12 hours')
+           OR ("상태" = '진행' AND EXISTS (
+                SELECT 1 FROM "진행" g
+                WHERE g."방_번호" = "방"."번호" AND g."상태" = '종료' AND g."종료일시" < CURRENT_TIMESTAMP - interval '6 hours'))
         RETURNING "번호"
         """
     ).fetchall()

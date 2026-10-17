@@ -42,6 +42,8 @@ class Game:
     away_seconds: float = 45.0
     last_seen: dict[int, float] = field(default_factory=dict)   # 계정 → 마지막으로 상태를 확인한 시각
     phase_index: int = 0             # 흐름 안의 위치(0부터)
+    auto_advance: bool = False       # 시간이 끝나면 저절로 다음 단계로 넘어갈지(방장이 고른다). 기본은 방장이 넘기기 전에는 넘어가지 않는다
+    ended: bool = False              # 게임 종료(전체 공개 단계가 시작된 뒤). 방은 이로부터 6시간 뒤에 종료된다
     state_version: int = 1           # 상태가 바뀔 때마다 올라간다(화면이 오래된 응답을 거르는 데 쓴다)
     lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
     clock: Callable[[], float] = time.time
@@ -174,6 +176,10 @@ class GameRegistry:
                     return game
             return None
 
+    def all(self) -> list[Game]:
+        with self._lock:
+            return list(self._games.values())
+
     def remove(self, room_id: int) -> None:
         with self._lock:
             self._games.pop(room_id, None)
@@ -202,6 +208,8 @@ def view_for(game: Game, account_id: int) -> dict[str, Any]:
                 "진행_권한": account_id == game.authority_id,
             },
             "권한": _authority_view(game),
+            "종료": game.ended,
+            "설정": {"자동_진행": game.auto_advance},
             "페이즈": {
                 "위치": game.phase_index + 1,
                 "전체": len(game.phases),
@@ -247,6 +255,8 @@ def assign_character(game: Game, account_id: int, character: int, persist) -> No
     같은 인물을 둘이 고르면 먼저 들어온 요청만 성공한다.
     """
     with game.lock:
+        if game.ended:
+            raise AssignError("ended", "게임이 끝났습니다")
         player = game.players.get(account_id)
         if player is None:
             raise AssignError("not_player", "플레이어만 캐릭터를 고를 수 있습니다")
@@ -299,6 +309,22 @@ def set_paused(game: Game, account_id: int, paused: bool) -> None:
         game.bump()
 
 
+def _advance(game: Game, persist: Callable[[int], None]) -> None:
+    """권한과 상관없이 다음 단계로 넘어가는 핵심 동작. 호출하는 쪽이 `game.lock` 을 잡고 있어야 한다."""
+    if game.ended:
+        raise AdvanceError("last", "게임이 끝났습니다")
+    if game.phase_index >= len(game.phases) - 1:
+        raise AdvanceError("last", "마지막 단계입니다")
+    for condition in game.advance_conditions:
+        message = condition(game)
+        if message:
+            raise AdvanceError("condition", message)
+    persist(game.phases[game.phase_index + 1]["순서"])
+    game.phase_index += 1
+    game.restart_timer()
+    game.bump()
+
+
 def advance_phase(game: Game, account_id: int, persist: Callable[[int], None]) -> None:
     """다음 단계로 넘어간다. 진행 권한이 있는 사람만 할 수 있고, 카드의 진행 조건이 맞아야 한다.
 
@@ -307,15 +333,44 @@ def advance_phase(game: Game, account_id: int, persist: Callable[[int], None]) -
     with game.lock:
         if account_id != game.authority_id:
             raise AdvanceError("forbidden", "진행 권한이 있는 사람만 넘길 수 있습니다")
-        if game.phase_index >= len(game.phases) - 1:
-            raise AdvanceError("last", "마지막 단계입니다")
-        for condition in game.advance_conditions:
-            message = condition(game)
-            if message:
-                raise AdvanceError("condition", message)
-        persist(game.phases[game.phase_index + 1]["순서"])
-        game.phase_index += 1
-        game.restart_timer()
+        _advance(game, persist)
+
+
+def set_auto_advance(game: Game, account_id: int, value: bool) -> None:
+    """시간이 끝나면 저절로 넘어갈지 고른다. 방장만 할 수 있다."""
+    with game.lock:
+        if account_id != game.host_id:
+            raise AdvanceError("forbidden", "방장만 바꿀 수 있습니다")
+        if value != game.auto_advance:
+            game.auto_advance = value
+            game.bump()
+
+
+def auto_advance_if_due(game: Game, persist: Callable[[int], None]) -> bool:
+    """자동 진행이 켜져 있고 시간이 끝났으면 다음 단계로 넘어간다. 진행 조건이 맞지 않거나 마지막 단계면 그대로 기다린다.
+
+    일시정지 중이거나 시간 제한이 없는 단계는 넘어가지 않는다. 넘어갔으면 True.
+    """
+    with game.lock:
+        if not game.auto_advance or game.ended or game.paused:
+            return False
+        remaining = game.remaining()
+        if remaining is None or remaining > 0:
+            return False
+        try:
+            _advance(game, persist)
+        except AdvanceError:
+            return False
+        return True
+
+
+def end_game(game: Game, persist: Callable[[], None]) -> None:
+    """게임을 끝낸다(전체 공개 단계가 시작될 때 스크립트가 부른다). 방은 이로부터 6시간 뒤에 종료된다(방 정리가 처리)."""
+    with game.lock:
+        if game.ended:
+            return
+        persist()
+        game.ended = True
         game.bump()
 
 

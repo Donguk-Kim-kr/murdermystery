@@ -15,7 +15,7 @@ from .auth import CurrentUser
 from .db import Conn
 from .engine import (
     AdvanceError, AssignError, Game, GameRegistry, Observer, Player, advance_phase, assign_character, hand_over_authority,
-    set_paused, view_for,
+    set_auto_advance, set_paused, view_for,
 )
 from .rooms import find_my_room, registry
 
@@ -158,8 +158,14 @@ class ProgressOut(BaseModel):
     전체: int
 
 
+class SettingsOut(BaseModel):
+    자동_진행: bool
+
+
 class GameStateOut(BaseModel):
     상태_버전: int
+    종료: bool
+    설정: SettingsOut
     나: MeOut
     권한: AuthorityOut
     시간: TimeOut
@@ -185,6 +191,7 @@ ASSIGN_STATUS = {
     "already": status.HTTP_409_CONFLICT,
     "taken": status.HTTP_409_CONFLICT,
     "unknown": status.HTTP_422_UNPROCESSABLE_CONTENT,
+    "ended": status.HTTP_409_CONFLICT,
 }
 
 
@@ -302,3 +309,18 @@ async def events(request: Request, me: CurrentUser) -> StreamingResponse:
         stream(), media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+class SettingsIn(BaseModel):
+    자동_진행: bool
+
+
+@state_router.post("/me/settings", response_model=GameStateOut)
+def change_settings(body: SettingsIn, me: CurrentUser, request: Request) -> dict:
+    """시간이 끝나면 저절로 다음 단계로 넘어갈지 고른다(방장만). 기본은 방장이 넘기기 전에는 넘어가지 않는 것이다."""
+    game = _my_game(request, me.계정.번호)
+    try:
+        set_auto_advance(game, me.계정.번호, body.자동_진행)
+    except AdvanceError as err:
+        raise HTTPException(ADVANCE_STATUS.get(err.code, status.HTTP_409_CONFLICT), err.message) from err
+    return view_for(game, me.계정.번호)

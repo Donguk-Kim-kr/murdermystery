@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     room_join_fail_window_seconds: float = 60.0
     # 게임 중 이탈 유예(docs/ENGINE_DESIGN.md 1-8): 상태 조회가 이 시간 동안 끊기면 이탈로 본다. 대기실과 같은 이유로 길게 잡는다.
     game_away_seconds: float = 45.0
+    # 시간이 끝난 게임을 자동 진행으로 넘길지 확인하는 주기(초)
+    game_tick_seconds: float = 1.0
     # 만료된 방을 정리하는 주기
     room_sweep_seconds: float = 60.0
 
