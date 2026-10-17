@@ -169,3 +169,44 @@ def test_intro_line_is_optional_editable_and_clearable(client, make_account):
     assert client.patch(f"/api/works/{wid}/characters/1", headers=headers, json={"소개": None}).json()["소개"] is None
     too_long = client.patch(f"/api/works/{wid}/characters/1", headers=headers, json={"소개": "가" * 1001})
     assert too_long.status_code == 422
+
+
+def test_story_parts_are_saved_with_ids_and_restored(client, headers, work):
+    wid = work["번호"]
+    made = client.post(f"/api/works/{wid}/characters", headers=headers, json={"이름": "의사", "서사_부분": [{"본문": "첫째"}, {"본문": "둘째"}]})
+    assert made.status_code == 201, made.text
+    parts = made.json()["서사_부분"]
+    assert [p["본문"] for p in parts] == ["첫째", "둘째"] and all(len(p["ID"]) == 6 for p in parts)
+    assert parts[0]["ID"] != parts[1]["ID"]
+    assert "@@MMPART:" in made.json()["서사"]                         # 저장된 글에는 표기가 들어 있고
+    got = client.get(f"/api/works/{wid}/characters/1", headers=headers).json()
+    assert got["서사_부분"] == parts                                  # 다시 읽어도 같은 부분과 ID
+    # 같은 ID 로 다시 보내면 ID 가 유지되고, ID 없는 부분은 새로 만든다
+    patched = client.patch(f"/api/works/{wid}/characters/1", headers=headers, json={"서사_부분": [{"ID": parts[1]["ID"], "본문": "둘째 수정"}, {"본문": "새 서사"}]})
+    assert patched.status_code == 200
+    kept = patched.json()["서사_부분"]
+    assert kept[0] == {"ID": parts[1]["ID"], "본문": "둘째 수정"} and kept[1]["본문"] == "새 서사" and kept[1]["ID"] not in {p["ID"] for p in parts}
+
+
+def test_story_limit_shrinks_as_parts_increase(client, headers, work):
+    wid = work["번호"]
+    url = f"/api/works/{wid}/characters"
+    assert client.post(url, headers=headers, json={"이름": "가", "서사_부분": [{"본문": "가" * 10000}]}).status_code == 201
+    two = client.post(url, headers=headers, json={"이름": "나", "서사_부분": [{"본문": "가" * 5001}, {"본문": "나"}]})
+    assert two.status_code == 422 and "5000자" in two.json()["detail"]
+    assert client.post(url, headers=headers, json={"이름": "다", "서사_부분": [{"본문": "가" * 5000}, {"본문": "나" * 5000}]}).status_code == 201
+    six = client.post(url, headers=headers, json={"이름": "라", "서사_부분": [{"본문": str(i)} for i in range(6)]})
+    assert six.status_code == 422 and "5개까지" in six.json()["detail"]
+    empty = client.post(url, headers=headers, json={"이름": "마", "서사_부분": [{"본문": "  "}]})
+    assert empty.status_code == 422
+
+
+def test_story_rejects_reserved_marker_and_conflicting_input(client, headers, work):
+    wid = work["번호"]
+    url = f"/api/works/{wid}/characters"
+    assert client.post(url, headers=headers, json={"이름": "가", "서사_부분": [{"본문": "앞 @@MMPART:abcdef@@ 뒤"}]}).status_code == 422
+    assert client.post(url, headers=headers, json={"이름": "가", "서사": "본문", "서사_부분": [{"본문": "다른"}]}).status_code == 422
+    # 옛 방식(글 한 덩어리)은 부분 하나로 저장되고 ID 가 붙는다
+    old = client.post(url, headers=headers, json={"이름": "나", "서사": "옛 서사"}).json()
+    assert [p["본문"] for p in old["서사_부분"]] == ["옛 서사"] and len(old["서사_부분"][0]["ID"]) == 6
+

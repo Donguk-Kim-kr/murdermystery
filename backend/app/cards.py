@@ -100,6 +100,9 @@ class CardHost:
         row = self._character(slot)
         if not isinstance(numbers, (list, tuple)):
             raise ScriptError("서사들() 의 두 번째 값은 번호 목록이어야 합니다(예: [1, 2])")
+        parts = row.get("서사_부분")
+        if isinstance(parts, list):                       # 확정할 때 해석해 둔 부분 목록
+            return narrative.pick([str(p.get("본문", "")) for p in parts], list(numbers))
         return narrative.numbered(row.get("서사") or "", list(numbers))
 
     def fn_배정된_플레이어수(self) -> int:

@@ -412,3 +412,11 @@ def test_game_state_includes_no_private_character_fields_even_with_scripts(clien
     for who in (host, *others):
         text = state(client, who).text
         assert "비밀" not in text and "서사 하나" not in text
+
+
+def test_confirmed_snapshot_carries_parsed_story_parts(client, make_scripted_game):
+    host, _, _, _ = two_phase_game(make_scripted_game)
+    game = client.app.state.games.of_account(host.number)
+    person = game.snapshot["인물"][0]
+    assert [p["본문"] for p in person["서사_부분"]] == [f"0번의 서사 하나", f"0번의 서사 둘"]
+    assert all(len(p["ID"]) == 6 for p in person["서사_부분"])

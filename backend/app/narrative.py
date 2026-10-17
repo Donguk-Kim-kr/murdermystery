@@ -122,8 +122,12 @@ def check_fits(parts: list[Part]) -> list[str]:
     return [i for i, p in enumerate(parts, 1) if len(p.text) > limit]
 
 
-def numbered(raw: str, numbers: list[int]) -> str:
-    """번호(1부터)로 고른 부분들을 번호 순서로 이어 붙인다(서사 1·2 를 고르면 1 뒤에 2). 없는 번호는 건너뛴다."""
-    parts = split(raw)
-    chosen = [parts[n - 1].text for n in sorted(set(numbers)) if isinstance(n, int) and 1 <= n <= len(parts)]
+def pick(texts: list[str], numbers: list[int]) -> str:
+    """부분 본문 목록에서 번호(1부터)로 고른 것들을 번호 순서로 이어 붙인다(1·2 를 고르면 1 뒤에 2). 없는 번호는 건너뛴다."""
+    chosen = [texts[n - 1] for n in sorted(set(numbers)) if isinstance(n, int) and 1 <= n <= len(texts)]
     return "\n\n".join(chosen)
+
+
+def numbered(raw: str, numbers: list[int]) -> str:
+    """저장된 글에서 번호로 고른 부분들을 이어 붙인다."""
+    return pick([p.text for p in split(raw)], numbers)

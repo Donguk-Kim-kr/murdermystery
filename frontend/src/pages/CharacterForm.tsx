@@ -8,6 +8,18 @@ export type Character = components["schemas"]["CharacterOut"];
 const TEXT_FIELDS = ["직업", "성별", "소개", "타임라인", "능력", "비밀", "목표"] as const;
 const LONG = new Set<string>(["소개", "타임라인", "능력", "비밀", "목표"]);
 
+// 서사는 부분으로 나누어 쓴다. 전체 글자 수는 10000자이고 부분이 늘수록 각 부분의 제한이 줄어든다(서버 narrative.py 와 같은 규칙).
+const MAX_PARTS = 5;
+const TOTAL_LIMIT = 10000;
+const partLimit = (count: number) => Math.floor(TOTAL_LIMIT / Math.max(count, 1));
+const length = (text: string) => Array.from(text).length;
+
+interface PartDraft {
+  key: number;
+  id: string | null;
+  text: string;
+}
+
 /** 빈 칸은 null(값 없음)로 보낸다. */
 const orNull = (s: string) => (s.trim() === "" ? null : s);
 
@@ -22,7 +34,11 @@ interface Props {
 export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
   const [name, setName] = useState(character?.이름 ?? "");
   const [age, setAge] = useState(character?.나이?.toString() ?? "");
-  const [story, setStory] = useState(character?.서사 ?? "");
+  const [parts, setParts] = useState<PartDraft[]>(() => {
+    const saved = character?.서사_부분 ?? [];
+    return (saved.length > 0 ? saved : [{ ID: null, 본문: "" }]).map((p, key) => ({ key, id: p.ID ?? null, text: p.본문 }));
+  });
+  const [nextKey, setNextKey] = useState(100);
   const [texts, setTexts] = useState<Record<string, string>>(
     Object.fromEntries(TEXT_FIELDS.map((f) => [f, character?.[f] ?? ""])),
   );
@@ -31,6 +47,24 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const limit = partLimit(parts.length);
+  const nextLimit = partLimit(parts.length + 1);
+  const overAfterAdd = parts.flatMap((p, i) => (length(p.text) > nextLimit ? [i + 1] : []));
+
+  function addPart() {
+    if (parts.length >= MAX_PARTS) return;
+    if (
+      overAfterAdd.length > 0 &&
+      !window.confirm(
+        `서사를 ${parts.length + 1}개로 나누면 각 서사는 ${nextLimit}자까지 쓸 수 있습니다. ` +
+          `지금 서사 ${overAfterAdd.join(", ")}이(가) 넘으므로 줄여야 저장할 수 있습니다. 추가할까요?`,
+      )
+    )
+      return;
+    setParts([...parts, { key: nextKey, id: null, text: "" }]);
+    setNextKey(nextKey + 1);
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -38,7 +72,8 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
     const body = {
       이름: name,
       나이: age.trim() === "" ? null : Number(age),
-      서사: story,
+      // 비어 있는 서사 하나뿐이면 서사가 없는 것으로 저장한다
+      서사_부분: parts.length === 1 && parts[0].text.trim() === "" ? [] : parts.map((p) => ({ ID: p.id, 본문: p.text })),
       직업: orNull(texts.직업),
       성별: orNull(texts.성별),
       소개: orNull(texts.소개),
@@ -83,10 +118,41 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
             )}
           </label>
         ))}
-        <label className="wide">
-          서사
-          <textarea rows={4} value={story} onChange={(e) => setStory(e.target.value)} />
-        </label>
+        <div className="wide story-parts">
+          {parts.map((p, i) => (
+            <div key={p.key} className="story-part">
+              <label>
+                <span className="row">
+                  <span>서사 {i + 1}</span>
+                  <span className={length(p.text) > limit ? "error" : "muted"}>
+                    {length(p.text)}/{limit}자
+                  </span>
+                </span>
+                <textarea
+                  rows={4}
+                  value={p.text}
+                  onChange={(e) => setParts(parts.map((q) => (q.key === p.key ? { ...q, text: e.target.value } : q)))}
+                />
+              </label>
+              {parts.length > 1 && (
+                <button type="button" className="small secondary" onClick={() => setParts(parts.filter((q) => q.key !== p.key))}>
+                  서사 {i + 1} 삭제
+                </button>
+              )}
+            </div>
+          ))}
+          <div className="row start">
+            <button type="button" className="small secondary" disabled={parts.length >= MAX_PARTS} onClick={addPart}>
+              서사 추가하기
+            </button>
+            <span className="muted">
+              {parts.length >= MAX_PARTS
+                ? `서사는 ${MAX_PARTS}개까지 나눌 수 있습니다.`
+                : `서사를 ${parts.length + 1}개로 나누면 각 서사는 ${nextLimit}자까지 쓸 수 있습니다.` +
+                  (overAfterAdd.length > 0 ? ` 지금 서사 ${overAfterAdd.join(", ")}이(가) 넘습니다.` : "")}
+            </span>
+          </div>
+        </div>
       </div>
       <div className="row start">
         <label className="check">

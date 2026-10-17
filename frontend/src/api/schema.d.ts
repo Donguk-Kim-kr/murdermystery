@@ -799,6 +799,8 @@ export interface components {
              * @default
              */
             "\uC11C\uC0AC"?: string;
+            /** 서사 부분 */
+            "\uC11C\uC0AC_\uBD80\uBD84"?: components["schemas"]["PartIn"][] | null;
             /** 타임라인 */
             "\uD0C0\uC784\uB77C\uC778"?: string | null;
             /** 능력 */
@@ -832,6 +834,11 @@ export interface components {
             "\uC131\uBCC4"?: string | null;
             /** 서사 */
             "\uC11C\uC0AC": string;
+            /**
+             * 서사 부분
+             * @default []
+             */
+            "\uC11C\uC0AC_\uBD80\uBD84"?: components["schemas"]["PartOut"][];
             /** 타임라인 */
             "\uD0C0\uC784\uB77C\uC778"?: string | null;
             /** 능력 */
@@ -867,6 +874,8 @@ export interface components {
             "\uC131\uBCC4"?: string | null;
             /** 서사 */
             "\uC11C\uC0AC"?: string | null;
+            /** 서사 부분 */
+            "\uC11C\uC0AC_\uBD80\uBD84"?: components["schemas"]["PartIn"][] | null;
             /** 타임라인 */
             "\uD0C0\uC784\uB77C\uC778"?: string | null;
             /** 능력 */
@@ -1097,6 +1106,23 @@ export interface components {
         MoveBody: {
             /** Position */
             position: number;
+        };
+        /**
+         * PartIn
+         * @description 서사 한 부분. ID 는 이미 있는 부분을 다시 보낼 때만 넣고, 새 부분은 비운다(서버가 만든다).
+         */
+        PartIn: {
+            /** Id */
+            ID?: string | null;
+            /** 본문 */
+            "\uBCF8\uBB38": string;
+        };
+        /** PartOut */
+        PartOut: {
+            /** Id */
+            ID: string | null;
+            /** 본문 */
+            "\uBCF8\uBB38": string;
         };
         /** ParticipationIn */
         ParticipationIn: {

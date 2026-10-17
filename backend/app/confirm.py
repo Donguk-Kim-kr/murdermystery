@@ -18,6 +18,7 @@ from psycopg import Connection, sql
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel, Field
 
+from . import narrative
 from .auth import CurrentUser
 from .characters import COLUMNS as CHARACTER_COLUMNS
 from .content import RESOURCES, Resource, card_display_names, columns, ensure_mine, key_col, phase_display_names
@@ -128,6 +129,9 @@ def build_snapshot(conn: Connection, work_id: int) -> dict[str, Any]:
     snap["인물"] = conn.execute(
         f'SELECT {CHARACTER_COLUMNS} FROM "인물" WHERE "작품_번호" = %s ORDER BY "순서"', (work_id,)
     ).fetchall()
+    for person in snap["인물"]:
+        # 확정할 때 해석한 서사 부분 목록(ID, 본문). 해석 규칙을 나중에 고쳐도 확정된 작품은 달라지지 않는다.
+        person["서사_부분"] = [{"ID": p.id, "본문": p.text} for p in narrative.split(person["서사"])]
     used: dict[str, set[int]] = {"진행단계": set(), "기믹": set()}
     for res in RESOURCES:
         rows = _rows(conn, res, work_id)

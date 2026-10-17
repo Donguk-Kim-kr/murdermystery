@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, status
 from psycopg import Connection, errors
 from pydantic import BaseModel, Field
 
+from . import narrative
 from .auth import CurrentUser
 from .db import Conn
 from .ordering import next_order
@@ -17,12 +18,25 @@ router = APIRouter(prefix="/api/works/{work_id}/characters", tags=["characters"]
 COLUMNS = '"순서", "이름", "직업", "나이", "성별", "서사", "타임라인", "능력", "비밀", "목표", "범인", "NPC", "소개"'
 
 
+class PartIn(BaseModel):
+    """서사 한 부분. ID 는 이미 있는 부분을 다시 보낼 때만 넣고, 새 부분은 비운다(서버가 만든다)."""
+
+    ID: str | None = Field(default=None, max_length=6)
+    본문: str = Field(max_length=narrative.TOTAL_LIMIT)
+
+
+class PartOut(BaseModel):
+    ID: str | None
+    본문: str
+
+
 class CharacterIn(BaseModel):
     이름: str = Field(min_length=1, max_length=50)
     직업: str | None = Field(default=None, max_length=50)
     나이: int | None = Field(default=None, ge=0, le=200)
     성별: str | None = Field(default=None, max_length=20)
-    서사: str = Field(default="", max_length=5000)
+    서사: str = Field(default="", max_length=narrative.TOTAL_LIMIT + 400)
+    서사_부분: list[PartIn] | None = None
     타임라인: str | None = Field(default=None, max_length=5000)
     능력: str | None = Field(default=None, max_length=2000)
     비밀: str | None = Field(default=None, max_length=2000)
@@ -37,7 +51,8 @@ class CharacterPatch(BaseModel):
     직업: str | None = Field(default=None, max_length=50)
     나이: int | None = Field(default=None, ge=0, le=200)
     성별: str | None = Field(default=None, max_length=20)
-    서사: str | None = Field(default=None, max_length=5000)
+    서사: str | None = Field(default=None, max_length=narrative.TOTAL_LIMIT + 400)
+    서사_부분: list[PartIn] | None = None
     타임라인: str | None = Field(default=None, max_length=5000)
     능력: str | None = Field(default=None, max_length=2000)
     비밀: str | None = Field(default=None, max_length=2000)
@@ -50,6 +65,7 @@ class CharacterPatch(BaseModel):
 class CharacterOut(CharacterIn):
     순서: int
     서사: str
+    서사_부분: list[PartOut] = []
 
 
 # 비울 수 없는(NOT NULL) 컬럼. 나머지는 null 로 지울 수 있다.
@@ -74,10 +90,33 @@ def sync_capacity(conn: Connection, work_id: int, min_players: int) -> None:
     )
 
 
+def stored_story(raw: str | None, parts: list[PartIn] | None) -> str | None:
+    """저장할 서사 글. 부분 목록(`서사_부분`)이나 글(`서사`) 중 하나로 받고, 둘 다 없으면 None(바꾸지 않음).
+
+    글로 받으면 부분으로 나눠 다시 합친다(표기 검사, 글자 수 검사, 표기 없는 부분에 ID 붙이기). 둘 다 주면 거부한다.
+    """
+    if parts is not None and raw:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "서사와 서사_부분 중 하나로만 보내 주세요")
+    try:
+        if parts is not None:
+            return narrative.join([narrative.Part(p.ID, p.본문) for p in parts])
+        if raw is None:
+            return None
+        return narrative.join(narrative.split(raw))
+    except narrative.NarrativeError as err:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(err)) from None
+
+
+def present(row: dict) -> dict:
+    """응답에 서사의 부분 목록(ID, 본문)을 덧붙인다. 화면은 표기 줄을 보지 않는다."""
+    return {**row, "서사_부분": [{"ID": p.id, "본문": p.text} for p in narrative.split(row["서사"])]}
+
+
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=CharacterOut)
 def create_character(work_id: int, body: CharacterIn, conn: Conn, me: CurrentUser) -> dict:
     work = lock_work(conn, work_id, me.계정.번호)
-    values = body.model_dump()
+    values = body.model_dump(exclude={"서사_부분"})
+    values["서사"] = stored_story(body.서사, body.서사_부분)
     order = next_order(conn, "인물", work_id)
     cols = list(values)
     row = conn.execute(
@@ -86,32 +125,36 @@ def create_character(work_id: int, body: CharacterIn, conn: Conn, me: CurrentUse
         (work_id, order, *values.values()),
     ).fetchone()
     sync_capacity(conn, work_id, work["최소인원"])
-    return row
+    return present(row)
 
 
 @router.get("", response_model=list[CharacterOut])
 def list_characters(work_id: int, conn: Conn, me: CurrentUser) -> list[dict]:
     _ensure_mine(conn, work_id, me.계정.번호)
-    return conn.execute(
+    rows = conn.execute(
         f'SELECT {COLUMNS} FROM "인물" WHERE "작품_번호" = %s ORDER BY "순서"', (work_id,)
     ).fetchall()
+    return [present(r) for r in rows]
 
 
 @router.get("/{order}", response_model=CharacterOut)
 def get_character(work_id: int, order: int, conn: Conn, me: CurrentUser) -> dict:
     _ensure_mine(conn, work_id, me.계정.번호)
-    return _get(conn, work_id, order)
+    return present(_get(conn, work_id, order))
 
 
 @router.patch("/{order}", response_model=CharacterOut)
 def update_character(work_id: int, order: int, body: CharacterPatch, conn: Conn, me: CurrentUser) -> dict:
     work = lock_work(conn, work_id, me.계정.번호)
-    changes = body.model_dump(exclude_unset=True)
+    changes = body.model_dump(exclude_unset=True, exclude={"서사_부분"})
     if any(changes.get(col, 0) is None for col in REQUIRED):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "값을 비울 수 없는 항목입니다")
+    story = stored_story(changes.get("서사"), body.서사_부분)
+    if story is not None:
+        changes["서사"] = story
     current = _get(conn, work_id, order)
     if not changes:
-        return current
+        return present(current)
     assignments = ", ".join(f'"{col}" = %s' for col in changes)
     row = conn.execute(
         f'UPDATE "인물" SET {assignments} WHERE "작품_번호" = %s AND "순서" = %s RETURNING {COLUMNS}',
@@ -119,7 +162,7 @@ def update_character(work_id: int, order: int, body: CharacterPatch, conn: Conn,
     ).fetchone()
     if "NPC" in changes and changes["NPC"] != current["NPC"]:
         sync_capacity(conn, work_id, work["최소인원"])
-    return row
+    return present(row)
 
 
 def _ensure_mine(conn: Connection, work_id: int, account_id: int) -> None:
