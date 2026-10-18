@@ -118,8 +118,38 @@ def check_work(conn: Connection, work_id: int) -> dict:
                 f"페이즈 {row['phase']}에 연결된 {word} '{row['이름']}' v{row['버전']}은(는) 삭제되어 확정 내용에서 빠집니다."
             )
     errors.extend(script_errors(conn, work_id))
+    errors.extend(condition_errors(conn, work_id))
     warnings.extend(story_selection_warnings(conn, work_id))
     return {"errors": errors, "warnings": warnings, "다음버전": next_version(conn, work_id)}
+
+
+def condition_errors(conn: Connection, work_id: int) -> list[str]:
+    """엔딩 분기와 후일담의 조건 식을 검사한다. 비어 있으면 항상 적용이고, 있으면 `{"식": "…"}` 모양이어야 하며 문법·이름이 맞아야 한다."""
+    from .cards import condition_names
+    from .script import ScriptError, compile_expression
+
+    names = condition_names()
+    found = []
+    for table, label in (("엔딩분기", "엔딩 분기"), ("후일담", "후일담")):
+        for row in conn.execute(
+            sql.SQL('SELECT "순서", "조건", {name} AS "이름" FROM {t} WHERE "작품_번호" = %s ORDER BY "순서"').format(
+                t=sql.Identifier(table), name=sql.SQL('"이름"') if table == "엔딩분기" else sql.SQL("NULL")
+            ),
+            (work_id,),
+        ).fetchall():
+            condition = row["조건"]
+            who = f"{label} {row['이름'] or row['순서']}"
+            if not condition:
+                continue
+            expression = condition.get("식") if isinstance(condition, dict) else None
+            if not isinstance(expression, str) or not expression.strip():
+                found.append(f"{who}의 조건은 {{\"식\": \"…\"}} 모양으로 써야 합니다.")
+                continue
+            try:
+                compile_expression(expression, names)
+            except ScriptError as err:
+                found.append(f"{who}의 조건 식에 오류가 있습니다: {err}")
+    return found
 
 
 def story_selection_warnings(conn: Connection, work_id: int) -> list[str]:

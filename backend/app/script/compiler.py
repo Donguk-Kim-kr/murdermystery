@@ -56,6 +56,28 @@ def _reject(node: ast.AST, what: str) -> ScriptError:
     return ScriptError(f"{what}은(는) 쓸 수 없습니다", _line(node))
 
 
+def compile_expression(expression: str, known_names: set[str] | frozenset[str] = frozenset()) -> Program:
+    """한 줄(또는 여러 줄) 식을 `조건()` 함수 하나짜리 프로그램으로 번역한다. 엔딩·후일담의 조건에 쓴다.
+
+    식 하나만 받는다(여러 문장이나 정의를 끼워 넣을 수 없다). 오류의 줄 번호는 식의 줄 기준이다.
+    """
+    text = (expression or "").strip()
+    if not text:
+        raise ScriptError("식이 비어 있습니다")
+    try:
+        ast.parse(text, mode="eval")
+    except SyntaxError as err:
+        raise ScriptError(f"문법 오류: {err.msg}", err.lineno) from None
+    except ValueError as err:
+        raise ScriptError(f"읽을 수 없는 글입니다: {err}") from None
+    try:
+        return compile_source(f"def 조건():\n    return (\n{text}\n)\n", known_names)
+    except ScriptError as err:
+        if err.line is not None:
+            err.line = max(err.line - 2, 1)
+        raise
+
+
 def compile_source(source: str, known_names: set[str] | frozenset[str] = frozenset()) -> Program:
     """스크립트를 검사하고 번역한다. 문제가 있으면 `ScriptError`. `known_names` 는 호출할 수 있는 기본 함수·상수의 이름이다."""
     try:

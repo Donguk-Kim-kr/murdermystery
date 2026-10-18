@@ -88,6 +88,8 @@ class Game:
     votes: dict[str, dict[int, int | str]] = field(default_factory=dict, repr=False)
     # 투표 이름 → 후보로 둔 인물 아닌 선택지(예: "사고사", "자살"). 투표칸을 보일 때마다 그 투표의 후보로 바뀐다
     vote_options: dict[str, set[str]] = field(default_factory=dict, repr=False)
+    # 스크립트가 남기는 게임 변수(이름 → 값). 엔딩·후일담의 조건이 읽는다
+    variables: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @property
     def phases(self) -> list[dict[str, Any]]:

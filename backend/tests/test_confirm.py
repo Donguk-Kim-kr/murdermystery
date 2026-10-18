@@ -192,3 +192,33 @@ def test_content_bundle_tells_which_settings_a_card_script_uses_and_story_counts
     ref = bundle["library"]["phases"][str(lib["번호"])]
     assert ref["사용설정"] == ["개인서사공개"] and "규칙" not in ref
     assert bundle["characters"][0]["서사_부분수"] == 2 and "서사" not in bundle["characters"][0]
+
+
+def test_ending_and_epilogue_condition_expressions_are_checked_at_confirm(client, headers):
+    w = ready(client, headers)
+    post(client, headers, w, "endings", 이름="좋은 엔딩", 조건={"식": "몰라()"}, 내용="x")
+    post(client, headers, w, "endings", 이름="모양 오류", 조건={"조건": "x"}, 내용="x")
+    post(client, headers, w, "endings", 이름="문법 오류", 조건={"식": "1 +"}, 내용="x")
+    post(client, headers, w, "epilogues", 조건={"식": "import os"}, 내용="x")
+    post(client, headers, w, "endings", 이름="정상", 조건={"식": '결과_인물("최종 투표") is None'}, 내용="x")
+    post(client, headers, w, "endings", 이름="항상", 조건={}, 내용="x")
+    errors = check(client, headers, w)["errors"]
+    joined = "\n".join(errors)
+    assert len(errors) == 4
+    assert "엔딩 분기 좋은 엔딩의 조건 식에 오류" in joined and "알 수 없는 이름" in joined
+    assert "엔딩 분기 모양 오류의 조건은" in joined and "엔딩 분기 문법 오류" in joined and "후일담 1의 조건 식에 오류" in joined
+    assert confirm(client, headers, w).status_code == 422
+
+
+def test_valid_condition_expressions_do_not_block_confirm(client, headers):
+    w = ready(client, headers)
+    post(client, headers, w, "endings", 이름="정상", 조건={"식": '변수("a") == 1 and 결과("최종 투표") is None'}, 내용="x")
+    post(client, headers, w, "epilogues", 내용="항상")
+    assert check(client, headers, w)["errors"] == [] and confirm(client, headers, w).status_code == 201
+
+
+def test_condition_expressions_cannot_use_functions_that_change_the_game(client, headers):
+    w = ready(client, headers)
+    post(client, headers, w, "endings", 이름="바꾸기", 조건={"식": '변수설정("a", 1)'}, 내용="x")
+    errors = check(client, headers, w)["errors"]
+    assert len(errors) == 1 and "알 수 없는 이름 '변수설정'" in errors[0]

@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from . import clues, narrative
-from .script import VM, Program, Ref, ScriptError, Suspend, builtin_names, compile_source
+from .script import VM, Program, Ref, ScriptError, Suspend, builtin_names, compile_expression, compile_source
 
 MAX_ANSWER_BYTES = 2000
 MAX_NOTICES = 20
@@ -50,10 +50,10 @@ class CardRun:
 
 # ---- 호스트(스크립트가 부르는 엔진 기능) -------------------------------------------------------
 
-MUTATING = {"배정", "투표", "투표초기화", "조사", "양도", "공개설정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
+MUTATING = {"변수설정", "배정", "투표", "투표초기화", "조사", "양도", "공개설정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
 FUNCTION_NAMES = {
     "플레이어들", "플레이어수", "인물들", "공통스토리", "서사들", "배정된_플레이어수", "인물_없는_플레이어가_있다",
-    "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "보유목록", "받은공개", "인물찾기", "투표", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
+    "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "보유목록", "받은공개", "인물찾기", "투표", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
     "단계_끝내기", "게임_종료",
 }
 CONSTANT_NAMES = {"통과", ALL}
@@ -61,11 +61,19 @@ MAX_INPUT_CHARS = 2000
 MAX_CARDS = 200
 CARD_ACTIONS = ("보여주기", "양도")
 MAX_OPTION_CHARS = 50
+MAX_VARIABLES = 500
+MAX_VARIABLE_NAME = 100
+MAX_VARIABLE_BYTES = 2000
 MAX_CANDIDATES = 30
 
 
 def known_names() -> set[str]:
     return FUNCTION_NAMES | CONSTANT_NAMES | builtin_names()
+
+
+def condition_names() -> set[str]:
+    """조건 식에서 부를 수 있는 이름. 상태를 바꾸는 함수는 뺀다(조건은 읽기만 한다)."""
+    return known_names() - MUTATING
 
 
 class CardHost:
@@ -126,6 +134,112 @@ class CardHost:
         if not _is_int(순서) or not any(c["순서"] == 순서 for c in self.game.snapshot.get("인물") or []):
             return None
         return Ref("인물", 순서)
+
+    # -- 게임 변수와 상태 읽기(엔딩·후일담의 조건이 쓴다) --
+    def fn_변수설정(self, 이름: str, 값: Any) -> None:
+        """게임 변수를 정한다. 값은 글자, 숫자, 참/거짓, 없음, 목록, 사전만 되고 작아야 한다. 이름 하나당 값 하나이다."""
+        name = str(이름)
+        if not name or len(name) > MAX_VARIABLE_NAME:
+            raise ScriptError(f"변수 이름은 1자 이상 {MAX_VARIABLE_NAME}자 이하여야 합니다")
+        try:
+            text = json.dumps(값, ensure_ascii=False)
+        except (TypeError, ValueError):
+            raise ScriptError("변수에는 글자, 숫자, 참/거짓, 목록, 사전만 담을 수 있습니다") from None
+        if len(text) > MAX_VARIABLE_BYTES:
+            raise ScriptError(f"변수 값이 너무 큽니다(최대 {MAX_VARIABLE_BYTES}자)")
+        if name not in self.game.variables and len(self.game.variables) >= MAX_VARIABLES:
+            raise ScriptError(f"변수는 {MAX_VARIABLES}개까지 만들 수 있습니다")
+        self.game.variables[name] = json.loads(text)
+
+    def fn_변수(self, 이름: str, 기본값: Any = None) -> Any:
+        """게임 변수의 값. 정한 적이 없으면 기본값(없으면 None)."""
+        value = self.game.variables.get(str(이름), 기본값)
+        return json.loads(json.dumps(value))            # 스크립트가 받은 값을 바꿔도 원본은 그대로
+
+    def fn_가지고_있다(self, 플레이어: Any, 단서이름: str) -> bool:
+        """이 플레이어가 그 이름의 단서를 지금 가지고 있는지."""
+        return any(c["종류"] == "단서" and c["이름"] == 단서이름 for c in clues.holdings_of(self.game, self._player_account(플레이어)))
+
+    def fn_단서_보유자(self, 단서이름: str) -> Ref | None:
+        """그 이름의 단서를 지금 가진 플레이어. 아무도 갖지 않았으면 None."""
+        for account in self.game.players:
+            if any(c["종류"] == "단서" and c["이름"] == 단서이름 for c in clues.holdings_of(self.game, account)):
+                return Ref("플레이어", account)
+        return None
+
+    def fn_인물의_플레이어(self, 인물: Any) -> Ref | None:
+        """그 인물을 맡은 플레이어. 아무도 맡지 않았으면 None."""
+        if not (isinstance(인물, Ref) and 인물.kind == "인물"):
+            return None
+        for player in self.game.players.values():
+            if player.character == 인물.key:
+                return Ref("플레이어", player.account_id)
+        return None
+
+    def fn_모든_단서(self) -> list[dict[str, Any]]:
+        """작품의 모든 단서와 증언(누가 가졌는지와 상관없이). 전체 공개 단계가 보여 준다. 각 항목은 {종류, 이름, 내용, 장소}."""
+        out = []
+        for kind in ("단서", "증언"):
+            for row in sorted(self.game.snapshot.get(kind) or [], key=lambda r: r["순서"]):
+                out.append(clues.describe(self.game, kind, row))
+        return out
+
+    def fn_모든_인물(self) -> list[Ref]:
+        """NPC 를 포함한 작품의 모든 인물."""
+        return [Ref("인물", c["순서"]) for c in sorted(self.game.snapshot.get("인물") or [], key=lambda c: c["순서"])]
+
+    def fn_서사_전체(self, 인물: Any) -> str:
+        """인물의 서사를 모든 부분을 이어서 돌려준다(전체 공개 단계용)."""
+        if not (isinstance(인물, Ref) and 인물.kind == "인물"):
+            raise ScriptError("서사_전체() 에는 인물을 넘겨야 합니다")
+        row = self._character(인물.key)
+        parts = row.get("서사_부분")
+        texts = [str(p.get("본문", "")) for p in parts] if isinstance(parts, list) else [p.text for p in narrative.split(row.get("서사") or "")]
+        return "\n\n".join(texts)
+
+    def fn_엔딩분기들(self) -> list[Ref]:
+        return [Ref("엔딩분기", r["순서"]) for r in sorted(self.game.snapshot.get("엔딩분기") or [], key=lambda r: r["순서"])]
+
+    def fn_후일담들(self) -> list[Ref]:
+        return [Ref("후일담", r["순서"]) for r in sorted(self.game.snapshot.get("후일담") or [], key=lambda r: r["순서"])]
+
+    def fn_조건_맞음(self, 항목: Any) -> bool:
+        """엔딩 분기나 후일담의 조건이 지금 맞는지. 조건이 비어 있으면 항상 맞는다. 조건이 잘못되었으면 맞지 않는 것으로 보고
+        카드 오류로 알린다(게임은 멈추지 않는다)."""
+        if not (isinstance(항목, Ref) and 항목.kind in ("엔딩분기", "후일담")):
+            raise ScriptError("조건_맞음() 에는 엔딩분기들()·후일담들() 의 항목을 넘겨야 합니다")
+        row = self._row(항목)
+        condition = row.get("조건")
+        if not condition:
+            return True
+        expression = condition.get("식") if isinstance(condition, dict) else None
+        if not isinstance(expression, str) or not expression.strip():
+            self.run.error = f"{항목.kind} '{row.get('이름') or row['순서']}' 의 조건은 {{\"식\": \"…\"}} 모양이어야 합니다"
+            return False
+        key = ("식", expression)
+        if key not in self.game.programs:
+            try:
+                self.game.programs[key] = (compile_expression(expression, condition_names()), None)
+            except ScriptError as err:
+                self.game.programs[key] = (None, f"조건 식 오류: {err}")
+        program, error = self.game.programs[key]
+        if program is None:
+            self.run.error = f"{항목.kind} '{row.get('이름') or row['순서']}': {error}"
+            return False
+        vm = VM(program, CardHost(self.game, self.run, None, readonly=True))
+        try:
+            vm.start("조건", [])
+            vm.run()
+        except ScriptError as err:
+            self.run.error = f"{항목.kind} '{row.get('이름') or row['순서']}' 의 조건을 계산하지 못했습니다: {err}"
+            return False
+        return bool(vm.result)
+
+    def _row(self, ref: Ref) -> dict[str, Any]:
+        row = next((r for r in self.game.snapshot.get(ref.kind) or [] if r["순서"] == ref.key), None)
+        if row is None:
+            raise ScriptError(f"없는 {ref.kind} 입니다")
+        return row
 
     def fn_기타후보(self, 값: Any) -> str | None:
         """인물이 아닌 투표 선택지(예: "사고사")로 쓸 수 있는 글이면 그 글, 아니면 None. 카드 설정의 후보를 읽을 때 쓴다."""
@@ -358,6 +472,20 @@ class CardHost:
                 raise ScriptError("서사는 서사들(인물, 번호들) 로 읽으세요")
             if name in CHARACTER_FIELDS:
                 return row.get(name)
+        elif ref.kind == "엔딩분기":
+            row = self._row(ref)
+            if name in ("이름", "내용"):
+                return row.get(name)
+            if name == "순서":
+                return row["순서"]
+        elif ref.kind == "후일담":
+            row = self._row(ref)
+            if name == "내용":
+                return row.get("내용")
+            if name == "순서":
+                return row["순서"]
+            if name == "인물":
+                return None if row.get("인물_순서") is None else Ref("인물", row["인물_순서"])
         elif ref.kind == "카드":
             if name == "설정":
                 return json.loads(json.dumps(self.run.settings))     # 스크립트가 바꿔도 원본은 그대로

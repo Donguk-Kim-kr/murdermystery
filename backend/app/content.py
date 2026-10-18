@@ -106,12 +106,12 @@ RESOURCES: tuple[Resource, ...] = (
     ), title=("설명",)),
     Resource("endings", "엔딩분기", "엔딩 분기", (
         F("이름", "text", True, 100, help=NAME_HELP),
-        F("조건", "json", True, default={}, help="엔딩이 나오는 조건. 규칙 형식이 정해지기 전이라 JSON 객체를 직접 씁니다."),
+        F("조건", "json", True, default={}, help="엔딩이 나오는 조건. {\"식\": \"조건 식\"} 으로 씁니다(예: {\"식\": \"결과_인물('최종 투표') is not None\"}). 비워 두면({}) 항상 나옵니다. 조건이 맞는 엔딩은 모두 순서대로 보입니다."),
         F("내용", "long", True, 5000),
     ), title=("이름", "내용")),
     Resource("epilogues", "후일담", "후일담", (
         _ref("인물_순서", "characters", "대상 인물 (비우면 전체)"),
-        F("조건", "json", default=None, help="비워 두면 항상 적용됩니다. JSON 객체를 직접 씁니다."),
+        F("조건", "json", default=None, help="비워 두면 항상 적용됩니다. {\"식\": \"조건 식\"} 으로 씁니다. 조건이 맞는 후일담은 모두 순서대로 보입니다."),
         F("내용", "long", True, 5000),
     ), title=("내용",)),
     Resource("relations", "관계", "관계", (

@@ -22,7 +22,7 @@ def db(test_dbname):
 def make_scripted_game(client, make_account, db):
     """카드(이름, 스크립트, 설정)를 페이즈 하나에 하나씩 놓은 확정 작품으로 방을 열어 게임을 시작한다."""
 
-    def make(cards, players=3, observer_host=False, story="모두가 읽는 공통 스토리", unchecked=(), setup=None):
+    def make(cards, players=3, observer_host=False, story="모두가 읽는 공통 스토리", unchecked=(), setup=None, edit=None):
         """`unchecked` 에 든 카드 이름의 스크립트는 확정(검사)을 통과한 뒤 스냅샷에서 바꿔 넣는다(검사를 통과하지 못할 스크립트를 실행해 보려고)."""
         host = make_account()
         wid = client.post("/api/works", headers=host.headers, json={"제목": "스크립트 시험", "공통스토리": story}).json()["번호"]
@@ -51,11 +51,13 @@ def make_scripted_game(client, make_account, db):
             })
             assert placed.status_code == 201, placed.text
         assert client.post(f"/api/works/{wid}/confirm", headers=host.headers, json={}).status_code == 201
-        if swaps:
+        if swaps or edit:
             scenario = db.execute('SELECT "시나리오" FROM "버전" WHERE "작품_번호" = %s', (wid,)).fetchone()[0]
             for item in scenario["라이브러리"]["진행단계"]:
                 if item["이름"] in swaps:
                     item["규칙"] = {"스크립트": swaps[item["이름"]]}
+            if edit:
+                edit(scenario)                                              # 확정 검사를 통과하지 못할 내용을 스냅샷에 직접 넣는다(시험 전용)
             db.execute('ALTER TABLE "버전" DISABLE TRIGGER USER')          # 확정된 버전은 바꿀 수 없게 막혀 있어 잠시 푼다(시험 전용)
             db.execute('UPDATE "버전" SET "시나리오" = %s WHERE "작품_번호" = %s', (Jsonb(scenario), wid))
             db.execute('ALTER TABLE "버전" ENABLE TRIGGER USER')
