@@ -1288,6 +1288,11 @@ export interface components {
             /** 플레이어 수 */
             "\uD50C\uB808\uC774\uC5B4_\uC218": number;
             /**
+             * 게임 종료
+             * @default false
+             */
+            "\uAC8C\uC784_\uC885\uB8CC"?: boolean;
+            /**
              * 생성일시
              * Format: date-time
              */

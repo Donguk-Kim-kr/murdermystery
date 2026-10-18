@@ -912,6 +912,35 @@ describe("방", () => {
     expect(await screen.findByText("참여 중인 방이 없습니다.")).toBeInTheDocument();
   });
 
+  it("플레이 홈: 참여 중인 방은 작품 이름과 상태로 보이고, 이동·나가기 버튼이 있다", async () => {
+    let room: unknown = { ...baseRoom, 내가_방장: false };
+    routes["GET /api/rooms/me"] = () => json(room);
+    routes["POST /api/rooms/leave"] = () => { room = null; return new Response(null, { status: 204 }); };
+    renderApp("/");
+    const card = await screen.findByRole("region", { name: "내 방" });
+    expect(card).toHaveTextContent("저택의 비밀 - 참여 중");
+    expect(within(card).getByRole("link", { name: "이동" })).toHaveAttribute("href", "/room");
+    expect(screen.getByRole("heading", { name: "게임 목록" })).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "나가기" }));
+    await waitFor(() => expect(screen.queryByRole("region", { name: "내 방" })).not.toBeInTheDocument());
+  });
+
+  it("플레이 홈: 진행 중·종료 상태가 구분되어 보이고, 방장이 대기 중인 방을 나가려면 확인을 거친다", async () => {
+    let room: unknown = { ...baseRoom, 상태: "진행", 게임_종료: false };
+    routes["GET /api/rooms/me"] = () => json(room);
+    renderApp("/");
+    expect(await screen.findByRole("region", { name: "내 방" })).toHaveTextContent("저택의 비밀 - 진행 중");
+    room = { ...baseRoom, 상태: "진행", 게임_종료: true };
+    await waitFor(() => expect(screen.getByRole("region", { name: "내 방" })).toHaveTextContent("저택의 비밀 - 종료"));
+    room = baseRoom;
+    await waitFor(() => expect(screen.getByRole("region", { name: "내 방" })).toHaveTextContent("저택의 비밀 - 참여 중"));
+    let left = false;
+    routes["POST /api/rooms/leave"] = () => { left = true; return new Response(null, { status: 204 }); };
+    await userEvent.click(screen.getByRole("button", { name: "나가기" }));
+    expect(await answerConfirm(false)).toBe("방장이 나가면 방이 닫힙니다.나가시겠습니까?");
+    expect(left).toBe(false);
+  });
+
   it("방에 있으면 상단에 내 방 코드가 보인다", async () => {
     routes["GET /api/rooms/me"] = () => json(baseRoom);
     renderApp("/");

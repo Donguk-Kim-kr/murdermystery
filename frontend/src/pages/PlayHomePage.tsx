@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { api, errorMessage } from "../api/client";
 import type { components } from "../api/schema";
+import { useConfirm } from "../confirm/ConfirmContext";
 import { useRoom } from "../rooms/RoomContext";
 import { JoinCodeDialog } from "./JoinRoomPage";
 
@@ -10,10 +11,19 @@ type PlayWork = components["schemas"]["PlayWorkOut"];
 
 /** 로그인하면 처음 보이는 플레이공간: 내가 방을 만들 수 있는 작품과, 입장코드로 들어가는 버튼(누르면 코드 입력 창이 열린다). */
 export function PlayHomePage() {
-  const { room } = useRoom();
+  const confirm = useConfirm();
+  const { room, refresh } = useRoom();
   const [works, setWorks] = useState<PlayWork[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
+
+  async function leave() {
+    setError(null);
+    if (room!.내가_방장 && room!.상태 === "대기" && !(await confirm("방장이 나가면 방이 닫힙니다.\n나가시겠습니까?"))) return;
+    const { error } = await api.POST("/api/rooms/leave");
+    if (error) setError(errorMessage(error, "나가지 못했습니다"));
+    await refresh();
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -35,13 +45,18 @@ export function PlayHomePage() {
       {room && (
         <section className="card" aria-label="내 방">
           <div className="row">
-            <span>참여 중인 방 <strong>{room.입장코드}</strong></span>
-            <Link to="/room" className="button">내 방으로 돌아가기</Link>
+            <span>
+              <strong>{room.작품.제목}</strong> - {room.상태 === "대기" ? "참여 중" : room.게임_종료 ? "종료" : "진행 중"}
+            </span>
+            <span className="row start">
+              <Link to="/room" className="button">이동</Link>
+              <button type="button" className="secondary" onClick={() => void leave()}>나가기</button>
+            </span>
           </div>
         </section>
       )}
       <div className="row">
-        <h2>플레이할 작품</h2>
+        <h2>게임 목록</h2>
         <button type="button" className="secondary" onClick={() => setJoining(true)}>입장코드</button>
       </div>
       {error && <p role="alert" className="error">{error}</p>}

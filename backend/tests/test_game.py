@@ -1012,3 +1012,13 @@ def test_games_left_running_in_the_database_are_closed_when_the_server_restarts(
         state_.rooms, state_.games = kept                                                # 다른 시험에 영향을 주지 않게 되돌린다
     assert db.execute('SELECT "상태" FROM "방" WHERE "번호" = %s', (room["번호"],)).fetchone()[0] == "종료"
     assert db.execute('SELECT count(*) FROM "참여" WHERE "작품_번호" = %s', (wid,)).fetchone()[0] == 3        # 참여 기록은 남는다
+
+
+def test_room_info_says_when_the_game_has_ended_and_host_cannot_leave_a_running_room(client, make_account, make_game_work):
+    host, others, room, _ = started(client, make_account, make_game_work)
+    assert client.get("/api/rooms/me", headers=host.headers).json()["게임_종료"] is False
+    assert client.post("/api/rooms/leave", headers=host.headers).status_code == 409            # 방장은 진행 중인 방을 나갈 수 없다
+    end_now(client, room["번호"])
+    assert client.get("/api/rooms/me", headers=host.headers).json()["게임_종료"] is True
+    assert client.post("/api/rooms/leave", headers=host.headers).status_code == 409            # 게임이 끝난 뒤에도 방이 닫히기 전까지는 같다
+    assert client.post("/api/rooms/leave", headers=others[0].headers).status_code == 204       # 참가자는 나갈 수 있다

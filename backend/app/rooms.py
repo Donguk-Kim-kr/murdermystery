@@ -102,6 +102,7 @@ class RoomOut(BaseModel):
     내_계정_번호: int
     참가자: list[MemberOut]
     플레이어_수: int
+    게임_종료: bool = False   # 진행 중인 방에서 게임이 끝났다(방은 그로부터 6시간 뒤에 닫힌다)
     생성일시: datetime
 
 
@@ -154,7 +155,7 @@ def expire_stale(request: Request) -> None:
         request.app.state.games.remove(room_id)
 
 
-def build_room_out(row: dict, room: WaitingRoom, me_id: int) -> RoomOut:
+def build_room_out(row: dict, room: WaitingRoom, me_id: int, game_ended: bool = False) -> RoomOut:
     members = [
         MemberOut(계정_번호=m.account_id, 닉네임=m.nickname, 방장=m.account_id == room.host_id, 플레이=m.playing, GM관전=m.gm)
         for m in sorted(room.members.values(), key=lambda m: (m.account_id != room.host_id, m.account_id))
@@ -166,7 +167,7 @@ def build_room_out(row: dict, room: WaitingRoom, me_id: int) -> RoomOut:
             예상시간=row["예상시간"], 최소인원=row["최소인원"], 최대인원=row["최대인원"],
         ),
         버전=row["버전_버전"], 내가_방장=room.host_id == me_id, 내_계정_번호=me_id, 참가자=members,
-        플레이어_수=room.player_count(), 생성일시=row["생성일시"],
+        플레이어_수=room.player_count(), 게임_종료=game_ended, 생성일시=row["생성일시"],
     )
 
 
@@ -317,7 +318,8 @@ def my_room(conn: Conn, me: CurrentUser, request: Request) -> RoomOut | None:
         return None
     row, room = mine
     reg.touch(me.계정.번호)
-    return build_room_out(row, room, me.계정.번호)
+    game = request.app.state.games.get(row["번호"])
+    return build_room_out(row, room, me.계정.번호, game_ended=game is not None and game.ended)
 
 
 @router.patch("/me", response_model=RoomOut)
