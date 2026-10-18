@@ -77,9 +77,12 @@ await next("자기소개");
 await pages[2].getByRole("tab", { name: "자기소개" }).click();
 check((await text(pages[2])).includes("마을의 의사입니다."), "자기소개: 소개 멘트가 모두에게 보인다");
 await next("조사");
-const pick = async (p, place) => { await p.getByRole("button", { name: new RegExp(place) }).click(); };
-await pick(host, "서재"); await host.getByText("찢어진 편지").first().waitFor({ timeout: 8000 }).catch(() => {});
-await pick(p1, "서재"); await pick(p2, "정원");
+const pick = async (p, item) => { await p.getByRole("button", { name: new RegExp(item) }).click(); };      // 장소가 아니라 단서·증언을 직접 고른다
+await pick(host, "서랍 속 종이"); await host.getByText("'서랍 속 종이'을(를) 얻었습니다").first().waitFor({ timeout: 8000 }).catch(() => {});
+let greyed = false;
+for (let i = 0; i < 40 && !greyed; i++) { greyed = await p1.getByRole("button", { name: /서랍 속 종이/ }).isDisabled().catch(() => false); if (!greyed) await p1.waitForTimeout(200); }
+check(greyed, "조사: 다른 사람이 가져간 단서는 회색(고를 수 없음)이다");
+await pick(p1, "깨진 안경"); await pick(p2, "정원사");
 const openCards = async (p) => { const closed = p.getByRole("button", { name: /눌러서 내용 보기/ }); while (await closed.count() > 0) await closed.first().click(); };
 await host.getByRole("tab", { name: "내 단서" }).click();
 check((await text(host)).includes("서랍 속 종이") && !(await text(host)).includes("편지 내용입니다"), "조사: 방장이 단서를 얻었고 공개이름만 먼저 보이며 내용은 접혀 있다");

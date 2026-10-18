@@ -20,8 +20,12 @@ interface Item {
   비활성?: boolean;
   /** 투표: 인물이 아닌 선택지(예: 사고사) */
   기타?: boolean;
-  /** 투표: 인물 / 장소 / 단서 / 기타 */
+  /** 투표: 인물 / 장소 / 단서 / 기타. 조사 목록: 단서 / 증언 */
   종류?: string;
+  /** 조사 목록: 있는 장소, 이 사람에게 고를 수 있는 상태("가능"/"가져감"/"얻음"), 가진 사람(조사 공개를 켰을 때만) */
+  장소?: string;
+  상태?: string;
+  가진_사람?: string[];
 }
 
 interface Card {
@@ -388,6 +392,44 @@ function ChoiceBlock({ block, state, onAnswer }: { block: Block; state: GameStat
     const ok = await onAnswer(text(block.질문ID), value);
     setBusy(false);
     if (ok) setPicked(undefined);
+  }
+
+  // 조사 목록(단서·증언)은 장소별로 묶어 보여 준다
+  const investigation = items.length > 0 && items.every((i) => (i.종류 === "단서" || i.종류 === "증언") && i.장소 !== undefined);
+  if (investigation) {
+    const places = [...new Set(items.map((i) => i.장소 ?? ""))];
+    return (
+      <section className="block" aria-label={text(block.이름)}>
+        <Title block={block} />
+        {places.map((place) => (
+          <div key={place} className="investigation-place" role="group" aria-label={place}>
+            <h4>{place}</h4>
+            <ul className="choice-list">
+              {items.filter((i) => (i.장소 ?? "") === place).map((item) => {
+                const others = item.가진_사람 ?? [];
+                const note = item.상태 === "얻음" ? "내가 얻음" : item.상태 === "가져감" ? (others.length > 0 ? `${others.join(", ")} 가져감` : "다른 사람이 가져감") : null;
+                return (
+                  <li key={String(item.값)}>
+                    <button
+                      type="button"
+                      className={`choice${item.상태 === "얻음" ? " mine" : ""}`}
+                      disabled={!isPlayer || busy || item.비활성 === true}
+                      onClick={() => void send(item.값)}
+                    >
+                      <strong>{text(item.이름) || "이름 없음"}</strong>
+                      <span className="chip">{item.종류}</span>
+                      {note && <span className="chip accent">{note}</span>}
+                      {item.상태 === "가능" && item.종류 === "증언" && others.length > 0 && <span className="muted">{others.join(", ")} 들음</span>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+        {!isPlayer && <p className="muted">관전 중에는 고를 수 없습니다.</p>}
+      </section>
+    );
   }
 
   return (

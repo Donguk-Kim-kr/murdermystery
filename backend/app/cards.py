@@ -55,7 +55,7 @@ class CardRun:
 MUTATING = {"배정취소", "탭이어쓰기", "변수설정", "배정", "투표", "투표초기화", "조사", "양도", "공개설정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
 FUNCTION_NAMES = {
     "플레이어들", "플레이어수", "인물들", "공통스토리", "서사들", "배정된_플레이어수", "인물_없는_플레이어가_있다",
-    "공통스토리부분들", "탭이어쓰기", "배정취소", "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "모든_장소", "단서들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
+    "공통스토리부분들", "탭이어쓰기", "배정취소", "조사항목들", "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "모든_장소", "단서들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
     "단계_끝내기", "게임_종료",
 }
 FUNCTION_NAMES |= BUILDER_NAMES          # 제작 화면을 정하는 함수들(app/declare.py). 게임 중에 불러도 값만 만들 뿐이다
@@ -343,12 +343,13 @@ class CardHost:
     def fn_글(self, 이름: str, 내용: Any) -> dict[str, Any]:
         return {"종류": "글", "이름": str(이름), "내용": _text(내용)}
 
-    def fn_선택지(self, 이름: str, 항목: Any, 한사람당: int = 1, 확인필요: bool = False, 설명보임: bool = False) -> dict[str, Any]:
-        """고르는 칸. 인물을 고르는 칸이면 `설명보임` 으로 인물의 캐릭터 설명(`캐릭터설명`)를 함께 보여 줄 수 있다."""
+    def fn_선택지(self, 이름: str, 항목: Any, 한사람당: int = 1, 확인필요: bool = False, 설명보임: bool = False, 공개: bool = False) -> dict[str, Any]:
+        """고르는 칸. 인물을 고르는 칸이면 `설명보임` 으로 인물의 캐릭터 설명(`캐릭터설명`)을 함께 보여 줄 수 있다.
+        조사 항목(단서·증언)을 고르는 칸이면 `공개` 로 누가 그것을 가졌는지도 모두에게 보여 줄 수 있다(기본은 보이지 않는다)."""
         if not isinstance(항목, (list, tuple)):
             raise ScriptError("선택지의 항목은 목록이어야 합니다")
         return {
-            "종류": "선택지", "이름": str(이름), "항목": list(항목), "한사람당": 한사람당, "확인필요": bool(확인필요), "설명보임": bool(설명보임),
+            "종류": "선택지", "이름": str(이름), "항목": list(항목), "한사람당": 한사람당, "확인필요": bool(확인필요), "설명보임": bool(설명보임), "공개": bool(공개),
             "질문ID": f"{self.run.key}:확인",
         }
 
@@ -422,13 +423,15 @@ class CardHost:
         return {"거부": _text(메시지)}
 
     # -- 엔진 명령 --
-    def fn_조사(self, 플레이어: Any, 장소: Any) -> dict[str, Any] | None:
-        """장소에서 항목 하나를 얻는다. 얻은 {종류, 이름, 내용, 장소} 를 돌려주고, 얻을 것이 없거나 장소가 아니면 None."""
+    def fn_조사항목들(self) -> list[Ref]:
+        """조사로 얻을 수 있는 단서·증언(장소가 있는 것). 장소 순서대로, 같은 장소에서는 단서가 먼저. `선택지()` 에 넘기면 화면에 장소별로 보인다."""
+        return [Ref(kind, row["순서"]) for kind, row in clues.investigable(self.game)]
+
+    def fn_조사(self, 플레이어: Any, 항목: Any) -> dict[str, Any] | None:
+        """고른 단서·증언 하나를 얻는다. 얻은 {종류, 이름, 공개이름, 내용, 장소} 를 돌려주고, 얻을 수 없으면(이미 다른 사람이 가져갔거나
+        내가 얻었거나 항목이 아니면) None. 항목은 `조사항목들()` 의 항목이거나 선택지에서 받은 값이다."""
         account = self._player_account(플레이어)
-        slot = 장소.key if isinstance(장소, Ref) and 장소.kind == "장소" else 장소
-        if not isinstance(slot, int) or isinstance(slot, bool):         # 플레이어가 보낸 값이라 잘못되어도 카드가 멈추지 않는다
-            return None
-        return clues.investigate(self.game, account, slot, self.io)
+        return clues.investigate(self.game, account, 항목, self.io)       # 플레이어가 보낸 값이라 잘못되어도 카드가 멈추지 않는다
 
     def fn_양도(self, 플레이어: Any, 받는사람: Any, 단서: Any) -> bool:
         """단서를 다른 플레이어에게 바로 넘긴다(수락이 필요 없다). 성공하면 True. 그 단서에 걸린 공개는 사라진다."""
@@ -839,7 +842,23 @@ def answer(game, account_id: int, qid: str, value: Any, io) -> None:
 
 # ---- 보는 사람에게 보여 줄 것 ----------------------------------------------------------------------
 
-def _item(game, viewer: int, item: Any, show_intro: bool = False) -> dict[str, Any]:
+def _investigation_item(game, viewer: int, item: Ref, show_holders: bool) -> dict[str, Any]:
+    """조사 목록의 한 항목: 남들에게 보이는 이름(공개이름), 있는 장소, 이 사람에게 고를 수 있는지."""
+    row = next((r for r in game.snapshot.get(item.kind) or [] if r["순서"] == item.key), None) or {}
+    status = clues.availability(game, viewer, item.kind, item.key) if viewer in game.players else "가져감"
+    shown: dict[str, Any] = {}
+    if show_holders:
+        shown["가진_사람"] = [game.players[a].nickname for a in clues.holders(game, item.kind, item.key) if a != viewer and a in game.players]
+    return {
+        "값": f"{item.kind}:{item.key}", "이름": row.get("공개이름") or row.get("이름") or f"{item.kind} {item.key}",
+        "종류": item.kind, "장소": clues.place_path(game, row["장소_순서"]) if row.get("장소_순서") is not None else "",
+        "상태": status, "비활성": status != "가능", **shown,
+    }
+
+
+def _item(game, viewer: int, item: Any, show_intro: bool = False, show_holders: bool = False) -> dict[str, Any]:
+    if isinstance(item, Ref) and item.kind in clues.KINDS:
+        return _investigation_item(game, viewer, item, show_holders)
     if isinstance(item, Ref) and item.kind == "인물":
         row = next((c for c in game.snapshot.get("인물") or [] if c["순서"] == item.key), None)
         taken = next((p.account_id for p in game.players.values() if p.character == item.key), None)
@@ -867,7 +886,7 @@ def _block(game, viewer: int, block: dict[str, Any]) -> dict[str, Any]:
     kind = block.get("종류")
     if kind == "선택지":
         items = block.get("항목", [])
-        out["항목"] = [_item(game, viewer, i, bool(block.get("설명보임"))) for i in items]
+        out["항목"] = [_item(game, viewer, i, bool(block.get("설명보임")), bool(block.get("공개"))) for i in items]
         player = game.players.get(viewer)
         picks_character = any(isinstance(i, Ref) and i.kind == "인물" for i in items)
         out["내_선택_끝남"] = bool(picks_character and player and player.character is not None)

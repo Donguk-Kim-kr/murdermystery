@@ -13,12 +13,10 @@ def start(client, make_scripted_game, settings=None):
     host, others, room, wid = make_scripted_game([("조사", INVESTIGATE, {"횟수": 3}), ("토론", DISCUSSION, settings)], setup=build)
     people = players_of(host, others)
     view = state(client, people[0]).json()
-    choice = block(view, "조사할 장소")
-    place = {i["이름"]: i["값"] for i in choice["항목"]}
-    study, garden = place["저택 › 서재"], place["정원"]
-    answer(client, people[0], choice["질문ID"], study)        # 찢어진 편지
-    answer(client, people[0], choice["질문ID"], garden)       # 정원사의 증언
-    answer(client, people[1], choice["질문ID"], study)        # 깨진 안경
+    choice = block(view, "조사 대상")
+    answer(client, people[0], choice["질문ID"], "단서:1")      # 찢어진 편지
+    answer(client, people[0], choice["질문ID"], "증언:2")      # 정원사의 증언
+    answer(client, people[1], choice["질문ID"], "단서:2")      # 깨진 안경
     assert advance(client, host).status_code == 200
     return host, others, people, room
 

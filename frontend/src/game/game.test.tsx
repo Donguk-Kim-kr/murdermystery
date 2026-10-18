@@ -344,6 +344,52 @@ describe("대기실에서 게임 시작", () => {
   });
 });
 
+describe("조사 목록(단서·증언을 직접 고른다)", () => {
+  const list = (extra: Record<string, unknown> = {}) => ({
+    종류: "선택지", 이름: "조사 대상", 한사람당: 1, 확인필요: false, 질문ID: "1:5:확인", 내_선택_끝남: false,
+    항목: [
+      { 값: "단서:1", 이름: "서랍 속 종이", 종류: "단서", 장소: "저택 › 서재", 상태: "가능", 비활성: false },
+      { 값: "단서:2", 이름: "깨진 안경", 종류: "단서", 장소: "저택 › 서재", 상태: "가져감", 비활성: true, ...extra },
+      { 값: "증언:2", 이름: "정원사", 종류: "증언", 장소: "정원", 상태: "얻음", 비활성: true },
+      { 값: "단서:3", 이름: "독이 든 컵", 종류: "단서", 장소: "정원", 상태: "가능", 비활성: false },
+    ],
+  });
+
+  it("장소별로 묶어 공개이름을 보여 주고, 가져간 것·내가 얻은 것은 회색으로 보인다", async () => {
+    state = makeState({ 화면: [list()] });
+    render(<GamePage />);
+    const study = within(await screen.findByRole("group", { name: "저택 › 서재" }));
+    expect(study.getByRole("button", { name: /서랍 속 종이/ })).toBeEnabled();
+    const taken = study.getByRole("button", { name: /깨진 안경/ });
+    expect(taken).toBeDisabled();
+    expect(within(taken).getByText("다른 사람이 가져감")).toBeInTheDocument();
+    const garden = within(screen.getByRole("group", { name: "정원" }));
+    expect(garden.getByRole("button", { name: /정원사/ })).toBeDisabled();
+    expect(garden.getByText("내가 얻음")).toBeInTheDocument();
+    expect(garden.getByRole("button", { name: /독이 든 컵/ })).toBeEnabled();
+  });
+
+  it("조사 공개를 켠 게임에서는 가져간 사람의 닉네임이 보인다", async () => {
+    state = makeState({ 화면: [list({ 가진_사람: ["조수"] })] });
+    render(<GamePage />);
+    expect(await screen.findByText("조수 가져감")).toBeInTheDocument();
+  });
+
+  it("고르면 확인 없이 그 항목의 값을 바로 보낸다", async () => {
+    posts.length = 0;
+    state = makeState({ 화면: [list()] });
+    render(<GamePage />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: /독이 든 컵/ }));
+    await waitFor(() => expect(posts).toEqual([{ path: "/api/game/me/answer", body: { 질문ID: "1:5:확인", 값: "단서:3" } }]));
+  });
+
+  it("관전자는 고를 수 없다", async () => {
+    state = makeState({ 나: { ...state.나, 역할: "관전자" }, 화면: [list()] });
+    render(<GamePage />);
+    expect(await screen.findByRole("button", { name: /서랍 속 종이/ })).toBeDisabled();
+  });
+});
+
 describe("조사 블록", () => {
   const places = (disabled: boolean) => ({
     종류: "선택지", 이름: "조사할 장소", 한사람당: 1, 확인필요: false, 질문ID: "1:5:확인", 내_선택_끝남: false,

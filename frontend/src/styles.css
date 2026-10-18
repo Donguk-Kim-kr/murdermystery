@@ -613,6 +613,8 @@ body.flow-dragging, body.flow-dragging * { cursor: grabbing !important; user-sel
 .tray-desc { font-size: 0.75rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .tray-x { position: absolute; top: 0.15rem; right: 0.35rem; }
 .push-right { margin-left: auto; }
+.investigation-place { display: grid; gap: 0.35rem; margin-bottom: 0.6rem; }
+.investigation-place h4 { margin: 0; font-size: 0.9rem; color: var(--muted); }
 .npc-kind { border: 0; padding: 0; margin: 0; display: grid; gap: 0.45rem; }
 .npc-kind legend { padding: 0; font-weight: 600; margin-bottom: 0.25rem; }
 .pick-intro { display: block; margin-top: 0.25rem; font-size: 0.8125rem; font-weight: 400; color: var(--muted); text-align: left; white-space: pre-wrap; }
