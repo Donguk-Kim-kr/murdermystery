@@ -206,11 +206,21 @@ def test_reveal_all_ends_the_game_and_shows_every_clue_and_every_narrative(clien
     view = state(client, others[0]).json()
     assert view["종료"] is True
     assert "게임이 끝났습니다" in block(view, "게임 종료")["내용"]
-    cards = tab(view, "전체 단서")["항목"]
-    assert sorted(c["이름"] for c in cards) == sorted(["찢어진 편지", "깨진 안경", "독이 든 컵", "장소 없는 단서", "정원사의 증언", "집사의 증언"])
-    story = tab(view, "전체 서사")["내용"]
+    clues = tab(view, "전체 단서")
+    assert clues["종류"] == "구역보기"
+    by_place = {sec["제목"]: [(i["제목"], i["내용"]) for i in sec["항목"]] for sec in clues["구역"]}
+    assert list(by_place) == ["저택 › 서재", "저택 › 주방", "정원", "장소 없음"]               # 장소별 상자, 장소 순서대로 장소가 없는 것은 끝
+    assert [t for t, _ in by_place["저택 › 서재"]] == ["찢어진 편지", "깨진 안경"]
+    assert [t for t, _ in by_place["저택 › 주방"]] == ["독이 든 컵", "집사의 증언 (증언)"]
+    assert [t for t, _ in by_place["정원"]] == ["정원사의 증언 (증언)"] and [t for t, _ in by_place["장소 없음"]] == ["장소 없는 단서"]
+    assert by_place["저택 › 서재"][0][1] == "게임 중 이름: 서랍 속 종이\n\n편지 내용 XYZ1"       # 공개이름이 다르면 게임 중 이름을 알려 준다
+    assert by_place["저택 › 서재"][1][1] == "안경 내용 XYZ2"
+    story = tab(view, "전체 서사")
+    assert story["종류"] == "구역보기" and [sec["제목"] for sec in story["구역"]] == ["인물별 서사"]
+    people = {i["제목"]: i["내용"] for i in story["구역"][0]["항목"]}
+    assert list(people) == ["인물0", "인물1", "인물2"]
     for i in range(3):
-        assert f"인물{i}\n{i}번의 서사 하나\n\n{i}번의 서사 둘" in story                      # 모든 인물의 서사가 모든 부분으로
+        assert people[f"인물{i}"] == f"{i}번의 서사 하나\n\n{i}번의 서사 둘"                  # 인물마다 상자, 모든 부분이 이어서
     assert db.execute('SELECT "상태" FROM "진행" WHERE "방_번호" = %s', (room["번호"],)).fetchone()[0] == "종료"
     assert advance(client, host).status_code == 409                                        # 끝난 게임은 더 진행하지 않는다
 

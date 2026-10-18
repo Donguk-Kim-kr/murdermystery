@@ -83,6 +83,7 @@ let greyed = false;
 for (let i = 0; i < 40 && !greyed; i++) { greyed = await p1.getByRole("button", { name: /서랍 속 종이/ }).isDisabled().catch(() => false); if (!greyed) await p1.waitForTimeout(200); }
 check(greyed, "조사: 다른 사람이 가져간 단서는 회색(고를 수 없음)이다");
 await pick(p1, "깨진 안경"); await pick(p2, "정원사");
+const openFolds = async (p) => { const closed = p.locator(".fold-head[aria-expanded=false]"); while (await closed.count() > 0) await closed.first().click(); };
 const openCards = async (p) => { const closed = p.getByRole("button", { name: /눌러서 내용 보기/ }); while (await closed.count() > 0) await closed.first().click(); };
 await host.getByRole("tab", { name: "내 단서" }).click();
 check((await text(host)).includes("서랍 속 종이") && !(await text(host)).includes("편지 내용입니다"), "조사: 방장이 단서를 얻었고 공개이름만 먼저 보이며 내용은 접혀 있다");
@@ -139,10 +140,11 @@ check((await text(p1)).includes("모두의 이후 이야기"), "후일담: 조�
 await p1.getByRole("tab", { name: "결말" }).click();
 check(await p1.getByRole("group", { name: "엔딩" }).isVisible() && await p1.getByRole("group", { name: "후일담" }).isVisible(), "결말: 엔딩과 후일담이 한 탭의 두 구역에 모인다");
 await next("전체 공개");
-await p1.getByRole("tab", { name: "전체 단서" }).click(); await openCards(p1);
+await p1.getByRole("tab", { name: "전체 단서" }).click(); await openFolds(p1);
 const all = await text(p1);
 check(all.includes("편지 내용입니다") && all.includes("컵 내용입니다") && all.includes("그날 밤 누군가를 보았습니다"), "전체 공개: 아무도 얻지 못한 단서까지 모든 단서가 보인다");
-await p1.getByRole("tab", { name: "전체 서사" }).click();
+await p1.screenshot({ path: `${OUT}/full-all-clues.png` });
+await p1.getByRole("tab", { name: "전체 서사" }).click(); await openFolds(p1);
 const story = await text(p1);
 check(story.includes("의사의 서사 둘째") && story.includes("하녀의 서사 둘째"), "전체 공개: 모든 인물의 서사가 보인다");
 check((await host.getByText("게임 종료").count()) > 0 && (await host.getByRole("button", { name: "다음 단계" }).count()) === 0, "전체 공개: 게임 종료 표시, 진행 버튼 없음");

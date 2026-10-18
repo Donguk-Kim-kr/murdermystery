@@ -233,12 +233,10 @@ class CardHost:
         return None
 
     def fn_모든_단서(self) -> list[dict[str, Any]]:
-        """작품의 모든 단서와 증언(누가 가졌는지와 상관없이). 전체 공개 단계가 보여 준다. 각 항목은 {종류, 이름, 공개이름, 내용, 장소}."""
-        out = []
-        for kind in ("단서", "증언"):
-            for row in sorted(self.game.snapshot.get(kind) or [], key=lambda r: r["순서"]):
-                out.append(clues.describe(self.game, kind, row))
-        return out
+        """작품의 모든 단서와 증언(누가 가졌는지와 상관없이)을 장소 순서대로(장소가 없는 것은 끝). 전체 공개 단계가 보여 준다. 각 항목은 {종류, 이름, 공개이름, 내용, 장소}."""
+        rows = [(kind, row) for kind in ("단서", "증언") for row in self.game.snapshot.get(kind) or []]
+        rows.sort(key=lambda kr: (kr[1].get("장소_순서") is None, kr[1].get("장소_순서") or 0, ("단서", "증언").index(kr[0]), kr[1]["순서"]))   # 장소 순서대로, 장소가 없는 것은 끝
+        return [clues.describe(self.game, kind, row) for kind, row in rows]
 
     def fn_모든_인물(self) -> list[Ref]:
         """NPC 를 포함한 작품의 모든 인물."""

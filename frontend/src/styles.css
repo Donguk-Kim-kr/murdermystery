@@ -716,7 +716,13 @@ button.clue-head:hover { background: transparent; }
 .notice-ok { margin: 0; padding: 0.6rem 0.8rem; border-radius: var(--radius-sm); background: var(--success-soft); color: var(--success); font-size: 0.875rem; }
 .join-plain { display: grid; gap: 0.9rem; }
 
-/* 구역보기: 엔딩·후일담처럼 한 탭 안의 구역들. 구역마다 상자로 나뉘고 항목 제목을 눌러 하나씩 읽는다. */
+/* 구역보기: 엔딩·후일담·전체 단서·전체 서사처럼 한 탭 안의 구역들. 구역마다 상자로 나뉘고, 항목은 카드로 늘어서며 누르면 열린다. */
 .section-view { border: 1px solid var(--border-strong); border-radius: 8px; padding: 12px 14px; margin: 12px 0; }
 .section-view h4 { margin: 0 0 8px; }
-.section-view .prose { margin-top: 12px; }
+.fold-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.fold-card { border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2, transparent); }
+.fold-card.on { border-color: var(--border-strong); }
+.fold-head { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 8px 12px; background: none; border: 0; box-shadow: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.fold-head:hover:not(:disabled) { background: var(--surface-2); text-decoration: none; }
+.fold-head:active:not(:disabled) { transform: none; }
+.fold-body { margin: 0; padding: 0 12px 12px; white-space: pre-wrap; }

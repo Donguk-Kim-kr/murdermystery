@@ -94,32 +94,36 @@ function TextBlock({ block }: { block: Block }) {
 interface SectionItem { 제목: string; 내용: string }
 interface Section { 제목: string; 항목: SectionItem[] }
 
-/** 한 블록 안의 구역들(엔딩, 후일담 …). 구역마다 항목 제목을 눌러 하나씩 골라 읽는다. 처음에는 각 구역의 첫 항목이 펼쳐져 있다. */
+/**
+ * 한 블록 안의 구역들(엔딩·후일담, 장소별 단서, 인물별 서사 …). 구역마다 상자가 있고, 그 안에 항목이 카드로 늘어서며
+ * 카드를 누르면 열려서 내용이 보인다(다시 누르면 닫힌다). 항목이 하나뿐인 구역은 처음부터 열려 있다.
+ */
 function SectionsBlock({ block }: { block: Block }) {
   const sections = ((block.구역 as Section[] | undefined) ?? []).filter((s) => s.항목.length > 0);
-  const [picked, setPicked] = useState<Record<string, number>>({});
+  const [open, setOpen] = useState<Record<string, boolean>>({});
   return (
     <section className="block" aria-label={text(block.이름)}>
       <Title block={block} />
-      {sections.map((section) => {
-        const at = Math.min(picked[section.제목] ?? 0, section.항목.length - 1);
-        return (
-          <div key={section.제목} className="section-view" role="group" aria-label={section.제목}>
-            <h4>{section.제목}</h4>
-            <ul className="choice-list">
-              {section.항목.map((item, index) => (
-                <li key={index}>
-                  <button type="button" className={`choice${index === at ? " on" : ""}`} aria-pressed={index === at}
-                    onClick={() => setPicked({ ...picked, [section.제목]: index })}>
+      {sections.map((section, sectionIndex) => (
+        <div key={`${sectionIndex}:${section.제목}`} className="section-view" role="group" aria-label={section.제목}>
+          <h4>{section.제목}</h4>
+          <ul className="fold-list">
+            {section.항목.map((item, index) => {
+              const key = `${sectionIndex}:${index}`;
+              const isOpen = key in open ? open[key] : section.항목.length === 1;
+              return (
+                <li key={index} className={`fold-card${isOpen ? " on" : ""}`}>
+                  <button type="button" className="fold-head" aria-expanded={isOpen} onClick={() => setOpen({ ...open, [key]: !isOpen })}>
                     <strong>{item.제목}</strong>
+                    <span aria-hidden="true">{isOpen ? "▾" : "▸"}</span>
                   </button>
+                  {isOpen && <p className="prose fold-body">{item.내용}</p>}
                 </li>
-              ))}
-            </ul>
-            <p className="prose">{section.항목[at].내용}</p>
-          </div>
-        );
-      })}
+              );
+            })}
+          </ul>
+        </div>
+      ))}
     </section>
   );
 }
