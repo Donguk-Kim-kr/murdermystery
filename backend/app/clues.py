@@ -177,7 +177,7 @@ def set_reveal(game, owner: int, order: int, targets: Any, io) -> bool:
 
 
 def revealed_to(game, viewer: int) -> list[dict[str, Any]]:
-    """다른 사람이 나에게(또는 전체에게) 보여 준 단서."""
+    """다른 사람이 나에게(또는 전체에게) 보여 준 단서. `주인` 은 보여 준 사람의 캐릭터 이름(아직 안 골랐으면 닉네임)."""
     by_slot = {c["순서"]: c for c in game.snapshot.get("인물") or []}
     out = []
     for (owner, order), targets in game.reveals.items():
@@ -189,6 +189,6 @@ def revealed_to(game, viewer: int) -> list[dict[str, Any]]:
             continue
         item = describe(game, "단서", row)
         character = by_slot.get(player.character)
-        item["주인"] = f"{character['이름']} ({player.nickname})" if character else player.nickname
+        item["주인"] = character["이름"] if character else player.nickname
         out.append(item)
     return out

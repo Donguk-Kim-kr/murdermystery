@@ -41,7 +41,7 @@ interface Card {
   순서?: number;
   공개?: "전체" | number[];
   양도가능?: boolean;
-  /** 공개된 단서: 누가 보여 준 것인지 */
+  /** 공개 단서: 누가 보여 준 것인지(캐릭터 이름) */
   주인?: string;
 }
 
@@ -189,7 +189,7 @@ function ClueCard({ card: c, state, actions, onSend }: {
       <span className="clue-meta">
         <span className="chip">{c.종류}</span>
         {c.장소 && <span className="muted">{c.장소}</span>}
-        {c.주인 && <span className="chip accent">{c.주인}</span>}
+        {c.주인 && <span className="chip accent">{josa(c.주인, "이/가")} 단서를 공유했습니다</span>}
       </span>
       {c.내용 ? (
         <button type="button" className="clue-head" aria-expanded={open} onClick={() => setOpen(!open)}>

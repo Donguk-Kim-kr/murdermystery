@@ -535,10 +535,10 @@ describe("단서 보여 주기·양도", () => {
   });
 
   it("다른 사람이 보여 준 단서에는 보여 준 사람이 표시된다", async () => {
-    state = makeState({ ...base(), 탭: [{ 종류: "카드목록", 이름: "공개된 단서", 카드: "토론", 항목: [{ ...clue, 공개: undefined, 주인: "집사 (조수)" }] }] });
+    state = makeState({ ...base(), 탭: [{ 종류: "카드목록", 이름: "공개 단서", 카드: "토론", 항목: [{ ...clue, 공개: undefined, 주인: "집사" }] }] });
     render(<GamePage />);
-    await userEvent.setup().click(await screen.findByRole("tab", { name: "공개된 단서" }));
-    expect(screen.getByText("집사 (조수)")).toBeInTheDocument();
+    await userEvent.setup().click(await screen.findByRole("tab", { name: "공개 단서" }));
+    expect(screen.getByText("집사가 단서를 공유했습니다")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "양도" })).toBeNull();
   });
 });

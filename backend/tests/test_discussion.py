@@ -54,9 +54,9 @@ def test_show_a_clue_to_one_person_only(client, make_scripted_game):
     giver, friend, stranger = people
     letter = clue_cards(client, giver)["찢어진 편지"]["순서"]
     assert act(client, giver, "보여주기", letter, [acct(friend)]).status_code == 200
-    seen = tab(state(client, friend).json(), "공개된 단서")["항목"]
+    seen = tab(state(client, friend).json(), "공개 단서")["항목"]
     assert [c["이름"] for c in seen] == ["찢어진 편지"] and giver_name_in(seen[0]["주인"], client, giver)
-    assert tab(state(client, stranger).json(), "공개된 단서")["항목"] == []
+    assert tab(state(client, stranger).json(), "공개 단서")["항목"] == []
     assert "편지 내용 XYZ1" not in state(client, stranger).text                      # 보여 주지 않은 사람에게는 내용이 가지 않는다
     assert clue_cards(client, giver)["찢어진 편지"]["공개"] == [acct(friend)]
 
@@ -67,14 +67,14 @@ def test_show_to_several_then_everyone_then_cancel(client, make_scripted_game, d
     letter = clue_cards(client, giver)["찢어진 편지"]["순서"]
     act(client, giver, "보여주기", letter, [acct(b), acct(c)])
     for who in (b, c):
-        assert len(tab(state(client, who).json(), "공개된 단서")["항목"]) == 1
+        assert len(tab(state(client, who).json(), "공개 단서")["항목"]) == 1
     act(client, giver, "보여주기", letter, "전체")
     assert clue_cards(client, giver)["찢어진 편지"]["공개"] == "전체"
     for who in (b, c):
-        assert len(tab(state(client, who).json(), "공개된 단서")["항목"]) == 1
+        assert len(tab(state(client, who).json(), "공개 단서")["항목"]) == 1
     act(client, giver, "보여주기", letter, [])                                        # 취소
     for who in (b, c):
-        assert tab(state(client, who).json(), "공개된 단서")["항목"] == []
+        assert tab(state(client, who).json(), "공개 단서")["항목"] == []
         assert "XYZ1" not in state(client, who).text
     rows = db.execute(
         'SELECT 대상_참여_번호 IS NULL, 취소일시 IS NOT NULL FROM "공개" WHERE 진행_번호 = (SELECT 번호 FROM "진행" WHERE 방_번호 = %s) ORDER BY 번호',
@@ -91,7 +91,7 @@ def test_transfer_is_immediate_and_clears_reveals(client, make_scripted_game, db
     assert act(client, giver, "양도", letter, [acct(taker)]).status_code == 200
     assert "찢어진 편지" not in clue_cards(client, giver)
     assert clue_cards(client, taker)["찢어진 편지"]["공개"] == []                       # 받은 단서에는 이전 공개가 남아 있지 않다
-    assert tab(state(client, third).json(), "공개된 단서")["항목"] == []                 # 양도하면 걸린 공개는 사라진다
+    assert tab(state(client, third).json(), "공개 단서")["항목"] == []                 # 양도하면 걸린 공개는 사라진다
     assert [n["글"] for n in state(client, taker).json()["알림"]][-1].endswith("단서를 넘겨주었습니다.")
     rows = db.execute(
         'SELECT 획득방법, 보유여부 FROM "획득" WHERE 단서_순서 = %s AND 진행_번호 = (SELECT 번호 FROM "진행" WHERE 방_번호 = %s) ORDER BY 번호',
@@ -182,10 +182,22 @@ def test_actions_disappear_from_the_tab_after_the_phase_ends_but_cards_stay(clie
     assert answer(client, p2[0], qid, {"동작": "보여주기", "단서": 1, "대상": "전체"}).status_code == 409
 
 
-def test_revealed_clue_shows_the_owner_by_character_and_nickname(client, make_scripted_game):
+def test_revealed_clue_shows_the_owner_by_nickname_when_no_character_is_chosen(client, make_scripted_game):
     host, others, people, _ = start(client, make_scripted_game)
     giver, friend, _ = people
     letter = clue_cards(client, giver)["찢어진 편지"]["순서"]
     act(client, giver, "보여주기", letter, [acct(friend)])
-    owner = tab(state(client, friend).json(), "공개된 단서")["항목"][0]["주인"]
-    assert owner and owner != "None"
+    owner = tab(state(client, friend).json(), "공개 단서")["항목"][0]["주인"]
+    assert owner and "(" not in owner                                                      # 캐릭터를 고르지 않았으면 닉네임만
+
+
+def test_revealed_clue_shows_the_owner_by_character_name_only():
+    from types import SimpleNamespace
+
+    from app import clues
+
+    game = SimpleNamespace(
+        snapshot={"인물": [{"순서": 4, "이름": "집사"}], "단서": [{"순서": 1, "이름": "편지", "장소_순서": None}], "장소": []},
+        reveals={(10, 1): {20}}, players={10: SimpleNamespace(character=4, nickname="조수")},
+    )
+    assert [c["주인"] for c in clues.revealed_to(game, 20)] == ["집사"]                      # 닉네임 없이 캐릭터 이름만
