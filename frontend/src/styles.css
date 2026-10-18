@@ -715,3 +715,8 @@ button.clue-head:hover { background: transparent; }
 .field-hint { display: block; margin-top: 0.25rem; font-size: 0.8125rem; font-weight: 400; color: var(--muted); }
 .notice-ok { margin: 0; padding: 0.6rem 0.8rem; border-radius: var(--radius-sm); background: var(--success-soft); color: var(--success); font-size: 0.875rem; }
 .join-plain { display: grid; gap: 0.9rem; }
+
+/* 구역보기: 엔딩·후일담처럼 한 탭 안의 구역들. 구역마다 상자로 나뉘고 항목 제목을 눌러 하나씩 읽는다. */
+.section-view { border: 1px solid var(--border-strong); border-radius: 8px; padding: 12px 14px; margin: 12px 0; }
+.section-view h4 { margin: 0 0 8px; }
+.section-view .prose { margin-top: 12px; }

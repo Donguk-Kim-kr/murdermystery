@@ -65,8 +65,23 @@ def go_to_endings(client, host, steps):
         assert advance(client, host).status_code == 200
 
 
-def titles(client, who):
-    return sorted(b["이름"] for b in state(client, who).json()["화면"])
+def section_items(client, who, section):
+    """화면의 구역보기 블록에서 한 구역(엔딩·후일담)의 [(제목, 내용)] 을 순서대로."""
+    out = []
+    for b in state(client, who).json()["화면"]:
+        if b["종류"] == "구역보기":
+            for sec in b["구역"]:
+                if sec["제목"] == section:
+                    out += [(i["제목"], i["내용"]) for i in sec["항목"]]
+    return out
+
+
+def ending_titles(client, who):
+    return [t for t, _ in section_items(client, who, "엔딩")]
+
+
+def ending_texts(client, who):
+    return [c for _, c in section_items(client, who, "엔딩")]
 
 
 def test_ending_branch_is_chosen_by_the_vote_result(client, make_scripted_game):
@@ -80,8 +95,8 @@ def test_ending_branch_is_chosen_by_the_vote_result(client, make_scripted_game):
 
     host, people, _ = play(client, make_scripted_game, endings, votes=votes)
     go_to_endings(client, host, 1)                                             # 투표 → 엔딩
-    assert titles(client, people[1]) == ["엔딩: A 구속"]
-    assert block(state(client, people[1]).json(), "엔딩: A 구속")["내용"] == "범인이 잡혔습니다."
+    assert ending_titles(client, people[1]) == ["A 구속"]
+    assert ending_texts(client, people[1]) == ["범인이 잡혔습니다."]
 
 
 def test_ending_branch_for_a_failed_arrest_and_for_a_non_character_result(client, make_scripted_game):
@@ -98,11 +113,11 @@ def test_ending_branch_for_a_failed_arrest_and_for_a_non_character_result(client
 
     host, people, _ = play(client, make_scripted_game, endings, votes=votes)
     go_to_endings(client, host, 1)
-    assert titles(client, people[0]) == ["엔딩: 사고사"]
+    assert ending_titles(client, people[0]) == ["사고사"]
 
     host2, people2, _ = play(client, make_scripted_game, endings)               # 투표가 없다
     go_to_endings(client, host2, 1)
-    assert titles(client, people2[0]) == ["엔딩: 없음"]
+    assert ending_titles(client, people2[0]) == ["없음"]
 
 
 def test_all_matching_branches_are_shown_in_order_and_an_empty_condition_always_shows(client, make_scripted_game):
@@ -114,9 +129,7 @@ def test_all_matching_branches_are_shown_in_order_and_an_empty_condition_always_
     ]
     host, people, _ = play(client, make_scripted_game, endings)
     go_to_endings(client, host, 1)
-    assert titles(client, people[0]) == ["엔딩: 셋째", "엔딩: 첫째", "엔딩: 항상"]      # 정렬한 이름(보이는 순서는 분기 순서)
-    shown = [b["이름"] for b in state(client, people[0]).json()["화면"]]
-    assert shown == ["엔딩: 항상", "엔딩: 첫째", "엔딩: 셋째"]                          # 분기 순서대로
+    assert ending_titles(client, people[0]) == ["항상", "첫째", "셋째"]                  # 분기 순서대로
 
 
 def test_conditions_read_game_variables_set_by_scripts(client, make_scripted_game):
@@ -127,10 +140,10 @@ def test_conditions_read_game_variables_set_by_scripts(client, make_scripted_gam
     ]
     host, people, _ = play(client, make_scripted_game, endings, flag=True)
     go_to_endings(client, host, 2)                                              # 투표 → 변수 → 엔딩
-    assert titles(client, people[0]) == ["엔딩: 알아챔", "엔딩: 점수"]
+    assert ending_titles(client, people[0]) == ["알아챔", "점수"]
     host2, people2, _ = play(client, make_scripted_game, endings, flag=False)
     go_to_endings(client, host2, 2)
-    assert titles(client, people2[0]) == ["엔딩: 모름", "엔딩: 점수"]
+    assert ending_titles(client, people2[0]) == ["모름", "점수"]
 
 
 def test_conditions_can_read_who_holds_a_clue_and_which_player_has_a_character(client, make_scripted_game):
@@ -140,7 +153,7 @@ def test_conditions_can_read_who_holds_a_clue_and_which_player_has_a_character(c
     ]
     host, people, _ = play(client, make_scripted_game, endings)
     go_to_endings(client, host, 1)
-    assert titles(client, people[0]) == ["엔딩: 단서 없음", "엔딩: 인물 확인"]
+    assert ending_titles(client, people[0]) == ["단서 없음", "인물 확인"]
 
 
 def test_epilogues_show_per_character_with_conditions_and_without(client, make_scripted_game):
@@ -152,9 +165,10 @@ def test_epilogues_show_per_character_with_conditions_and_without(client, make_s
     host, people, _ = play(client, make_scripted_game, [("끝", {}, "끝")], epilogues=epilogues, flag=True)
     go_to_endings(client, host, 3)                                              # 투표 → 변수 → 엔딩 → 후일담
     view = state(client, people[0]).json()
-    names = [b["이름"] for b in view["화면"]]
-    assert names == ["후일담 1", "후일담 2: 인물0"]                                 # 인물2 의 후일담은 조건이 맞지 않는다
-    assert any(t["이름"] == "엔딩: 끝" for t in view["탭"])                         # 앞 단계의 탭은 남는다
+    assert section_items(client, people[0], "후일담") == [("후일담 1", "모두의 후일담"), ("인물0", "인물1 의 이후")]     # 인물2 의 후일담은 조건이 맞지 않는다
+    tabs = [t for t in view["탭"] if t["이름"] == "결말"]
+    assert len(tabs) == 1 and [sec["제목"] for sec in tabs[0]["구역"]] == ["엔딩", "후일담"]   # 엔딩과 후일담이 한 탭에 모인다
+    assert [(i["제목"], i["내용"]) for i in tabs[0]["구역"][0]["항목"]] == [("끝", "끝")]
 
 
 def test_broken_conditions_do_not_stop_the_game_and_are_reported_to_the_host_only(client, make_scripted_game):
@@ -162,7 +176,7 @@ def test_broken_conditions_do_not_stop_the_game_and_are_reported_to_the_host_onl
     endings = [(name, {"식": "True"}, "x") for name in broken] + [("정상", {"식": "True"}, "정상 엔딩")]
     host, people, _ = play(client, make_scripted_game, endings, unchecked=broken)      # 확정 검사는 통과한 뒤 스냅샷만 깨뜨린다
     go_to_endings(client, host, 1)
-    assert titles(client, people[1]) == ["엔딩: 정상"]
+    assert ending_titles(client, people[1]) == ["정상"]
     assert state(client, people[1]).json()["오류"] == []
     assert state(client, host).json()["오류"]                                       # 방장은 무엇이 잘못인지 본다
 
@@ -171,7 +185,7 @@ def test_conditions_cannot_change_the_game(client, make_scripted_game):
     bad = {"바꾸기": {"식": '변수설정("x", 1) is None'}}
     host, people, _ = play(client, make_scripted_game, [("바꾸기", {"식": "True"}, "x")], unchecked=bad)
     go_to_endings(client, host, 1)
-    assert titles(client, people[0]) == []                                          # 조건 안에서는 상태를 바꾸는 함수를 쓸 수 없다
+    assert ending_titles(client, people[0]) == []                                          # 조건 안에서는 상태를 바꾸는 함수를 쓸 수 없다
     assert any("알 수 없는 이름" in e["메시지"] for e in state(client, host).json()["오류"])
 
 
@@ -220,8 +234,7 @@ def test_ending_condition_arrested_the_culprit_by_vote(client, make_scripted_gam
     for target, expected in (("인물0", "범인을 검거했습니다."), ("인물1", "범인이 달아났습니다.")):
         host, people, _ = play(client, make_scripted_game, endings, votes=run(target), setup_extra=mark_culprit)
         go_to_endings(client, host, 1)
-        shown = [b for b in state(client, people[0]).json()["화면"] if b["이름"].startswith("엔딩")]
-        assert [b["내용"] for b in shown] == [expected], target
+        assert ending_texts(client, people[0]) == [expected], target
 
 
 def test_tie_and_no_votes_count_as_a_failed_arrest(client, make_scripted_game):
@@ -249,7 +262,7 @@ def test_tie_and_no_votes_count_as_a_failed_arrest(client, make_scripted_game):
     ):
         host, people, slots = play(client, make_scripted_game, endings, votes=scenario(picks), setup_extra=mark_culprit)
         go_to_endings(client, host, 1)
-        shown = [b["내용"] for b in state(client, people[0]).json()["화면"] if b["이름"].startswith("엔딩")]
+        shown = ending_texts(client, people[0])
         assert shown == [expected], (picks, shown)
 
 
@@ -282,5 +295,5 @@ def test_conditions_declared_by_the_final_vote_phase_work_as_written(client, mak
     ):
         host, people, _ = play(client, make_scripted_game, endings, votes=votes(picks), setup_extra=mark_culprit)
         go_to_endings(client, host, 1)
-        shown = [b["내용"] for b in state(client, people[0]).json()["화면"] if b["이름"].startswith("엔딩")]
+        shown = ending_titles(client, people[0])
         assert shown == expected, (picks, shown)

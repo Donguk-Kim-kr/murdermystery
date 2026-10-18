@@ -3,7 +3,7 @@ import pytest
 
 from app.default_phases import CHARACTER_SELECT, ENDING, FINAL_VOTE, PERSONAL_QUESTION
 from test_cards import all_pick, answer, block, db, make_scripted_game, players_of, state  # noqa: F401  (픽스처 포함)
-from test_endings import api
+from test_endings import api, ending_titles
 from test_game import advance
 
 QUESTIONS = {"질문": {"1": "당신이 본 것은 무엇입니까?", "2": {"질문": "비밀을 알고 있었습니까?", "선택": ["예", "아니오"]}}}
@@ -65,8 +65,7 @@ def test_free_text_and_choice_answers_are_saved_as_variables_and_progress_is_sha
     assert answer(client, who[2], box2["질문ID"], "아니오").status_code == 200
     assert block(state(client, who[3]).json(), "답변 완료")["완료"] == 2
     assert advance(client, host).status_code == 200
-    shown = sorted(b["이름"] for b in state(client, who[3]).json()["화면"])
-    assert shown == ["엔딩: 본 것", "엔딩: 비밀 모름"]                          # 답에 따라 엔딩이 갈린다
+    assert ending_titles(client, who[3]) == ["본 것", "비밀 모름"]                          # 답에 따라 엔딩이 갈린다
 
 
 def test_answers_can_be_changed_until_the_phase_ends(client, make_scripted_game):
@@ -78,7 +77,7 @@ def test_answers_can_be_changed_until_the_phase_ends(client, make_scripted_game)
     answer(client, who[2], qid, "아니오")
     assert block(state(client, who[2]).json(), "답변 완료")["완료"] == 1           # 바꿔도 한 명으로 센다
     advance(client, host)
-    assert [b["이름"] for b in state(client, who[1]).json()["화면"]] == ["엔딩: 아니오"]
+    assert ending_titles(client, who[1]) == ["아니오"]
 
 
 @pytest.mark.parametrize("value", [None, 5, ["예"], {"a": 1}, True, "", "가" * 301])
@@ -163,7 +162,7 @@ def test_a_question_can_be_answered_by_picking_a_character(client, make_scripted
     assert answer(client, who[1], box["질문ID"], 2).status_code == 200
     assert block(state(client, who[2]).json(), "답변 완료")["완료"] == 1
     assert advance(client, host).status_code == 200
-    assert [b["이름"] for b in state(client, who[3]).json()["화면"]] == ["엔딩: 의심"]
+    assert ending_titles(client, who[3]) == ["의심"]
 
 
 def test_a_question_can_be_answered_by_picking_a_place(client, make_scripted_game):
@@ -176,7 +175,7 @@ def test_a_question_can_be_answered_by_picking_a_place(client, make_scripted_gam
     assert answer(client, who[1], box["질문ID"], "장소:3").json()["알림"][-1]["글"] == "고를 수 없는 답입니다."
     assert answer(client, who[1], box["질문ID"], "장소:2").status_code == 200
     assert advance(client, host).status_code == 200
-    assert [b["이름"] for b in state(client, who[2]).json()["화면"]] == ["엔딩: 정원"]
+    assert ending_titles(client, who[2]) == ["정원"]
 
 
 def test_text_and_choice_questions_can_share_one_card_name(client, make_scripted_game):

@@ -1,7 +1,7 @@
 """능력 사용: 능력이 있는 인물의 플레이어가 다른 플레이어를 지목하고, 지목은 게임 변수로 남아 엔딩 조건이 읽는다 (app/default_phases.py ABILITY)."""
 from app.default_phases import ABILITY, CHARACTER_SELECT, ENDING
 from test_cards import all_pick, answer, block, db, make_scripted_game, players_of, state  # noqa: F401  (픽스처 포함)
-from test_endings import api
+from test_endings import api, ending_titles
 from test_game import advance
 
 
@@ -51,8 +51,7 @@ def test_the_target_is_saved_as_a_variable_that_endings_read(client, make_script
     assert answer(client, who[1], qid, 2).status_code == 200                                  # 넘어가기 전에는 바꿀 수 있다
     assert answer(client, who[1], qid, 1).status_code == 200                                  # 자기 자신은 고를 수 없다(무시된다)
     assert advance(client, host).status_code == 200
-    shown = sorted(b["이름"] for b in state(client, who[3]).json()["화면"])
-    assert shown == ["엔딩: 2번 지목"]
+    assert ending_titles(client, who[3]) == ["2번 지목"]
 
 
 def test_not_using_the_ability_is_also_a_choice(client, make_scripted_game):
@@ -61,7 +60,7 @@ def test_not_using_the_ability_is_also_a_choice(client, make_scripted_game):
     qid = block(state(client, who[1]).json(), "능력 사용")["질문ID"]
     assert answer(client, who[1], qid, "사용 안 함").status_code == 200
     assert advance(client, host).status_code == 200
-    assert [b["이름"] for b in state(client, who[1]).json()["화면"] if b["이름"].startswith("엔딩")] == ["엔딩: 쓰지 않음"]
+    assert ending_titles(client, who[1]) == ["쓰지 않음"]
 
 
 def test_targets_can_also_be_places_and_clues(client, make_scripted_game):
@@ -80,7 +79,7 @@ def test_targets_can_also_be_places_and_clues(client, make_scripted_game):
     assert answer(client, who[1], box["질문ID"], "단서:1").status_code == 200
     assert answer(client, who[1], box["질문ID"], "단서:9").status_code == 200              # 없는 대상은 무시된다
     assert advance(client, host).status_code == 200
-    assert [b["이름"] for b in state(client, who[1]).json()["화면"] if b["이름"].startswith("엔딩")] == ["엔딩: 서랍 지목"]
+    assert ending_titles(client, who[1]) == ["서랍 지목"]
 
 
 def test_places_and_clues_are_not_offered_unless_the_card_setting_asks(client, make_scripted_game):

@@ -56,7 +56,7 @@ class CardRun:
 MUTATING = {"배정취소", "탭이어쓰기", "변수설정", "배정", "투표", "투표초기화", "조사", "양도", "공개설정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
 FUNCTION_NAMES = {
     "플레이어들", "플레이어수", "인물들", "공통스토리", "서사들", "배정된_플레이어수", "인물_없는_플레이어가_있다",
-    "공통스토리부분들", "탭이어쓰기", "배정취소", "조사항목들", "토씨", "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "모든_장소", "단서들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
+    "공통스토리부분들", "탭이어쓰기", "배정취소", "조사항목들", "토씨", "글", "선택지", "입력", "카드목록", "구역보기", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "모든_장소", "단서들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
     "단계_끝내기", "게임_종료",
 }
 FUNCTION_NAMES |= BUILDER_NAMES          # 제작 화면을 정하는 함수들(app/declare.py). 게임 중에 불러도 값만 만들 뿐이다
@@ -69,6 +69,7 @@ MAX_VARIABLES = 500
 MAX_VARIABLE_NAME = 100
 MAX_VARIABLE_BYTES = 2000
 MAX_CANDIDATES = 100
+MAX_SECTION_ITEMS = 60                        # 구역보기 한 구역의 항목 수
 
 
 def known_names() -> set[str]:
@@ -130,8 +131,24 @@ class CardHost:
         if not isinstance(대상, Ref) or 대상.kind not in (ALL, "플레이어"):
             raise ScriptError("탭이어쓰기() 의 대상은 모두 또는 플레이어여야 합니다")
         key = self._target_key(대상)
-        name, text = str(이름), _text(글내용)
+        name = str(이름)
         old = self.game.tabs.get(key, {}).get(name)
+        if isinstance(글내용, dict) and 글내용.get("종류") == "구역보기":      # 구역이 있는 블록은 같은 제목의 구역에 항목을 더하고, 없는 구역은 새로 둔다
+            if old is None or old["내용"].get("종류") != "구역보기":
+                self.m_탭(대상, name, 글내용)
+                return
+            sections = [{"제목": s["제목"], "항목": list(s["항목"])} for s in old["내용"]["구역"]]
+            for new in 글내용["구역"]:
+                same = next((s for s in sections if s["제목"] == new["제목"]), None)
+                if same is None:
+                    sections.append({"제목": new["제목"], "항목": list(new["항목"])})
+                else:
+                    same["항목"].extend(new["항목"])
+            order = old["순번"]
+            self.m_탭(대상, name, {**글내용, "구역": sections})
+            self.game.tabs[key][name]["순번"] = order
+            return
+        text = _text(글내용)
         if old is None or old["내용"].get("종류") != "글":
             self.m_탭(대상, name, text)
             return
@@ -360,6 +377,21 @@ class CardHost:
             "종류": "선택지", "이름": str(이름), "항목": list(항목), "한사람당": 한사람당, "확인필요": bool(확인필요), "설명보임": bool(설명보임), "공개": bool(공개),
             "질문ID": f"{self.run.key}:확인",
         }
+
+    def fn_구역보기(self, 이름: str, 구역제목: Any, 항목들: Any) -> dict[str, Any]:
+        """한 블록 안에 구역(예: "엔딩", "후일담")을 두고, 구역마다 항목 제목을 골라 그 내용을 읽는 블록. `항목들` 은 [제목, 내용] 의 목록이다.
+        같은 이름의 탭에 `탭이어쓰기` 로 더하면 구역이 한 탭에 모인다."""
+        name = str(이름)
+        if not name.strip():
+            raise ScriptError("구역보기의 이름은 비워 둘 수 없습니다")
+        if not isinstance(항목들, (list, tuple)) or len(항목들) > MAX_SECTION_ITEMS:
+            raise ScriptError(f"구역보기의 항목은 [제목, 내용] 의 목록(최대 {MAX_SECTION_ITEMS}개)이어야 합니다")
+        items = []
+        for pair in 항목들:
+            if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+                raise ScriptError("구역보기의 항목은 [제목, 내용] 이어야 합니다")
+            items.append({"제목": _text(pair[0]).strip()[:100], "내용": _text(pair[1])})
+        return {"종류": "구역보기", "이름": name, "구역": [{"제목": _text(구역제목).strip()[:100], "항목": items}]}
 
     def fn_입력(self, 이름: str, 질문: Any, 글자수: int = 300) -> dict[str, Any]:
         """글자를 받는 칸. 플레이어가 보내면 `기다리기(이름)` 이 `{플레이어, 값}` 을 돌려준다."""

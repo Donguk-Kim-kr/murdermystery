@@ -136,6 +136,8 @@ await next("엔딩");
 for (const [i, p] of pages.entries()) { const t = await text(p); check(t.includes("범인이 달아났습니다.") && !t.includes("범인이 잡혔습니다."), `엔딩: ${nicks[i]} 화면에 조건에 맞는 엔딩만 보인다`); }
 await next("후일담");
 check((await text(p1)).includes("모두의 이후 이야기"), "후일담: 조건 없는 후일담이 보인다");
+await p1.getByRole("tab", { name: "결말" }).click();
+check(await p1.getByRole("group", { name: "엔딩" }).isVisible() && await p1.getByRole("group", { name: "후일담" }).isVisible(), "결말: 엔딩과 후일담이 한 탭의 두 구역에 모인다");
 await next("전체 공개");
 await p1.getByRole("tab", { name: "전체 단서" }).click(); await openCards(p1);
 const all = await text(p1);

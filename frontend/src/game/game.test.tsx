@@ -543,6 +543,31 @@ describe("단서 보여 주기·양도", () => {
   });
 });
 
+describe("구역보기 블록", () => {
+  const sections = {
+    종류: "구역보기", 이름: "결말",
+    구역: [
+      { 제목: "엔딩", 항목: [{ 제목: "범인 검거", 내용: "범인이 잡혔습니다." }] },
+      { 제목: "후일담", 항목: [{ 제목: "의사", 내용: "의사는 병원으로 돌아갔다." }, { 제목: "집사", 내용: "집사는 저택을 떠났다." }] },
+    ],
+  };
+
+  it("구역마다 첫 항목이 펼쳐져 있고, 항목을 눌러 하나씩 골라 읽는다", async () => {
+    state = makeState({ 탭: [sections] });
+    render(<GamePage />);
+    await userEvent.setup().click(await screen.findByRole("tab", { name: "결말" }));
+    const ending = within(screen.getByRole("group", { name: "엔딩" }));
+    const epilogue = within(screen.getByRole("group", { name: "후일담" }));
+    expect(ending.getByText("범인이 잡혔습니다.")).toBeInTheDocument();
+    expect(epilogue.getByText("의사는 병원으로 돌아갔다.")).toBeInTheDocument();
+    expect(epilogue.queryByText("집사는 저택을 떠났다.")).toBeNull();
+    await userEvent.setup().click(epilogue.getByRole("button", { name: "집사" }));
+    expect(epilogue.getByText("집사는 저택을 떠났다.")).toBeInTheDocument();
+    expect(epilogue.queryByText("의사는 병원으로 돌아갔다.")).toBeNull();
+    expect(ending.getByText("범인이 잡혔습니다.")).toBeInTheDocument();                  // 다른 구역은 그대로
+  });
+});
+
 describe("투표 블록", () => {
   const box = (over: Record<string, unknown> = {}) => ({
     종류: "투표", 이름: "최종 투표", 질문: "범인은 누구입니까?", 질문ID: "1:7:최종 투표", 내_선택: null, 투표수: 0,
