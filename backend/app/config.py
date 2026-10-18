@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     static_dir: str = ""
     # 가입할 때 패스워드의 최소 글자 수(기본 8). 여러 계정을 만들어 시험할 때만 MM_PASSWORD_MIN_LENGTH 로 낮춘다(1 이상).
     password_min_length: int = Field(default=8, ge=1)
+    # 같은 아이디로 패스워드를 연속으로 틀릴 수 있는 횟수와, 넘으면 로그인을 막는 시간(사용자 결정 2026-10-18: 10회, 5분)
+    login_fail_limit: int = Field(default=10, ge=1)
+    login_lock_seconds: float = Field(default=300.0, ge=1)
     db_pool_min: int = 1
     db_pool_max: int = 10
 

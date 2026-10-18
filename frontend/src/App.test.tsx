@@ -132,6 +132,74 @@ describe("로그인 화면 구성과 다크 모드", () => {
   });
 });
 
+describe("로그인 화면 오가기와 패스워드 찾기", () => {
+  it("로그인과 회원가입 화면을 오가면 입력한 내용이 비워진다", async () => {
+    renderApp();
+    await userEvent.type(await screen.findByLabelText("아이디"), "alice");
+    await userEvent.type(screen.getByLabelText("패스워드"), "secret");
+    await userEvent.click(screen.getByRole("button", { name: "회원가입" }));
+    expect(screen.getByLabelText("아이디")).toHaveValue("");
+    expect(screen.getByLabelText("패스워드")).toHaveValue("");
+    await userEvent.type(screen.getByLabelText("아이디"), "bob");
+    await userEvent.type(screen.getByLabelText("닉네임"), "밥");
+    await userEvent.click(screen.getByRole("button", { name: "로그인으로 돌아가기" }));
+    expect(screen.getByLabelText("아이디")).toHaveValue("");
+    await userEvent.click(screen.getByRole("button", { name: "회원가입" }));
+    expect(screen.getByLabelText("닉네임")).toHaveValue("");
+  });
+
+  it("가입 화면에는 아이디·닉네임 길이 안내 문구가 없다", async () => {
+    renderApp();
+    await userEvent.click(await screen.findByRole("button", { name: "회원가입" }));
+    expect(screen.queryByText(/공백 없이 50자 이하/)).not.toBeInTheDocument();
+  });
+
+  it("로그인 실패 메시지(아이디 없음, 패스워드 오류, 잠김)를 그대로 보여 준다", async () => {
+    let answer = { detail: "아이디가 존재하지 않습니다" };
+    let status = 401;
+    routes["POST /api/auth/login"] = () => json(answer, status);
+    renderApp();
+    await userEvent.type(await screen.findByLabelText("아이디"), "ghost");
+    await userEvent.type(screen.getByLabelText("패스워드"), "x");
+    await userEvent.click(screen.getByRole("button", { name: "로그인" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("아이디가 존재하지 않습니다");
+    answer = { detail: "패스워드가 올바르지 않습니다 (남은 시도 9회)" };
+    await userEvent.click(screen.getByRole("button", { name: "로그인" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("남은 시도 9회"));
+    answer = { detail: "패스워드를 여러 번 틀려 잠시 막혔습니다. 5분 뒤에 다시 시도해 주세요" };
+    status = 429;
+    await userEvent.click(screen.getByRole("button", { name: "로그인" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("5분 뒤에 다시 시도"));
+  });
+
+  it("패스워드를 잊었을 때 아이디와 닉네임으로 새 패스워드를 정하고 로그인 화면으로 돌아간다", async () => {
+    routes["POST /api/auth/reset-password"] = () => new Response(null, { status: 204 });
+    renderApp();
+    await userEvent.click(await screen.findByRole("button", { name: "패스워드를 잊으셨나요?" }));
+    await userEvent.type(screen.getByLabelText("아이디"), "alice");
+    await userEvent.type(screen.getByLabelText("닉네임"), "탐정");
+    await userEvent.type(screen.getByLabelText("새 패스워드"), "new-password");
+    await userEvent.click(screen.getByRole("button", { name: "패스워드 바꾸기" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("패스워드를 바꿨습니다");
+    expect(await calls.find((c) => c.key === "POST /api/auth/reset-password")!.req.json()).toEqual({ 아이디: "alice", 닉네임: "탐정", 새_패스워드: "new-password" });
+    expect(screen.getByRole("button", { name: "로그인" })).toBeInTheDocument();
+    expect(screen.getByLabelText("패스워드")).toHaveValue("");               // 새 패스워드는 다시 입력한다
+    expect(screen.getByLabelText("아이디")).toHaveValue("alice");
+  });
+
+  it("아이디와 닉네임이 맞지 않으면 이유를 보여 주고 화면에 남는다", async () => {
+    routes["POST /api/auth/reset-password"] = () => json({ detail: "닉네임이 맞지 않습니다 (남은 시도 9회)" }, 401);
+    renderApp();
+    await userEvent.click(await screen.findByRole("button", { name: "패스워드를 잊으셨나요?" }));
+    await userEvent.type(screen.getByLabelText("아이디"), "alice");
+    await userEvent.type(screen.getByLabelText("닉네임"), "틀림");
+    await userEvent.type(screen.getByLabelText("새 패스워드"), "new-password");
+    await userEvent.click(screen.getByRole("button", { name: "패스워드 바꾸기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("닉네임이 맞지 않습니다 (남은 시도 9회)");
+    expect(screen.getByRole("button", { name: "패스워드 바꾸기" })).toBeInTheDocument();
+  });
+});
+
 describe("회원가입", () => {
   it("가입이 안 되면 어느 항목이 왜 문제인지 알려 준다", async () => {
     routes["POST /api/auth/signup"] = () =>

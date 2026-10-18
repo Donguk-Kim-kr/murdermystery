@@ -17,6 +17,8 @@ interface AuthApi {
   /** 실패하면 사용자에게 보여 줄 메시지를 돌려주고, 성공하면 null. */
   login(id: string, password: string, autoLogin: boolean): Promise<string | null>;
   signup(id: string, password: string, nickname: string): Promise<string | null>;
+  /** 아이디와 닉네임이 맞으면 새 패스워드를 정한다. 실패하면 메시지, 성공하면 null (로그인은 따로 한다). */
+  resetPassword(id: string, nickname: string, newPassword: string): Promise<string | null>;
   logout(): Promise<void>;
 }
 
@@ -71,13 +73,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [login],
   );
 
+  const resetPassword = useCallback<AuthApi["resetPassword"]>(async (id, nickname, newPassword) => {
+    const { error } = await api.POST("/api/auth/reset-password", { body: { 아이디: id, 닉네임: nickname, 새_패스워드: newPassword } });
+    return error ? errorMessage(error, "패스워드를 바꾸지 못했습니다") : null;
+  }, []);
+
   const logout = useCallback(async () => {
     await api.POST("/api/auth/logout"); // 서버 폐기에 실패해도 이 기기에서는 로그아웃 처리한다.
     clearToken();
     setState({ status: "anonymous" });
   }, []);
 
-  const value = useMemo(() => ({ state, login, signup, logout }), [state, login, signup, logout]);
+  const value = useMemo(() => ({ state, login, signup, resetPassword, logout }), [state, login, signup, resetPassword, logout]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

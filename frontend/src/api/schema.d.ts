@@ -38,6 +38,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Password
+         * @description 아이디와 닉네임이 둘 다 맞으면 새 패스워드를 정한다. 이메일 같은 확실한 본인 확인이 없어서 약한 확인이다(docs/BACKLOG.md).
+         *
+         *     실패는 로그인 실패와 함께 세어 같은 제한을 받는다. 성공하면 그 계정의 로그인 세션을 모두 끊는다(주인이 로그인해 둔 상태면 쫓겨난다).
+         */
+        post: operations["reset_password_api_auth_reset_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/logout": {
         parameters: {
             query?: never;
@@ -1207,6 +1229,18 @@ export interface components {
             /** 예상시간 */
             "\uC608\uC0C1\uC2DC\uAC04": string;
         };
+        /**
+         * ResetIn
+         * @description 패스워드 초기화: 아이디와 닉네임이 둘 다 맞아야 한다(사용자 결정 2026-10-18).
+         */
+        ResetIn: {
+            /** 아이디 */
+            "\uC544\uC774\uB514": string;
+            /** 닉네임 */
+            "\uB2C9\uB124\uC784": string;
+            /** 새 패스워드 */
+            "\uC0C8_\uD328\uC2A4\uC6CC\uB4DC": string;
+        };
         /** RoomCreateIn */
         RoomCreateIn: {
             /** 작품 번호 */
@@ -1493,6 +1527,37 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["LoginOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_password_api_auth_reset_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
