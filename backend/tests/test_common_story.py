@@ -113,10 +113,12 @@ def test_profile_card_tab_name_and_append_mode(client, make_scripted_game):
 
 def test_custom_names_for_the_other_tab_cards(client, make_scripted_game):
     from app.default_phases import DISCUSSION, ENDING, INTRO, INVESTIGATE
+    def setup(client_, host, wid):
+        assert client_.patch(f"/api/works/{wid}/characters/1", headers=host.headers, json={"소개": "의사입니다."}).status_code == 200
     host, others, _, _ = make_scripted_game([
         ("자기소개", INTRO, {"탭이름": "인물 소개"}), ("조사", INVESTIGATE, {"탭이름": "얻은 단서"}),
         ("토론", DISCUSSION, {"내단서탭": "얻은 단서", "공개단서탭": "남이 보여 준 것"}), ("엔딩", ENDING, {"탭이름": "결말"}),
-    ])
+    ], setup=setup)
     names = lambda: [t["이름"] for t in state(client, host).json()["탭"]]
     assert "인물 소개" in names() and "자기소개" not in names()
     advance(client, host)

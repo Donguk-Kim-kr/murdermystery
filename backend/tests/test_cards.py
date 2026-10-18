@@ -415,8 +415,11 @@ def test_confirmed_snapshot_carries_parsed_story_parts(client, make_scripted_gam
 
 # ---- 자기소개 --------------------------------------------------------------------------------
 
-def test_intro_shows_each_character_with_the_intro_line_only_when_there_is_one(client, make_scripted_game):
-    host, others, _, _ = make_scripted_game([("캐릭터 선택", CHARACTER_SELECT, None), ("자기소개", INTRO, None)])
+def test_intro_shows_only_the_intro_lines_of_characters_that_have_one_in_order(client, make_scripted_game):
+    def setup(client_, host, wid):
+        for slot, line in ((1, "안녕하세요, 저는 의사입니다."), (3, "집사입니다. 잘 부탁드립니다.")):
+            assert client_.patch(f"/api/works/{wid}/characters/{slot}", headers=host.headers, json={"소개": line}).status_code == 200
+    host, others, _, _ = make_scripted_game([("캐릭터 선택", CHARACTER_SELECT, None), ("자기소개", INTRO, None)], setup=setup)
     people = [host, *others]
     all_pick(client, people)
     assert advance(client, host).status_code == 200
@@ -424,21 +427,30 @@ def test_intro_shows_each_character_with_the_intro_line_only_when_there_is_one(c
         view = state(client, who).json()
         board = tab(view, "자기소개")
         assert board is not None and block(view, "안내")["내용"] == "한 사람씩 자기소개를 해 주세요."
-        text = board["내용"]
-        assert text.count("안녕하세요, 저는 의사입니다.") == 1          # 소개가 있는 한 명만
-        assert "None" not in text
-        assert text.count("의사)") == 3                                  # 세 인물 모두 이름과 직업이 나온다
-    # 소개가 비어 있는 인물은 빈 값으로 두고 플레이어가 스스로 소개한다: 그 줄이 만들어지지 않는다
-    lines = [l for l in tab(state(client, host).json(), "자기소개")["내용"].split("\n") if l.strip()]
-    assert len(lines) == 4                                               # 제목 3줄 + 소개 1줄
+        assert board["내용"] == "인물0\n안녕하세요, 저는 의사입니다.\n\n인물2\n집사입니다. 잘 부탁드립니다."   # 멘트가 있는 인물만, 인물 순서대로
+        assert "None" not in board["내용"] and "의사)" not in board["내용"]                               # 직업·닉네임은 캐릭터 설명 탭의 몫이다
 
 
-def test_intro_tab_stays_in_later_phases(client, make_scripted_game):
-    host, others, _, _ = make_scripted_game([("캐릭터 선택", CHARACTER_SELECT, None), ("자기소개", INTRO, None), ("빈", "", None)])
+def test_intro_without_any_line_makes_no_tab(client, make_scripted_game):
+    def setup(client_, host, wid):
+        assert client_.patch(f"/api/works/{wid}/characters/1", headers=host.headers, json={"소개": None}).status_code == 200
+    host, others, _, _ = make_scripted_game([("캐릭터 선택", CHARACTER_SELECT, None), ("자기소개", INTRO, None)], setup=setup)
     all_pick(client, [host, *others])
     advance(client, host)
-    advance(client, host)
-    assert tab(state(client, others[0]).json(), "자기소개") is not None
+    view = state(client, host).json()
+    assert tab(view, "자기소개") is None and block(view, "안내") is not None
+
+
+def test_intro_tab_stays_by_default_and_goes_away_with_the_keep_setting_off(client, make_scripted_game):
+    def setup(client_, host, wid):
+        assert client_.patch(f"/api/works/{wid}/characters/1", headers=host.headers, json={"소개": "의사입니다."}).status_code == 200
+    for settings, stays in ((None, True), ({"내용유지": False}, False)):
+        host, others, _, _ = make_scripted_game([("캐릭터 선택", CHARACTER_SELECT, None), ("자기소개", INTRO, settings), ("빈", "", None)], setup=setup)
+        all_pick(client, [host, *others])
+        advance(client, host)
+        assert tab(state(client, host).json(), "자기소개") is not None             # 그 단계에서는 보인다
+        advance(client, host)
+        assert (tab(state(client, others[0]).json(), "자기소개") is not None) is stays
 
 
 @pytest.mark.parametrize("value", ["abc", 9999, None, [1], {"a": 1}, True])
