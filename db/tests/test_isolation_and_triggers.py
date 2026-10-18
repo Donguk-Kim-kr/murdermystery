@@ -58,7 +58,7 @@ class TestRuntimeIsIndependentFromAuthoringContent(Scenario):
         self.ins("획득", 작품_번호=w, 진행_번호=g, 참여_번호=pb, 증언_순서=1, 진행순서_순서=1, 획득방법="조사")
         self.ins("획득", 작품_번호=w, 진행_번호=g, 참여_번호=pb, 조합_순서=1, 진행순서_순서=2, 획득방법="조합")
         self.ins("기믹실행", 작품_번호=w, 진행_번호=g, 기믹적용_순서=1, 실행여부=True, 결과={"ok": True})
-        self.ins("투표결과", 작품_번호=w, 투표_순서=1, 참여_번호=pa, 선택="인물2")
+        self.ins("투표결과", 작품_번호=w, 투표이름="투표1", 참여_번호=pa, 선택="인물2")
         self.ins("엔딩", 작품_번호=w, 진행_번호=g, 순서=1, 엔딩분기_순서=1)
         self.ins("엔딩", 작품_번호=w, 진행_번호=g, 순서=2, 후일담_순서=1)
         return g
@@ -202,7 +202,7 @@ class TestDeletePolicies(Scenario):
             p = self.participant(w, g)
             self.ins("획득", 작품_번호=w, 진행_번호=g, 참여_번호=p, 단서_순서=1, 진행순서_순서=1, 획득방법="조사")
             self.ins("기믹실행", 작품_번호=w, 진행_번호=g, 기믹적용_순서=1)
-            self.ins("투표결과", 작품_번호=w, 투표_순서=1, 참여_번호=p, 선택="a")
+            self.ins("투표결과", 작품_번호=w, 투표이름="투표1", 참여_번호=p, 선택="a")
             self.ins("엔딩", 작품_번호=w, 진행_번호=g, 순서=1, 엔딩분기_순서=1)
         self.db.ok(f'DELETE FROM "진행" WHERE "번호"={g1}')
         for t in ("참여", "획득", "기믹실행", "투표결과", "엔딩"):

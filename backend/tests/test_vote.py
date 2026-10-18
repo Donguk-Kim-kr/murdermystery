@@ -321,3 +321,51 @@ def test_abstain_does_not_make_ties_and_everyone_abstaining_means_no_result(clie
 def test_a_candidate_cannot_be_named_abstain(client, make_scripted_game):
     host, others, _, _ = make_scripted_game([("최종 투표", FINAL_VOTE, {"후보": [1, "기권"], "기권허용": True})])
     assert any("기권" in e["메시지"] for e in state(client, host).json()["오류"])
+
+
+def test_two_vote_cards_keep_separate_votes_by_their_names(client, make_scripted_game):
+    """투표 카드를 여러 번 놓을 때 이름(설정)을 다르게 하면 표와 결과가 서로 섞이지 않는다."""
+    probe = ("def 실행(카드):\n    첫 = 결과('첫 투표')\n    둘 = 결과('둘째 투표')\n"
+             "    모두.보이기(글('결과', ('없음' if 첫 is None else 첫.이름) + '/' + ('없음' if 둘 is None else 둘.이름)))\n")
+    cards = [("캐릭터 선택", CHARACTER_SELECT, None), ("1차 투표", FINAL_VOTE, {"이름": "첫 투표"}), ("2차 투표", FINAL_VOTE, {"이름": "둘째 투표"}), ("결과 확인", probe, None)]
+    host, others, room, wid = make_scripted_game(cards)
+    people = players_of(host, others)
+    all_pick(client, people)
+    assert advance(client, host).status_code == 200
+    slots = {who.number: state(client, who).json()["나"]["인물_순서"] for who in people}
+    a, b, c = people
+    first = block(state(client, a).json(), "첫 투표")
+    assert answer(client, a, first["질문ID"], slots[c.number]).status_code == 200
+    assert answer(client, b, first["질문ID"], slots[c.number]).status_code == 200
+    assert advance(client, host).status_code == 200
+    second = block(state(client, a).json(), "둘째 투표")
+    assert second["질문ID"] != first["질문ID"] and block(state(client, a).json(), "투표 완료")["완료"] == 0   # 둘째 투표는 표가 없는 새 투표이다
+    assert answer(client, a, second["질문ID"], slots[b.number]).status_code == 200
+    assert advance(client, host).status_code == 200
+    names = {i["값"]: i["이름"] for i in second["항목"]}
+    assert block(state(client, host).json(), "결과")["내용"] == f"{names[slots[c.number]]}/{names[slots[b.number]]}"
+
+
+def records(db, game):
+    rows = db.execute(
+        'SELECT p."계정_번호", v."투표이름", v."선택" FROM "투표결과" v JOIN "참여" p ON p."번호" = v."참여_번호" WHERE p."진행_번호" = %s ORDER BY p."계정_번호"',
+        (game.id,),
+    ).fetchall()
+    return [tuple(r) for r in rows]
+
+
+def test_votes_are_recorded_in_the_database_changed_in_place_and_cleared_on_revote(client, make_scripted_game, db):
+    host, people, slots = voting(make_scripted_game, client, settings={"기권허용": True})
+    game = client.app.state.games.of_account(host.number)
+    a, b, c = people
+    vote(client, a, slots[c.number])
+    vote(client, b, slots[c.number])
+    vote(client, c, "기권")                                                              # 후보는 c 인물 2표, 기권 1표 → 동률 아님
+    first = sorted([(a.number, "최종 투표", str(slots[c.number])), (b.number, "최종 투표", str(slots[c.number])), (c.number, "최종 투표", "기권")])
+    assert records(db, game) == first
+    vote(client, c, slots[a.number])                                                    # 바꾸면 그 사람의 기록만 바뀐다(한 사람당 한 줄)
+    after = {r[0]: r[2] for r in records(db, game)}
+    assert after == {a.number: str(slots[c.number]), b.number: str(slots[c.number]), c.number: str(slots[a.number])}
+    vote(client, b, slots[c.number])                                                    # 지금 b→c, c→a 이므로 a→b 로 바꾸면 각 1표 동률
+    vote(client, a, slots[b.number])                                                    # 재투표를 시작하며 기록도 비워진다
+    assert records(db, game) == []

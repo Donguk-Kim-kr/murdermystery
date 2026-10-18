@@ -796,11 +796,10 @@ describe("진행 탭", () => {
       await pickCard("2차 조사");
       const second = within(editor().getByRole("group", { name: "2차 조사 수정" }));
       expect(second.getByLabelText(/내용 유지/)).not.toBeChecked();
-      expect(second.getByLabelText(/JSON/)).toHaveValue(JSON.stringify({ 횟수: 3 }, null, 2));
+      expect(second.queryByLabelText(/JSON/)).not.toBeInTheDocument();                                  // 흐름에서는 JSON 을 쓰지 않는다
       await userEvent.click(second.getByLabelText(/내용 유지/));
-      await userEvent.clear(second.getByLabelText(/JSON/));
       await userEvent.click(second.getByRole("button", { name: "설정 저장" }));
-      expect(await sent("PATCH /api/works/7/content/phase-steps/10")[0].req.json()).toEqual({ 설정: null });
+      expect(await sent("PATCH /api/works/7/content/phase-steps/10")[0].req.json()).toEqual({ 설정: { 횟수: 3 } });      // 칸에 없는 값은 그대로, 기본값이 된 내용 유지는 빠진다
     });
 
     it("스크립트가 개인 서사 공개를 쓰는 카드는 인물마다 보여 줄 서사를 고르고, 기본(서사 전체)이면 저장하지 않는다", async () => {
@@ -1013,17 +1012,20 @@ describe("진행 탭", () => {
       expect(await card.findByText(/하나 이상 골라 주세요/)).toBeInTheDocument();
     });
 
-    it("칸을 선언하지 않은 진행단계(옛 방식)에는 JSON 칸이 남아 있다", async () => {
+    it("칸을 선언하지 않은 진행단계에도 흐름에는 JSON 칸이 없고, 있던 값은 그대로 둔다", async () => {
+      routes["PATCH /api/works/7/content/phase-steps/9"] = () => json({});
       twoPhases();
       (bundle["phase-steps"] as { 설정: unknown }[])[0].설정 = { 알수없는설정: 3 };
       renderApp("/works/7?tab=phases");
       await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));
       await pickCard("1차 조사");
       const card = within(editor().getByRole("group", { name: "1차 조사 수정" }));
-      expect(card.getByLabelText(/그 밖의 세부 설정/)).toHaveValue(JSON.stringify({ 알수없는설정: 3 }, null, 2));
+      expect(card.queryByLabelText(/그 밖의 세부 설정/)).not.toBeInTheDocument();
+      await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: { 알수없는설정: 3 } });
     });
 
-    it("칸을 선언한 진행단계는 JSON 칸 없이 저장하고, 칸에 없는 기존 값은 그대로 둔다", async () => {
+    it("칸을 선언한 진행단계는 칸으로만 저장하고, 칸에 없는 기존 값은 그대로 둔다", async () => {
       routes["PATCH /api/works/7/content/phase-steps/9"] = () => json({});
       twoPhases();
       (bundle.library as { phases: Record<string, object> }).phases[5] = {
@@ -1061,17 +1063,6 @@ describe("진행 탭", () => {
       await userEvent.click(editor().getByRole("button", { name: "1차 조사 삭제" }));
       await waitFor(() => expect(sent("DELETE /api/works/7/content/phase-steps/9")).toHaveLength(1));
       await waitFor(() => expect(editor().queryByRole("group", { name: "1차 조사 수정" })).not.toBeInTheDocument());
-    });
-
-    it("JSON 이 객체가 아니면 저장하지 않는다", async () => {
-      renderApp("/works/7?tab=phases");
-      await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));
-      await pickCard("1차 조사");
-      const box = within(editor().getByRole("group", { name: "1차 조사 수정" }));
-      await userEvent.type(box.getByLabelText(/JSON/), "[[1]");   // "[[" 는 글자 "[" 이다
-      await userEvent.click(box.getByRole("button", { name: "설정 저장" }));
-      expect(await box.findByRole("alert")).toHaveTextContent("JSON 객체");
-      expect(sent("PATCH /api/works/7/content/phase-steps/9")).toHaveLength(0);
     });
 
   });

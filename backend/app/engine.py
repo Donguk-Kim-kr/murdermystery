@@ -29,6 +29,9 @@ class GameIO:
     # (주인, 단서 순서, 대상 계정 또는 None=전체): 공개를 기록하거나 취소해 기록
     reveal: Callable[[int, int, int | None], None] = lambda *args: None
     unreveal: Callable[[int, int, int | None], None] = lambda *args: None
+    # (계정, 투표 이름, 고른 것): 표를 투표결과에 기록하거나(이미 했으면 바꿈) 이름의 표를 모두 지움
+    vote: Callable[[int, str, str], None] = lambda *args: None
+    clear_votes: Callable[[str], None] = lambda *args: None
 
 
 @dataclass

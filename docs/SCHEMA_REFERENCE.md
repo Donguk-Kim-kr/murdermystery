@@ -30,15 +30,15 @@
 | 22 | 방 |
 | 23 | 진행 |
 | 24 | 기믹실행 |
-| 25 | 투표결과 |
-| 26 | 엔딩 |
-| 27 | 획득 |
-| 28 | 테스터 |
-| 29 | 자료 |
-| 30 | 참여 |
-| 31 | 엔딩분기 |
-| 32 | 진행순서 |
-| 33 | 공개 |
+| 25 | 엔딩 |
+| 26 | 획득 |
+| 27 | 테스터 |
+| 28 | 자료 |
+| 29 | 참여 |
+| 30 | 엔딩분기 |
+| 31 | 진행순서 |
+| 32 | 공개 |
+| 33 | 투표결과 |
 
 ## 계정
 
@@ -701,29 +701,6 @@
 
 - `ix_기믹실행_작품`: `CREATE INDEX "ix_기믹실행_작품" ON public."기믹실행" USING btree ("작품_번호")`
 
-## 투표결과
-
-| 순번 | 컬럼 | 타입 | NULL | 기본값 / 특성 |
-|---|---|---|---|---|
-| 1 | 번호 | integer | 불가 | IDENTITY (GENERATED ALWAYS) |
-| 2 | 작품_번호 | integer | 불가 |  |
-| 3 | 투표_순서 | integer | 불가 |  |
-| 4 | 참여_번호 | integer | 불가 |  |
-| 5 | 선택 | text | 불가 |  |
-
-**제약조건**
-
-| 종류 | 이름 | 정의 |
-|---|---|---|
-| PK | `pk_투표결과` | `PRIMARY KEY ("번호")` |
-| UNIQUE | `uq_투표결과_투표_참여` | `UNIQUE ("작품_번호", "투표_순서", "참여_번호")` |
-| FK | `fk_투표결과_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE RESTRICT` |
-| FK | `fk_투표결과_참여` | `FOREIGN KEY ("참여_번호") REFERENCES "참여"("번호") ON DELETE CASCADE` |
-
-**추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
-
-- `ix_투표결과_참여`: `CREATE INDEX "ix_투표결과_참여" ON public."투표결과" USING btree ("참여_번호")`
-
 ## 엔딩
 
 | 순번 | 컬럼 | 타입 | NULL | 기본값 / 특성 |
@@ -923,4 +900,27 @@
 - `ix_공개_진행`: `CREATE INDEX "ix_공개_진행" ON public."공개" USING btree ("진행_번호")`
 - `ix_공개_참여`: `CREATE INDEX "ix_공개_참여" ON public."공개" USING btree ("대상_참여_번호")`
 - `ix_공개_획득`: `CREATE INDEX "ix_공개_획득" ON public."공개" USING btree ("획득_번호")`
+
+## 투표결과
+
+| 순번 | 컬럼 | 타입 | NULL | 기본값 / 특성 |
+|---|---|---|---|---|
+| 1 | 번호 | integer | 불가 | IDENTITY (GENERATED ALWAYS) |
+| 2 | 작품_번호 | integer | 불가 |  |
+| 3 | 투표이름 | text | 불가 |  |
+| 4 | 참여_번호 | integer | 불가 |  |
+| 5 | 선택 | text | 불가 |  |
+
+**제약조건**
+
+| 종류 | 이름 | 정의 |
+|---|---|---|
+| PK | `pk_투표결과` | `PRIMARY KEY ("번호")` |
+| UNIQUE | `uq_투표결과_투표_참여` | `UNIQUE ("작품_번호", "투표이름", "참여_번호")` |
+| FK | `fk_투표결과_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE RESTRICT` |
+| FK | `fk_투표결과_참여` | `FOREIGN KEY ("참여_번호") REFERENCES "참여"("번호") ON DELETE CASCADE` |
+
+**추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
+
+- `ix_투표결과_참여`: `CREATE INDEX "ix_투표결과_참여" ON public."투표결과" USING btree ("참여_번호")`
 

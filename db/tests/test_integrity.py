@@ -394,11 +394,11 @@ class TestRuntimeConstraints(Builders):
     def test_vote_result_unique_per_voter(self):
         w, g = self.playable_game()
         p1, p2 = self.participant(w, g), self.participant(w, g)
-        self.ins("투표결과", 작품_번호=w, 투표_순서=1, 참여_번호=p1, 선택="A")
-        self.ins("투표결과", 작품_번호=w, 투표_순서=1, 참여_번호=p2, 선택="B")
-        self.ins("투표결과", 작품_번호=w, 투표_순서=2, 참여_번호=p1, 선택="A")
-        self.ins_fails("투표결과", "uq_투표결과_투표_참여", 작품_번호=w, 투표_순서=1, 참여_번호=p1, 선택="C")
-        self.ins_fails("투표결과", "null value", 작품_번호=w, 투표_순서=3, 참여_번호=p1, 선택=None)
+        self.ins("투표결과", 작품_번호=w, 투표이름="투표1", 참여_번호=p1, 선택="A")
+        self.ins("투표결과", 작품_번호=w, 투표이름="투표1", 참여_번호=p2, 선택="B")
+        self.ins("투표결과", 작품_번호=w, 투표이름="투표2", 참여_번호=p1, 선택="A")
+        self.ins_fails("투표결과", "uq_투표결과_투표_참여", 작품_번호=w, 투표이름="투표1", 참여_번호=p1, 선택="C")
+        self.ins_fails("투표결과", "null value", 작품_번호=w, 투표이름="투표3", 참여_번호=p1, 선택=None)
 
     def test_acquisition_default_holding_and_history_rows(self):
         """A→B 양도 후 B→A 반환 같은 이력을 행으로 쌓을 수 있다. (보유 중복 방지는 백엔드 규칙)"""

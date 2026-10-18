@@ -519,11 +519,13 @@ class CardHost:
             pass
         elif not (isinstance(value, str) and value in self.game.vote_options.get(name, set())):
             return False
+        self.io.vote(account, name, str(value))                       # 기록을 먼저 남기고, 실패하면 메모리는 바뀌지 않는다
         self.game.votes.setdefault(name, {})[account] = value
         return True
 
     def fn_투표초기화(self, 이름: str) -> None:
         """이 투표의 표를 모두 지운다(재투표를 시작할 때)."""
+        self.io.clear_votes(str(이름))
         self.game.votes.pop(str(이름), None)
 
     def fn_배정(self, 플레이어: Any, 인물: Any) -> bool:

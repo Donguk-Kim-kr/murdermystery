@@ -43,6 +43,15 @@ def acquire_sql(kind: str) -> str:
     )
 
 
+def vote_sql() -> str:
+    """표를 남기는 문장(이미 했으면 고른 것을 바꾼다). 파라미터는 (투표 이름, 고른 것, 진행 번호, 계정 번호)."""
+    return (
+        'INSERT INTO "투표결과" ("작품_번호", "투표이름", "참여_번호", "선택") '
+        'SELECT "작품_번호", %s, "번호", %s FROM "참여" WHERE "진행_번호" = %s AND "계정_번호" = %s '
+        'ON CONFLICT ("작품_번호", "투표이름", "참여_번호") DO UPDATE SET "선택" = EXCLUDED."선택"'
+    )
+
+
 def _own_row(column: str = "g") -> str:
     """(진행, 계정, 단서 순서) 로 지금 보유 중인 획득 행을 고르는 조건. 앞의 세 값이 순서대로 파라미터이다."""
     return (
@@ -102,6 +111,10 @@ def build_io(game: Game, run) -> GameIO:
         transfer=lambda giver, taker, order, slot: [run(*st) for st in transfer_statements(game.id, giver, taker, order, slot)],
         reveal=lambda owner, order, target: run(*reveal_statement(game.id, owner, order, target)),
         unreveal=lambda owner, order, target: run(*unreveal_statement(game.id, owner, order, target)),
+        vote=lambda account, name, choice: run(vote_sql(), (name, choice, game.id, account)),
+        clear_votes=lambda name: run(
+            'DELETE FROM "투표결과" WHERE "투표이름" = %s AND "참여_번호" IN (SELECT "번호" FROM "참여" WHERE "진행_번호" = %s)', (name, game.id)
+        ),
     )
 
 

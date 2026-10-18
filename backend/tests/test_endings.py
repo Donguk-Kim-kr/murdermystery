@@ -284,7 +284,7 @@ def test_conditions_declared_by_the_final_vote_phase_work_as_written(client, mak
 
     declared = {c["이름"]: c for c in declarations(FINAL_VOTE, known_names())["조건"]}
     assert list(declared) == ["범인을 검거했다", "범인을 검거하지 못했다(검거 실패)"]            # 동률·투표 없음·특정 인물 같은 조건은 내놓지 않는다
-    endings = [(name, {"식": c["식"]}, name) for name, c in declared.items()]
+    endings = [(name, {"식": c["식"].replace("{@이름}", "최종 투표")}, name) for name, c in declared.items()]       # 식의 {@이름} 은 카드 설정의 이름(기본 최종 투표)으로 채워진다
 
     def mark_culprit(client_, host, wid):
         assert client_.patch(f"/api/works/{wid}/characters/1", headers=host.headers, json={"범인": True}).status_code == 200
