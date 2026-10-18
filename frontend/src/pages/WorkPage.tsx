@@ -164,6 +164,7 @@ export function WorkPage() {
                       </span>
                       <span className="tags">
                         {c.NPC && <span className="chip">NPC</span>}
+                        {c.NPC순위 != null && <span className="chip">NPC 가능 {c.NPC순위}순위</span>}
                         {c.범인 && <span className="chip danger">범인</span>}
                       </span>
                       <button type="button" className="small secondary" onClick={() => setEditing(c.순서)}>
@@ -240,7 +241,6 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
   const [synopsis, setSynopsis] = useState(work.시놉시스);
   const [genre, setGenre] = useState(work.장르);
   const [time, setTime] = useState(work.예상시간);
-  const [minPlayers, setMinPlayers] = useState(String(work.최소인원));
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -252,7 +252,7 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
     setSaved(false);
     const { error } = await api.PATCH("/api/works/{work_id}", {
       params: { path: { work_id: work.번호 } },
-      body: { 제목: title, 시놉시스: synopsis, 장르: genre, 예상시간: time, 최소인원: Number(minPlayers) },
+      body: { 제목: title, 시놉시스: synopsis, 장르: genre, 예상시간: time },
     });
     setBusy(false);
     if (error) setError(errorMessage(error, "저장하지 못했습니다"));
@@ -283,14 +283,12 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
           예상 시간
           <input value={time} onChange={(e) => setTime(e.target.value)} maxLength={50} required />
         </label>
-        <label>
-          최소 인원
-          <input type="number" min={1} value={minPlayers} onChange={(e) => setMinPlayers(e.target.value)} required />
-        </label>
         <div className="capacity">
-          <span className="capacity-label">최대 인원</span>
-          <span className="chip accent">{work.최대인원}명</span>
-          <span className="muted">NPC가 아닌 인물 수로 자동 계산, 인물이 없으면 임시로 1명</span>
+          <span className="capacity-label">플레이 인원</span>
+          <span className="chip accent">{work.최소인원 === work.최대인원 ? `${work.최대인원}명` : `${work.최소인원}~${work.최대인원}명`}</span>
+          <span className="muted">
+            인물에서 자동으로 계산됩니다. 최대는 NPC가 아닌 인물 수이고, 최소는 최대에서 "NPC가 될 수 있는 인물" 수를 뺀 값입니다
+          </span>
         </div>
       </div>
       {error && <p role="alert" className="error">{error}</p>}

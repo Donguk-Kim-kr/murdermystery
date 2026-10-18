@@ -141,8 +141,22 @@ describe("플레이 화면", () => {
     await user.click(confirm);
     await waitFor(() => expect(posts).toEqual([{ path: "/api/game/me/answer", body: { 질문ID: "1:5:확인", 값: 11 } }]));
     expect(await screen.findByText("내 인물")).toBeInTheDocument();
-    expect(screen.getByText("선택을 확정했습니다. 바꿀 수 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText(/선택을 확정했습니다\. 다음 단계로 넘어가기 전에는 취소하고 다시 고를 수 있습니다/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /의사/ })).toBeDisabled();
+  });
+
+  it("확정한 뒤에는 선택 취소 버튼으로 서버에 취소를 보낸다", async () => {
+    posts.length = 0;
+    state = makeState({ 나: { ...state.나, 인물_순서: 11 }, 화면: [{ ...choice(), 내_선택_끝남: true, 항목: [{ ...choice().항목[0], 선택한_계정: 1 }, { ...choice().항목[1] }] }] });
+    render(<GamePage />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "선택 취소" }));
+    await waitFor(() => expect(posts).toEqual([{ path: "/api/game/me/answer", body: { 질문ID: "1:5:확인", 값: "취소" } }]));
+  });
+
+  it("카드 설정이 켜져 있으면 인물 카드에 선택 화면 소개가 보인다", async () => {
+    state = makeState({ 화면: [{ ...choice(), 항목: [{ ...choice().항목[0], 선택소개: "마을의 다정한 의사" }, { ...choice().항목[1] }] }] });
+    render(<GamePage />);
+    expect(await screen.findByText("마을의 다정한 의사")).toBeInTheDocument();
   });
 
   it("이미 다른 사람이 확정한 인물은 고를 수 없다", async () => {
@@ -307,12 +321,12 @@ describe("대기실에서 게임 시작", () => {
   }
 
   it("방장은 게임 시작을 누르고, 거부 사유를 볼 수 있다", async () => {
-    handlers["/api/rooms/me/start"] = () => json({ detail: "플레이어 수(1명)가 캐릭터 수(2명)와 같아야 시작할 수 있습니다" }, 409);
+    handlers["/api/rooms/me/start"] = () => json({ detail: "플레이어 수(1명)가 허용 인원(2명)이어야 시작할 수 있습니다" }, 409);
     mountRoom(() => room());
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "게임 시작" }));
     expect(posts.at(-1)?.path).toBe("/api/rooms/me/start");
-    expect(await screen.findByRole("alert")).toHaveTextContent("캐릭터 수(2명)와 같아야");
+    expect(await screen.findByRole("alert")).toHaveTextContent("허용 인원(2명)");
   });
 
   it("방장이 아니면 시작 버튼이 없다", async () => {

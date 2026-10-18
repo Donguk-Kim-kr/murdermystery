@@ -1,7 +1,7 @@
 """작품 기본정보 API.
 
 * 로그인한 계정의 작품만 다룬다. 남의 작품은 존재 여부를 알리지 않도록 404 로 응답한다.
-* `최대인원` 은 직접 받지 않는다. NPC 가 아닌 인물 수로 자동 갱신된다 (인물이 0명이면 임시로 1).
+* `최대인원`·`최소인원` 은 직접 받지 않는다. 인물에서 자동 계산된다(최대 = NPC 가 아닌 인물 수, 인물이 0명이면 임시로 1. 최소 = 최대 - NPC 가 될 수 있는 인물 수). 자세히는 characters.py.
 * `상태`·`최신버전` 은 확정·버전 기능(B6~B8)에서 다루므로 여기서 받지 않는다.
 * `공통스토리` 는 게임 시작 때 모두가 읽는 글이다. 비어 있을 수 있다 (개인 서사는 인물의 `서사`).
 * `공개여부`·`공개권한` 은 여기서 바꾸지 않는다. 공개/비공개 전환은 `publishing.py` (B35)에서 한다.
@@ -73,7 +73,6 @@ class WorkPatch(BaseModel):
     시놉시스: Annotated[str, Field(max_length=5000)] | None = None
     장르: Annotated[str, Field(max_length=50)] | None = None
     예상시간: Annotated[str, Field(min_length=1, max_length=50)] | None = None
-    최소인원: Annotated[int, Field(ge=1, le=100)] | None = None
     공통스토리: Annotated[str, Field(max_length=narrative.COMMON_TOTAL_LIMIT + 400)] | None = None
     공통스토리_부분: list[PartIn] | None = None
 
@@ -182,12 +181,6 @@ def update_work(work_id: int, body: WorkPatch, conn: Conn, me: CurrentUser) -> d
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "값을 비울 수 없는 항목입니다")
     if not changes:
         return work
-    # DB 제약(최대 >= 최소)을 오류 대신 안내 메시지로 돌려준다. 최소인원은 인물 수(=최대인원)를 넘을 수 없다.
-    if changes.get("최소인원", 1) > work["최대인원"]:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            f"최소인원은 현재 인원({work['최대인원']}명)보다 클 수 없습니다. 인물을 먼저 추가해 주세요",
-        )
     assignments = ", ".join(f'"{col}" = %s' for col in changes)
     return conn.execute(
         f'UPDATE "작품" SET {assignments}, "수정일시" = CURRENT_TIMESTAMP WHERE "번호" = %s RETURNING {WORK_COLUMNS}',

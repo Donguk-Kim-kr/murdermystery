@@ -20,7 +20,7 @@ MAX_ANSWER_BYTES = 2000
 MAX_NOTICES = 20
 ALL = "모두"
 PUBLIC_FIELDS = ("이름", "직업", "나이", "성별")
-CHARACTER_FIELDS = ("이름", "직업", "나이", "성별", "타임라인", "능력", "비밀", "목표", "범인", "NPC", "소개")
+CHARACTER_FIELDS = ("이름", "직업", "나이", "성별", "타임라인", "능력", "비밀", "목표", "범인", "NPC", "소개", "선택소개")
 
 
 class AnswerError(Exception):
@@ -52,10 +52,10 @@ class CardRun:
 
 # ---- 호스트(스크립트가 부르는 엔진 기능) -------------------------------------------------------
 
-MUTATING = {"탭이어쓰기", "변수설정", "배정", "투표", "투표초기화", "조사", "양도", "공개설정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
+MUTATING = {"배정취소", "탭이어쓰기", "변수설정", "배정", "투표", "투표초기화", "조사", "양도", "공개설정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
 FUNCTION_NAMES = {
     "플레이어들", "플레이어수", "인물들", "공통스토리", "서사들", "배정된_플레이어수", "인물_없는_플레이어가_있다",
-    "공통스토리부분들", "탭이어쓰기", "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "모든_장소", "단서들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
+    "공통스토리부분들", "탭이어쓰기", "배정취소", "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "모든_장소", "단서들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
     "단계_끝내기", "게임_종료",
 }
 FUNCTION_NAMES |= BUILDER_NAMES          # 제작 화면을 정하는 함수들(app/declare.py). 게임 중에 불러도 값만 만들 뿐이다
@@ -343,11 +343,12 @@ class CardHost:
     def fn_글(self, 이름: str, 내용: Any) -> dict[str, Any]:
         return {"종류": "글", "이름": str(이름), "내용": _text(내용)}
 
-    def fn_선택지(self, 이름: str, 항목: Any, 한사람당: int = 1, 확인필요: bool = False) -> dict[str, Any]:
+    def fn_선택지(self, 이름: str, 항목: Any, 한사람당: int = 1, 확인필요: bool = False, 소개보임: bool = False) -> dict[str, Any]:
+        """고르는 칸. 인물을 고르는 칸이면 `소개보임` 으로 인물의 선택 화면 소개(`선택소개`)를 함께 보여 줄 수 있다."""
         if not isinstance(항목, (list, tuple)):
             raise ScriptError("선택지의 항목은 목록이어야 합니다")
         return {
-            "종류": "선택지", "이름": str(이름), "항목": list(항목), "한사람당": 한사람당, "확인필요": bool(확인필요),
+            "종류": "선택지", "이름": str(이름), "항목": list(항목), "한사람당": 한사람당, "확인필요": bool(확인필요), "소개보임": bool(소개보임),
             "질문ID": f"{self.run.key}:확인",
         }
 
@@ -481,6 +482,17 @@ class CardHost:
             return False
         return True
 
+    def fn_배정취소(self, 플레이어: Any) -> bool:
+        """플레이어가 확인했던 인물을 되돌린다. 고른 인물이 없으면 False."""
+        from .engine import AssignError, unassign_character
+
+        account = self._player_account(플레이어)
+        try:
+            unassign_character(self.game, account, lambda a, s: self.io.assign(a, s))
+        except AssignError:
+            return False
+        return True
+
     def fn_읽기(self, 대상: Any, 이름: str, 내용: Any) -> None:
         target, name = 대상, 이름
         accounts = self._target_accounts(target)
@@ -523,6 +535,8 @@ class CardHost:
                 return row["순서"]
             if name == "서사":
                 raise ScriptError("서사는 서사들(인물, 번호들) 로 읽으세요")
+            if name == "NPC":
+                return bool(row.get("NPC")) or row["순서"] in self.game.npc_slots     # 이 게임의 인원 때문에 NPC 가 된 인물도 포함
             if name in CHARACTER_FIELDS:
                 return row.get(name)
         elif ref.kind == "엔딩분기":
@@ -814,11 +828,12 @@ def answer(game, account_id: int, qid: str, value: Any, io) -> None:
 
 # ---- 보는 사람에게 보여 줄 것 ----------------------------------------------------------------------
 
-def _item(game, viewer: int, item: Any) -> dict[str, Any]:
+def _item(game, viewer: int, item: Any, show_intro: bool = False) -> dict[str, Any]:
     if isinstance(item, Ref) and item.kind == "인물":
         row = next((c for c in game.snapshot.get("인물") or [] if c["순서"] == item.key), None)
         taken = next((p.account_id for p in game.players.values() if p.character == item.key), None)
-        return {"값": item.key, **{f: (row or {}).get(f) for f in PUBLIC_FIELDS}, "선택한_계정": taken}
+        shown = {"선택소개": (row or {}).get("선택소개")} if show_intro else {}
+        return {"값": item.key, **{f: (row or {}).get(f) for f in PUBLIC_FIELDS}, **shown, "선택한_계정": taken}
     if isinstance(item, Ref) and item.kind == "장소":
         place = next((p for p in game.snapshot.get("장소") or [] if p["순서"] == item.key), None) or {}
         active = viewer in game.players and clues.next_item(game, viewer, item.key) is not None
@@ -841,7 +856,7 @@ def _block(game, viewer: int, block: dict[str, Any]) -> dict[str, Any]:
     kind = block.get("종류")
     if kind == "선택지":
         items = block.get("항목", [])
-        out["항목"] = [_item(game, viewer, i) for i in items]
+        out["항목"] = [_item(game, viewer, i, bool(block.get("소개보임"))) for i in items]
         player = game.players.get(viewer)
         picks_character = any(isinstance(i, Ref) and i.kind == "인물" for i in items)
         out["내_선택_끝남"] = bool(picks_character and player and player.character is not None)

@@ -1,7 +1,8 @@
 """게임 시작 API (docs/ENGINE_DESIGN.md 1-1, docs/ENGINE_SPEC.md).
 
 방장이 시작을 누르면 확정 스냅샷을 읽어 `진행` 과 `참여` 를 만들고 방을 `진행` 상태로 바꾼다.
-시작 조건: **대기실의 플레이어 수가 플레이어 캐릭터 수(NPC 가 아닌 인물 수)와 같을 때**.
+시작 조건: **대기실의 플레이어 수가 최소인원 이상, 최대인원(NPC 가 아닌 인물 수) 이하일 때**. 최대보다 적게 시작하면 모자란 만큼의 인물이 NPC 가 된다.
+어느 인물이 NPC 가 되는지는 제작자가 정한 순위(`인물.NPC순위`, 1 이 먼저)대로 이 게임을 시작할 때 정해진다(사용자 2026-10-18).
 플레이어가 아닌 방장은 관전자가 된다(지금은 일반 관전 하나뿐이고 GM 관전·자리 지정은 아직 없다).
 """
 import asyncio
@@ -166,13 +167,11 @@ def start_game(conn: Conn, me: CurrentUser, request: Request) -> StartOut:
     if not phases or not characters:
         raise HTTPException(status.HTTP_409_CONFLICT, "확정된 작품에 진행 순서나 인물이 없어 시작할 수 없습니다")
 
-    need = sum(1 for c in characters if not c.get("NPC"))
     joined = [m for m in room.members.values() if m.playing]
-    if len(joined) != need:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            f"플레이어 수({len(joined)}명)가 캐릭터 수({need}명)와 같아야 시작할 수 있습니다",
-        )
+    try:
+        npc_slots = npc_slots_for(characters, len(joined))
+    except ValueError as err:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(err)) from None
 
     created = conn.execute(
         'INSERT INTO "진행" ("방_번호", "작품_번호", "버전_버전", "진행순서_순서") VALUES (%s, %s, %s, %s) RETURNING "번호"',
@@ -187,7 +186,7 @@ def start_game(conn: Conn, me: CurrentUser, request: Request) -> StartOut:
 
     game = Game(
         id=created["번호"], room_id=row["번호"], work_id=row["작품_번호"], version=row["버전_버전"], host_id=room.host_id,
-        snapshot=snapshot,
+        snapshot=snapshot, npc_slots=npc_slots,
         players={m.account_id: Player(m.account_id, m.nickname) for m in joined},
         observers={m.account_id: Observer(m.account_id, m.nickname) for m in room.members.values() if not m.playing},
     )
@@ -199,6 +198,21 @@ def start_game(conn: Conn, me: CurrentUser, request: Request) -> StartOut:
         플레이어=[GameMemberRef(계정_번호=p.account_id, 닉네임=p.nickname) for p in game.players.values()],
         관전자=[GameMemberRef(계정_번호=o.account_id, 닉네임=o.nickname) for o in game.observers.values()],
     )
+
+
+def npc_slots_for(characters: list[dict[str, Any]], players: int) -> set[int]:
+    """플레이어 수에 맞게 이 게임에서 NPC 가 되는 인물(순서)을 정한다. 인원이 허용 범위 밖이면 ValueError(메시지는 그대로 보여 준다).
+
+    최대 = NPC 가 아닌 인물 수, 최소 = 최대 - NPC 가 될 수 있는 인물 수. 모자란 인원만큼 NPC 순위가 낮은 숫자(먼저)인 인물이 NPC 가 된다.
+    """
+    playable = [c for c in characters if not c.get("NPC")]
+    ranked = sorted((c["NPC순위"], c["순서"]) for c in playable if c.get("NPC순위") is not None)
+    most = len(playable)
+    least = max(most - len(ranked), 1)
+    if not least <= players <= most:
+        span = f"{most}명" if least == most else f"{least}명 이상 {most}명 이하"
+        raise ValueError(f"플레이어 수({players}명)가 허용 인원({span})이어야 시작할 수 있습니다")
+    return {slot for _, slot in ranked[: most - players]}
 
 
 class GameMeOut(BaseModel):

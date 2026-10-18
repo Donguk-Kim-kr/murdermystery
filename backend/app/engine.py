@@ -20,7 +20,7 @@ class GameIO:
     """게임이 DB 에 남겨야 하는 일. 호출하는 쪽(요청이나 주기 작업)이 자기 DB 연결로 만들어 넘긴다."""
 
     phase: Callable[[int], None]            # 새 페이즈의 칸 번호를 진행에 기록
-    assign: Callable[[int, int], None]      # (계정, 인물 순서) 를 참여에 기록
+    assign: Callable[[int, int | None], None]      # (계정, 인물 순서 또는 None=취소) 를 참여에 기록
     end: Callable[[], None]                 # 진행을 종료로 기록
     # (계정, "단서"/"증언", 순서, 진행순서 칸, 획득방법) 을 획득에 기록
     acquire: Callable[[int, str, int, int, str], None] = lambda *args: None
@@ -54,6 +54,7 @@ class Game:
     snapshot: dict[str, Any]
     players: dict[int, Player]       # 계정 번호 → 플레이어. 입장한 순서를 지킨다(dict 는 넣은 순서를 기억한다)
     observers: dict[int, Observer] = field(default_factory=dict)
+    npc_slots: set[int] = field(default_factory=set)   # 이 게임에서 NPC 가 된, 플레이어 인원보다 많은 인물(순서). 선택 목록에 나오지 않는다
     designated_id: int = 0           # 방장이 진행 권한을 맡긴 계정. 처음에는 방장이다
     away_seconds: float = 600.0
     last_seen: dict[int, float] = field(default_factory=dict)   # 계정 → 마지막으로 상태를 확인한 시각
@@ -108,8 +109,8 @@ class Game:
 
     @property
     def characters(self) -> list[dict[str, Any]]:
-        """플레이어가 맡는 인물(NPC 가 아닌 것)."""
-        return [c for c in (self.snapshot.get("인물") or []) if not c.get("NPC")]
+        """플레이어가 맡는 인물: 항상 NPC 가 아니고, 이 게임의 인원 때문에 NPC 가 되지도 않은 것."""
+        return [c for c in (self.snapshot.get("인물") or []) if not c.get("NPC") and c["순서"] not in self.npc_slots]
 
     def bump(self) -> int:
         self.state_version += 1
@@ -307,6 +308,23 @@ def assign_character(game: Game, account_id: int, character: int, persist) -> No
             raise AssignError("taken", "이미 다른 사람이 고른 인물입니다")
         persist(account_id, character)
         player.character = character
+
+
+def unassign_character(game: Game, account_id: int, persist) -> None:
+    """플레이어가 확인했던 인물을 되돌린다(다음 단계로 넘어가기 전까지, 사용자 2026-10-18). 이 인물은 다시 누구나 고를 수 있다.
+
+    `persist(account_id, None)` 이 DB 에서 배정을 지운다. 상태 버전은 호출하는 쪽이 올린다.
+    """
+    with game.lock:
+        if game.ended:
+            raise AssignError("ended", "게임이 끝났습니다")
+        player = game.players.get(account_id)
+        if player is None:
+            raise AssignError("not_player", "플레이어만 캐릭터를 고를 수 있습니다")
+        if player.character is None:
+            raise AssignError("none", "고른 캐릭터가 없습니다")
+        persist(account_id, None)
+        player.character = None
 
 
 def confirmed_count(game: Game) -> int:

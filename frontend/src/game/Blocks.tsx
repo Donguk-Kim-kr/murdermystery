@@ -12,6 +12,8 @@ interface Item {
   나이?: number | null;
   성별?: string | null;
   선택한_계정?: number | null;
+  /** 인물: 선택 화면에 보일 소개(카드 설정이 켜져 있을 때만 온다) */
+  선택소개?: string | null;
   /** 장소: 종류와 설명, 이 사람이 지금 고를 수 없는지 */
   유형?: string | null;
   특징?: string | null;
@@ -409,6 +411,7 @@ function ChoiceBlock({ block, state, onAnswer }: { block: Block; state: GameStat
                 <span className="muted">
                   {[item.직업, item.나이 != null ? `${item.나이}세` : null, item.성별, item.유형, item.특징].filter(Boolean).join(" · ")}
                 </span>
+                {item.선택소개 && <span className="pick-intro">{item.선택소개}</span>}
                 {taken && <span className="chip accent">{mine ? "내 인물" : `${nameOf(owner!)} 선택`}</span>}
               </button>
             </li>
@@ -420,8 +423,15 @@ function ChoiceBlock({ block, state, onAnswer }: { block: Block; state: GameStat
           <button type="button" disabled={finished || current === undefined || busy} onClick={() => void send(current)}>
             확인
           </button>
+          {finished && (
+            <button type="button" className="secondary" disabled={busy} onClick={() => void send("취소")}>
+              선택 취소
+            </button>
+          )}
           <span className="muted">
-            {finished ? "선택을 확정했습니다. 바꿀 수 없습니다." : current === undefined ? "인물을 고른 뒤 확인을 누르세요." : "확인하면 되돌릴 수 없습니다."}
+            {finished
+              ? "선택을 확정했습니다. 다음 단계로 넘어가기 전에는 취소하고 다시 고를 수 있습니다."
+              : current === undefined ? "인물을 고른 뒤 확인을 누르세요." : "확인을 누르면 선택이 확정됩니다(다음 단계로 넘어가기 전에는 취소할 수 있습니다)."}
           </span>
         </div>
       )}

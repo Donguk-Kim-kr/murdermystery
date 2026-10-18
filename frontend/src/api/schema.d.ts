@@ -880,6 +880,10 @@ export interface components {
             NPC?: boolean;
             /** 소개 */
             "\uC18C\uAC1C"?: string | null;
+            /** 선택소개 */
+            "\uC120\uD0DD\uC18C\uAC1C"?: string | null;
+            /** Npc순위 */
+            "NPC\uC21C\uC704"?: number | null;
         };
         /** CharacterOut */
         CharacterOut: {
@@ -918,6 +922,10 @@ export interface components {
             NPC?: boolean;
             /** 소개 */
             "\uC18C\uAC1C"?: string | null;
+            /** 선택소개 */
+            "\uC120\uD0DD\uC18C\uAC1C"?: string | null;
+            /** Npc순위 */
+            "NPC\uC21C\uC704"?: number | null;
             /** 순서 */
             "\uC21C\uC11C": number;
         };
@@ -949,6 +957,10 @@ export interface components {
             NPC?: boolean | null;
             /** 소개 */
             "\uC18C\uAC1C"?: string | null;
+            /** 선택소개 */
+            "\uC120\uD0DD\uC18C\uAC1C"?: string | null;
+            /** Npc순위 */
+            "NPC\uC21C\uC704"?: number | null;
         };
         /** ConfirmIn */
         ConfirmIn: {
@@ -1458,8 +1470,6 @@ export interface components {
             "\uC7A5\uB974"?: string | null;
             /** 예상시간 */
             "\uC608\uC0C1\uC2DC\uAC04"?: string | null;
-            /** 최소인원 */
-            "\uCD5C\uC18C\uC778\uC6D0"?: number | null;
             /** 공통스토리 */
             "\uACF5\uD1B5\uC2A4\uD1A0\uB9AC"?: string | null;
             /** 공통스토리 부분 */

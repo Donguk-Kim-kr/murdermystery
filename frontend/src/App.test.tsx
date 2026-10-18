@@ -515,14 +515,21 @@ describe("작품", () => {
   it("서버가 거부하면 기본정보 저장 오류를 보여 준다", async () => {
     routes["GET /api/works/7"] = () => json(work);
     routes["GET /api/works/7/characters"] = () => json([]);
-    routes["PATCH /api/works/7"] = () => json({ detail: "최소인원은 현재 인원(1명)보다 클 수 없습니다. 인물을 먼저 추가해 주세요" }, 409);
+    routes["PATCH /api/works/7"] = () => json({ detail: "저장할 수 없습니다" }, 409);
     renderApp("/works/7?tab=confirm");
     const form = await screen.findByRole("form", { name: "기본정보" });
-    const min = within(form).getByLabelText("최소 인원");
-    await userEvent.clear(min);
-    await userEvent.type(min, "4");
+    await userEvent.type(within(form).getByLabelText("장르"), "추리");
     await userEvent.click(within(form).getByRole("button", { name: "저장" }));
-    expect(await within(form).findByRole("alert")).toHaveTextContent("최소인원은 현재 인원(1명)보다 클 수 없습니다");
+    expect(await within(form).findByRole("alert")).toHaveTextContent("저장할 수 없습니다");
+  });
+
+  it("플레이 인원은 직접 입력하지 않고 인물에서 계산된 값으로 보인다", async () => {
+    routes["GET /api/works/7"] = () => json({ ...work, 최소인원: 3, 최대인원: 5 });
+    routes["GET /api/works/7/characters"] = () => json([]);
+    renderApp("/works/7?tab=confirm");
+    const form = await screen.findByRole("form", { name: "기본정보" });
+    expect(within(form).queryByLabelText("최소 인원")).not.toBeInTheDocument();
+    expect(within(form).getByText("3~5명")).toBeInTheDocument();
   });
 
   it("없는 작품이면 오류와 목록 링크를 보여 준다", async () => {

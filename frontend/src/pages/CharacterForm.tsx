@@ -5,8 +5,14 @@ import type { components } from "../api/schema";
 
 export type Character = components["schemas"]["CharacterOut"];
 
-const TEXT_FIELDS = ["직업", "성별", "소개", "타임라인", "능력", "비밀", "목표"] as const;
-const LONG = new Set<string>(["소개", "타임라인", "능력", "비밀", "목표"]);
+const TEXT_FIELDS = ["직업", "성별", "선택소개", "소개", "타임라인", "능력", "비밀", "목표"] as const;
+const LONG = new Set<string>(["선택소개", "소개", "타임라인", "능력", "비밀", "목표"]);
+// 화면에 보이는 이름(칸 이름과 다른 것만)
+const LABEL: Record<string, string> = { 선택소개: "선택 화면 소개", 소개: "자기소개 멘트" };
+const HINT: Record<string, string> = {
+  선택소개: "캐릭터를 고를 때 인물 카드에 함께 보여 줄 수 있는 소개입니다(보일지는 흐름의 캐릭터 선택 카드 설정에서 정합니다)",
+  소개: "자기소개 단계에서 이 인물을 소개할 때 보여 주는 멘트입니다. 비우면 플레이어가 스스로 소개합니다",
+};
 
 // 서사는 부분으로 나누어 쓴다. 전체 글자 수는 10000자이고 부분이 늘수록 각 부분의 제한이 줄어든다(서버 narrative.py 와 같은 규칙).
 const MAX_PARTS = 5;
@@ -43,7 +49,9 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
     Object.fromEntries(TEXT_FIELDS.map((f) => [f, character?.[f] ?? ""])),
   );
   const [culprit, setCulprit] = useState(character?.범인 ?? false);
-  const [npc, setNpc] = useState(character?.NPC ?? false);
+  // 인물 종류: 플레이하는 인물 / NPC 가 될 수 있는 인물(인원이 모자라면 순위대로 NPC 가 된다) / 항상 NPC(예: 시작부터 죽은 피해자)
+  const [kind, setKind] = useState<"player" | "maybe" | "npc">(character?.NPC ? "npc" : character?.NPC순위 != null ? "maybe" : "player");
+  const [rank, setRank] = useState(character?.NPC순위?.toString() ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -77,12 +85,14 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
       직업: orNull(texts.직업),
       성별: orNull(texts.성별),
       소개: orNull(texts.소개),
+      선택소개: orNull(texts.선택소개),
       타임라인: orNull(texts.타임라인),
       능력: orNull(texts.능력),
       비밀: orNull(texts.비밀),
       목표: orNull(texts.목표),
       범인: culprit,
-      NPC: npc,
+      NPC: kind === "npc",
+      NPC순위: kind === "maybe" ? (rank.trim() === "" ? null : Number(rank)) : null,
     };
     const params = { params: { path: { work_id: workId } } };
     const res = character
@@ -109,14 +119,17 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
           <input type="number" min={0} max={200} value={age} onChange={(e) => setAge(e.target.value)} />
         </label>
         {TEXT_FIELDS.map((f) => (
-          <label key={f} className={LONG.has(f) ? "wide" : undefined}>
-            {f}
-            {LONG.has(f) ? (
-              <textarea rows={2} value={texts[f]} onChange={(e) => setTexts({ ...texts, [f]: e.target.value })} />
-            ) : (
-              <input value={texts[f]} onChange={(e) => setTexts({ ...texts, [f]: e.target.value })} />
-            )}
-          </label>
+          <div key={f} className={LONG.has(f) ? "field wide" : "field"}>
+            <label>
+              {LABEL[f] ?? f}
+              {LONG.has(f) ? (
+                <textarea rows={2} value={texts[f]} onChange={(e) => setTexts({ ...texts, [f]: e.target.value })} />
+              ) : (
+                <input value={texts[f]} onChange={(e) => setTexts({ ...texts, [f]: e.target.value })} />
+              )}
+            </label>
+            {HINT[f] && <span className="hint">{HINT[f]}</span>}
+          </div>
         ))}
         <div className="wide story-parts">
           {parts.map((p, i) => (
@@ -159,11 +172,31 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
           <input type="checkbox" checked={culprit} onChange={(e) => setCulprit(e.target.checked)} />
           범인
         </label>
-        <label className="check">
-          <input type="checkbox" checked={npc} onChange={(e) => setNpc(e.target.checked)} />
-          NPC (플레이할 수 없는 인물)
-        </label>
       </div>
+      <fieldset className="npc-kind">
+        <legend>인물 종류</legend>
+        <label className="check">
+          <input type="radio" name="npc-kind" checked={kind === "player"} onChange={() => setKind("player")} />
+          플레이하는 인물
+        </label>
+        <label className="check">
+          <input type="radio" name="npc-kind" checked={kind === "maybe"} onChange={() => setKind("maybe")} />
+          NPC가 될 수 있는 인물
+        </label>
+        {kind === "maybe" && (
+          <label className="inline">
+            NPC 순위
+            <input type="number" min={1} max={100} value={rank} onChange={(e) => setRank(e.target.value)} required />
+            <span className="muted">
+              인원이 모자랄 때 숫자가 작은 인물부터 NPC가 됩니다(예: 8인 게임을 7인으로 하면 순위 1, 6인으로 하면 순위 1과 2). 순위는 인물마다 달라야 합니다
+            </span>
+          </label>
+        )}
+        <label className="check">
+          <input type="radio" name="npc-kind" checked={kind === "npc"} onChange={() => setKind("npc")} />
+          항상 NPC (플레이할 수 없는 인물, 예: 시작부터 죽은 피해자)
+        </label>
+      </fieldset>
       {error && <p role="alert" className="error">{error}</p>}
       <div className="row start">
         <button type="submit" disabled={busy}>저장</button>

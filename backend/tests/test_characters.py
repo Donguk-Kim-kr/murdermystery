@@ -67,25 +67,6 @@ def test_toggling_npc_recomputes_capacity(client, headers, work):
     assert capacity(client, headers, wid) == 3
 
 
-def test_npc_toggle_below_min_players_is_rejected_and_rolled_back(client, headers, work):
-    wid = work["번호"]
-    for n in "ABC":
-        add(client, headers, wid, n)
-    assert client.patch(f"/api/works/{wid}", headers=headers, json={"최소인원": 3}).status_code == 200
-    res = client.patch(f"/api/works/{wid}/characters/3", headers=headers, json={"NPC": True})
-    assert res.status_code == 409
-    assert client.get(f"/api/works/{wid}/characters/3", headers=headers).json()["NPC"] is False
-    assert capacity(client, headers, wid) == 3
-
-
-def test_min_players_can_be_raised_up_to_player_count(client, headers, work):
-    wid = work["번호"]
-    for n in "ABCD":
-        add(client, headers, wid, n)
-    assert client.patch(f"/api/works/{wid}", headers=headers, json={"최소인원": 4}).status_code == 200
-    assert client.patch(f"/api/works/{wid}", headers=headers, json={"최소인원": 5}).status_code == 409
-
-
 def test_update_character_fields(client, headers, work):
     wid = work["번호"]
     add(client, headers, wid, "A", 직업="의사")
@@ -138,16 +119,6 @@ def test_delete_character_updates_capacity_and_is_blocked_while_referenced(clien
     assert client.delete(f"{base}/{a}", headers=headers).status_code == 204
     assert client.get(f"/api/works/{wid}", headers=headers).json()["최대인원"] == 1
     assert client.delete(f"{base}/{a}", headers=headers).status_code == 404
-
-
-def test_delete_character_cannot_drop_below_min_players(client, headers):
-    wid = client.post("/api/works", headers=headers, json={"제목": "w"}).json()["번호"]
-    base = f"/api/works/{wid}/characters"
-    for n in "ABC":
-        client.post(base, headers=headers, json={"이름": n})
-    assert client.patch(f"/api/works/{wid}", headers=headers, json={"최소인원": 3}).status_code == 200
-    assert client.delete(f"{base}/3", headers=headers).status_code == 409
-    assert len(client.get(base, headers=headers).json()) == 3
 
 
 def test_other_users_cannot_delete_a_character(client, new_user):
@@ -210,3 +181,55 @@ def test_story_rejects_reserved_marker_and_conflicting_input(client, headers, wo
     old = client.post(url, headers=headers, json={"이름": "나", "서사": "옛 서사"}).json()
     assert [p["본문"] for p in old["서사_부분"]] == ["옛 서사"] and len(old["서사_부분"][0]["ID"]) == 6
 
+
+def limits(client, headers, wid):
+    work = client.get(f"/api/works/{wid}", headers=headers).json()
+    return work["최소인원"], work["최대인원"]
+
+
+def test_min_players_is_max_minus_the_characters_that_can_be_npc(client, headers, work):
+    """NPC 가 될 수 있는 인물(NPC순위가 있는 인물)이 있으면 그만큼 적은 인원으로도 시작할 수 있다(사용자 2026-10-18)."""
+    wid = work["번호"]
+    for n in "ABCDE":
+        add(client, headers, wid, n)
+    assert limits(client, headers, wid) == (5, 5)                                       # 모두 반드시 플레이하는 인물
+    assert client.patch(f"/api/works/{wid}/characters/5", headers=headers, json={"NPC순위": 1}).status_code == 200
+    assert limits(client, headers, wid) == (4, 5)
+    assert client.patch(f"/api/works/{wid}/characters/4", headers=headers, json={"NPC순위": 2}).status_code == 200
+    assert limits(client, headers, wid) == (3, 5)
+    add(client, headers, wid, "피해자", NPC=True)                                        # 항상 NPC 는 최대·최소에 들어가지 않는다
+    assert limits(client, headers, wid) == (3, 5)
+    assert client.patch(f"/api/works/{wid}/characters/4", headers=headers, json={"NPC순위": None}).status_code == 200
+    assert limits(client, headers, wid) == (4, 5)
+    assert client.delete(f"/api/works/{wid}/characters/5", headers=headers).status_code == 204
+    assert limits(client, headers, wid) == (4, 4)                                       # 지우면 다시 계산된다
+
+
+def test_min_players_is_not_editable_and_never_below_one(client, headers, work):
+    wid = work["번호"]
+    add(client, headers, wid, "A", NPC순위=1)
+    assert limits(client, headers, wid) == (1, 1)
+    client.patch(f"/api/works/{wid}", headers=headers, json={"최소인원": 7})
+    assert limits(client, headers, wid) == (1, 1)                                       # 보내도 바뀌지 않는다
+
+
+def test_npc_rank_rules(client, headers, work):
+    wid = work["번호"]
+    add(client, headers, wid, "A", NPC순위=1)
+    dup = client.post(f"/api/works/{wid}/characters", headers=headers, json={"이름": "B", "NPC순위": 1})
+    assert dup.status_code == 409 and "순위 1" in dup.json()["detail"]
+    b = add(client, headers, wid, "B")
+    taken = client.patch(f"/api/works/{wid}/characters/{b['순서']}", headers=headers, json={"NPC순위": 1})
+    assert taken.status_code == 409
+    both = client.post(f"/api/works/{wid}/characters", headers=headers, json={"이름": "피해자", "NPC": True, "NPC순위": 2})
+    assert both.status_code == 422                                                      # 항상 NPC 에는 순위를 둘 수 없다
+    assert client.post(f"/api/works/{wid}/characters", headers=headers, json={"이름": "C", "NPC순위": 0}).status_code == 422
+    # 항상 NPC 로 바꾸면 순위는 저절로 비워진다
+    res = client.patch(f"/api/works/{wid}/characters/1", headers=headers, json={"NPC": True})
+    assert res.status_code == 200 and res.json()["NPC순위"] is None and limits(client, headers, wid) == (1, 1)
+
+
+def test_pick_intro_is_stored_separately_from_the_self_introduction(client, headers, work):
+    wid = work["번호"]
+    c = add(client, headers, wid, "A", 소개="자기소개 멘트", 선택소개="선택 화면 소개")
+    assert (c["소개"], c["선택소개"]) == ("자기소개 멘트", "선택 화면 소개")

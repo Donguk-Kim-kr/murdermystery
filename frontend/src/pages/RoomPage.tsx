@@ -110,7 +110,7 @@ export function RoomPage() {
           ))}
         </ul>
         <p className="muted">
-          플레이어 수가 캐릭터 수({room.작품.최대인원}명)와 같아야 시작할 수 있습니다.
+          플레이어 수가 {room.작품.최소인원 === room.작품.최대인원 ? `${room.작품.최대인원}명` : `${room.작품.최소인원}명 이상 ${room.작품.최대인원}명 이하`}이어야 시작할 수 있습니다.
         </p>
         {room.내가_방장 && (
           <label className="check">

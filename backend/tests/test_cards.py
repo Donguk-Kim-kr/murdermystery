@@ -22,11 +22,11 @@ def db(test_dbname):
 def make_scripted_game(client, make_account, db):
     """카드(이름, 스크립트, 설정)를 페이즈 하나에 하나씩 놓은 확정 작품으로 방을 열어 게임을 시작한다."""
 
-    def make(cards, players=3, observer_host=False, story="모두가 읽는 공통 스토리", unchecked=(), setup=None, edit=None):
+    def make(cards, players=3, observer_host=False, story="모두가 읽는 공통 스토리", unchecked=(), setup=None, edit=None, characters=None, start_status=200):
         """`unchecked` 에 든 카드 이름의 스크립트는 확정(검사)을 통과한 뒤 스냅샷에서 바꿔 넣는다(검사를 통과하지 못할 스크립트를 실행해 보려고)."""
         host = make_account()
         wid = client.post("/api/works", headers=host.headers, json={"제목": "스크립트 시험", "공통스토리": story}).json()["번호"]
-        for i in range(players):
+        for i in range(characters if characters is not None else players):
             raw = narrative.join([Part(None, f"{i}번의 서사 하나"), Part(None, f"{i}번의 서사 둘")])
             res = client.post(f"/api/works/{wid}/characters", headers=host.headers, json={
                 "이름": f"인물{i}", "직업": "의사", "서사": raw, "비밀": f"비밀{i}",
@@ -69,7 +69,7 @@ def make_scripted_game(client, make_account, db):
         for o in others:
             join(client, o, room["입장코드"])
         res = start(client, host)
-        assert res.status_code == 200, res.text
+        assert res.status_code == start_status, res.text
         return host, others, room, wid
 
     return make

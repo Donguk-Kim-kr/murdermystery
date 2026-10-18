@@ -278,6 +278,8 @@
 | 13 | 범인 | boolean | 불가 | false |
 | 14 | NPC | boolean | 불가 | false |
 | 15 | 소개 | text | 가능 |  |
+| 16 | 선택소개 | text | 가능 |  |
+| 17 | NPC순위 | integer | 가능 |  |
 
 **제약조건**
 
@@ -286,7 +288,12 @@
 | PK | `pk_인물` | `PRIMARY KEY ("번호")` |
 | UNIQUE | `uq_인물_작품_순서` | `UNIQUE ("작품_번호", "순서")` |
 | FK | `fk_인물_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE CASCADE` |
+| CHECK | `ck_인물_NPC순위` | `CHECK ((("NPC순위" IS NULL) OR (("NPC순위" >= 1) AND (NOT "NPC"))))` |
 | CHECK | `ck_인물_순서` | `CHECK (("순서" >= 1))` |
+
+**추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
+
+- `uq_인물_NPC순위`: `CREATE UNIQUE INDEX "uq_인물_NPC순위" ON public."인물" USING btree ("작품_번호", "NPC순위") WHERE ("NPC순위" IS NOT NULL)`
 
 ## 관계
 

@@ -37,10 +37,10 @@ def test_update_cannot_blank_required_fields(client, headers):
         assert client.patch(f"/api/works/{work['번호']}", headers=headers, json=patch).status_code == 422
 
 
-def test_min_players_cannot_exceed_current_capacity(client, headers):
+def test_min_players_cannot_be_set_directly(client, headers):
     work = create(client, headers)
     res = client.patch(f"/api/works/{work['번호']}", headers=headers, json={"최소인원": 4})
-    assert res.status_code == 409
+    assert res.status_code == 200                                                       # 보내도 무시된다: 인물에서 자동 계산된다
     assert client.get(f"/api/works/{work['번호']}", headers=headers).json()["최소인원"] == 1
 
 
