@@ -743,3 +743,6 @@ button.clue-head:hover { background: transparent; }
 .time-parts input[type=number] { width: 4.5rem; flex: none; }
 .time-parts input[type=time] { width: 9rem; flex: none; }
 .time-parts .inline { display: inline-flex; align-items: center; gap: 0.25rem; }
+
+/* 아이콘만 있는 작은 버튼(링크 복사 등) */
+.icon-btn { padding: 0.4rem 0.55rem; line-height: 0; display: inline-flex; align-items: center; justify-content: center; }

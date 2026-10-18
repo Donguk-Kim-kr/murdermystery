@@ -698,6 +698,7 @@ describe("방", () => {
     expect(screen.queryByText(/버전/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "링크 복사" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "복사" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/누구나 입장할 수 있습니다/)).not.toBeInTheDocument();      // 안내 문구는 두지 않는다
   });
 
   it("대기실의 링크 복사 버튼은 입장 링크를 복사한다", async () => {
@@ -707,6 +708,7 @@ describe("방", () => {
     renderApp("/room");
     await userEvent.click(await screen.findByRole("button", { name: "링크 복사" }));
     expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/join/K7M2QX`);
+    expect(await screen.findByRole("button", { name: "링크 복사됨" })).toBeInTheDocument();      // 복사하면 잠깐 완료 표시가 된다
   });
 
   it("입장코드를 대문자로 바꿔 입장하고 대기실을 보여 준다", async () => {

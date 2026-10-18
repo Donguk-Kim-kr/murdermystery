@@ -82,11 +82,20 @@ export function RoomPage() {
         <div className="code-box">
           <span className="muted">입장코드</span>
           <strong className="code" aria-label="입장코드">{room.입장코드}</strong>
-          <button type="button" className="small secondary" onClick={() => void copyLink()}>
-            {copiedLink ? "링크 복사됨" : "링크 복사"}
+          <button type="button" className="small secondary icon-btn" onClick={() => void copyLink()}
+            aria-label={copiedLink ? "링크 복사됨" : "링크 복사"} title={copiedLink ? "링크 복사됨" : "링크 복사"}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              {copiedLink ? (
+                <path d="M20 6 9 17l-5-5" />
+              ) : (
+                <>
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                </>
+              )}
+            </svg>
           </button>
         </div>
-        <p className="muted">이 코드나 링크를 아는 사람은 누구나 입장할 수 있습니다. 함께할 사람에게만 알려 주세요.</p>
       </div>
 
       <section aria-label="참가자" className="card">
