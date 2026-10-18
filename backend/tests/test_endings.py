@@ -222,3 +222,36 @@ def test_ending_condition_arrested_the_culprit_by_vote(client, make_scripted_gam
         go_to_endings(client, host, 1)
         shown = [b for b in state(client, people[0]).json()["화면"] if b["이름"].startswith("엔딩")]
         assert [b["내용"] for b in shown] == [expected], target
+
+
+def test_tie_is_its_own_ending_and_not_a_failed_arrest(client, make_scripted_game):
+    """동률이면 '검거'도 '검거 실패'도 아니고 '동률' 분기만 나온다."""
+    vote = "'최종 투표'"
+    caught = f"결과_인물({vote}) is not None and 결과_인물({vote}).범인"
+    endings = [
+        ("검거", {"식": caught}, "검거"),
+        ("동률", {"식": f"len(최다득표({vote})) > 1"}, "동률"),
+        ("투표 없음", {"식": f"투표수({vote}) == 0"}, "투표 없음"),
+        ("검거 실패", {"식": f"결과({vote}) is not None and not ({caught})"}, "검거 실패"),
+    ]
+
+    def mark_culprit(client_, host, wid):
+        assert client_.patch(f"/api/works/{wid}/characters/1", headers=host.headers, json={"범인": True}).status_code == 200
+
+    def scenario(picks):
+        def votes(people, slots):
+            by_name = {p["이름"]: p["순서"] for p in state(client, people[0]).json()["인물"]}
+            for who, choice in zip(people, picks):
+                if choice is not None:
+                    cast(client, who, by_name.get(choice, choice))
+        return votes
+
+    for expected, picks in (
+        ("동률", ("인물1", "인물0", "사고사")),
+        ("투표 없음", (None, None, None)),
+        ("검거 실패", ("사고사", "사고사", "사고사")),
+    ):
+        host, people, slots = play(client, make_scripted_game, endings, votes=scenario(picks), setup_extra=mark_culprit)
+        go_to_endings(client, host, 1)
+        shown = [b["내용"] for b in state(client, people[0]).json()["화면"] if b["이름"].startswith("엔딩")]
+        assert shown == [expected], (expected, shown)
