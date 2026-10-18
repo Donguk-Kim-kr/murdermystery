@@ -467,13 +467,13 @@ def test_bad_character_values_do_not_break_character_select(client, make_scripte
 
 # ---- 밀담·추리 발표와 기본 진행단계 목록 ------------------------------------------------------------
 
-def test_secret_talk_and_deduction_show_their_announcement_and_settings_replace_it(client, make_scripted_game):
+def test_secret_talk_only_shows_that_it_is_possible_and_deduction_settings_replace_its_announcement(client, make_scripted_game):
     from app.default_phases import DEDUCTION, SECRET_TALK
 
     host, others, _, _ = make_scripted_game([
         ("밀담", SECRET_TALK, None), ("추리 발표", DEDUCTION, {"안내": "한 사람당 1분씩 발표합니다."}),
     ])
-    assert "밀담을 할 수 있는 단계" in block(state(client, others[0]).json(), "밀담")["내용"]
+    assert block(state(client, others[0]).json(), "밀담")["내용"] == "밀담 가능"                 # 안내 문구는 함께 가는 단계에서 정한다
     assert advance(client, host).status_code == 200
     assert block(state(client, others[0]).json(), "추리 발표")["내용"] == "한 사람당 1분씩 발표합니다."
 

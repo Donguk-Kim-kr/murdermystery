@@ -117,7 +117,7 @@ await p1.getByRole("tab", { name: "공개 단서" }).click();
 check(!(await text(p1)).includes("편지 내용입니다"), "토론: 양도하면 둘째에게 보여 준 공개는 사라진다");
 await pages[1].screenshot({ path: `${OUT}/full-discussion-mobile.png` });
 await next("밀담");
-check((await text(p1)).includes("밀담을 할 수 있는 단계"), "밀담: 안내 문구");
+check((await text(p1)).includes("밀담 가능"), "밀담: 밀담 가능 표시");
 await next("추리 발표");
 await next("최종 투표");
 const vote = async (p, who) => { try { await p.getByRole("button", { name: new RegExp(who) }).first().click({ timeout: 8000 }); } catch (e) { console.log("투표 화면:", (await text(p)).slice(0, 2000)); await p.screenshot({ path: `${OUT}/vote-fail.png` }); throw e; } await p.getByRole("button", { name: /^투표/ }).click(); };

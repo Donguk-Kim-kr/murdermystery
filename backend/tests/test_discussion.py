@@ -92,7 +92,7 @@ def test_transfer_is_immediate_and_clears_reveals(client, make_scripted_game, db
     assert "찢어진 편지" not in clue_cards(client, giver)
     assert clue_cards(client, taker)["찢어진 편지"]["공개"] == []                       # 받은 단서에는 이전 공개가 남아 있지 않다
     assert tab(state(client, third).json(), "공개 단서")["항목"] == []                 # 양도하면 걸린 공개는 사라진다
-    assert [n["글"] for n in state(client, taker).json()["알림"]][-1].endswith("단서를 넘겨주었습니다.")
+    assert [n["글"] for n in state(client, taker).json()["알림"]][-1].endswith("님이 단서를 양도했습니다.")
     rows = db.execute(
         'SELECT 획득방법, 보유여부 FROM "획득" WHERE 단서_순서 = %s AND 진행_번호 = (SELECT 번호 FROM "진행" WHERE 방_번호 = %s) ORDER BY 번호',
         (letter, room["번호"]),
