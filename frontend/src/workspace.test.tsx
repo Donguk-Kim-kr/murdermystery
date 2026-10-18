@@ -651,6 +651,31 @@ describe("진행 탭", () => {
       expect(doctor.getByRole("status")).toHaveTextContent("서사 3은(는) 없습니다(서사 1개)");
     });
 
+    it("스크립트가 후보를 쓰는 카드는 투표 후보를 고르고, 기본(플레이어 인물 모두)이면 저장하지 않는다", async () => {
+      routes["PATCH /api/works/7/content/phase-steps/9"] = () => json({});
+      twoPhases();
+      (bundle.library as { phases: Record<string, object> }).phases[5] = { 번호: 5, 이름: "최종 투표", 버전: 1, 설명: "d", 삭제됨: false, 사용설정: ["후보"] };
+      bundle.characters = [
+        { 순서: 1, 이름: "의사", 직업: null, NPC: false, 범인: false, 서사_부분수: 1 },
+        { 순서: 2, 이름: "집사", 직업: null, NPC: false, 범인: false, 서사_부분수: 1 },
+        { 순서: 3, 이름: "피해자", 직업: null, NPC: true, 범인: false, 서사_부분수: 1 },
+      ];
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));
+      await pickCard("1차 조사");
+      const card = within(editor().getByRole("group", { name: "1차 조사 수정" }));
+      expect(card.getByLabelText("의사")).toBeChecked();
+      expect(card.getByLabelText("집사")).toBeChecked();
+      expect(card.getByLabelText("피해자 (NPC)")).not.toBeChecked();
+      await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: null });        // 기본과 같으면 저장하지 않는다
+      await userEvent.click(card.getByLabelText("피해자 (NPC)"));
+      await userEvent.click(card.getByLabelText("집사"));
+      await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
+      await waitFor(() => expect(sent("PATCH /api/works/7/content/phase-steps/9")).toHaveLength(2));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[1].req.json()).toEqual({ 설정: { 후보: [1, 3] } });
+    });
+
     it("스크립트가 개인 서사 공개를 쓰지 않는 카드에는 서사 선택이 없다", async () => {
       twoPhases();
       bundle.characters = [{ 순서: 1, 이름: "의사", 직업: null, NPC: false, 범인: false, 서사_부분수: 2 }];

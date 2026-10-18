@@ -22,6 +22,7 @@ type Call = (method: string, path: string, body?: unknown) => Promise<boolean>;
 /** 칸에 놓은 카드·기믹의 세부 설정(`설정`)에서 다음 페이즈에도 탭을 남길지를 가리키는 키. 이름은 임시이며 엔진 설계에서 확정한다. */
 const KEEP_TAB = "내용유지";
 const STORY_PICKS = "개인서사공개";
+const CANDIDATES = "후보";
 
 /**
  * 게임 흐름 화면: 맨 위에 페이즈 카드가 왼쪽에서 오른쪽으로 놓이고, 아래에 진행카드(불러온 진행단계·기믹)가 있다.
@@ -583,9 +584,16 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
 }) {
   const current = asObject(value);
   const showPicks = settingKeys.includes(STORY_PICKS);
-  const { [KEEP_TAB]: keepRaw, [STORY_PICKS]: picksRaw, ...restAll } = current;
-  // 개인 서사 공개를 전용 입력으로 다룰 때만 JSON 칸에서 뺀다(스크립트가 쓰지 않는 카드에서는 값을 그대로 둔다).
-  const rest = showPicks ? restAll : { ...restAll, ...(picksRaw === undefined ? {} : { [STORY_PICKS]: picksRaw }) };
+  const showCandidates = settingKeys.includes(CANDIDATES);
+  const { [KEEP_TAB]: keepRaw, [STORY_PICKS]: picksRaw, [CANDIDATES]: candidatesRaw, ...restAll } = current;
+  // 전용 입력으로 다루는 설정만 JSON 칸에서 뺀다(스크립트가 쓰지 않는 카드에서는 값을 그대로 둔다).
+  const rest: Record<string, unknown> = { ...restAll };
+  if (!showPicks && picksRaw !== undefined) rest[STORY_PICKS] = picksRaw;
+  if (!showCandidates && candidatesRaw !== undefined) rest[CANDIDATES] = candidatesRaw;
+  const allPlayable = characters.filter((c) => c.NPC !== true).map((c) => Number(c.순서));
+  const [candidates, setCandidates] = useState<number[]>(
+    Array.isArray(candidatesRaw) ? candidatesRaw.filter((n): n is number => Number.isInteger(n)) : allPlayable,
+  );
   const [keepTab, setKeepTab] = useState(keepRaw !== false);
   const [text, setText] = useState(Object.keys(rest).length ? JSON.stringify(rest, null, 2) : "");
   const [picked, setPicked] = useState<Record<string, number[]>>(() => storyPicks(picksRaw));
@@ -608,6 +616,9 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
       Object.entries(picked).filter(([, nums]) => !(nums.length === 1 && nums[0] === 1)),
     );
     let next: Record<string, unknown> = showPicks && Object.keys(changed).length ? { ...extra, [STORY_PICKS]: changed } : extra;
+    // 기본(플레이어가 맡는 인물 모두)과 같은 선택은 따로 저장하지 않는다.
+    const isDefault = candidates.length === allPlayable.length && allPlayable.every((n) => candidates.includes(n));
+    if (showCandidates && !isDefault) next = { ...next, [CANDIDATES]: [...candidates].sort((a, b) => a - b) };
     if (showTab && !keepTab) next = { ...next, [KEEP_TAB]: false };
     setError(null);
     await call("PATCH", `${resource}/${id}`, { 설정: Object.keys(next).length ? next : null });
@@ -622,6 +633,7 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
         </label>
       )}
       {showPicks && <StoryPicks characters={characters} picked={picked} onChange={setPicked} />}
+      {showCandidates && <CandidatePicks characters={characters} selected={candidates} onChange={setCandidates} />}
       <label>
         그 밖의 세부 설정 (JSON)
         <textarea rows={4} value={text} placeholder="비우면 정의의 기본값을 씁니다" onChange={(e) => setText(e.target.value)} />
@@ -641,6 +653,34 @@ function storyPicks(raw: unknown): Record<string, number[]> {
     if (Array.isArray(nums)) out[key] = nums.filter((n): n is number => Number.isInteger(n) && n >= 1).sort((a, b) => a - b);
   }
   return out;
+}
+
+/** 투표 카드: 투표할 수 있는 후보를 고른다(NPC 도 후보로 둘 수 있다). 기본은 플레이어가 맡는 인물 모두이다. */
+function CandidatePicks({ characters, selected, onChange }: {
+  characters: Row[]; selected: number[]; onChange: (next: number[]) => void;
+}) {
+  return (
+    <fieldset className="story-picks">
+      <legend>투표 후보</legend>
+      <p className="muted">투표에서 고를 수 있는 인물입니다. 자기 인물에게는 투표할 수 없습니다.</p>
+      <div className="story-pick">
+        {characters.map((c) => {
+          const slot = Number(c.순서);
+          return (
+            <label key={slot} className="check">
+              <input
+                type="checkbox"
+                checked={selected.includes(slot)}
+                onChange={(e) => onChange(e.target.checked ? [...selected, slot] : selected.filter((n) => n !== slot))}
+              />
+              {String(c.이름)}
+              {c.NPC === true ? " (NPC)" : ""}
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
 }
 
 /** 프로필 숙지 카드: 인물마다 이 카드가 보여 줄 서사를 고른다(여러 개 가능, 기본은 서사 1). */

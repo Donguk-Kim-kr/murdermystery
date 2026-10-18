@@ -50,6 +50,8 @@ export function BlockView({ block, state, onAnswer }: Props) {
       return <ChoiceBlock block={block} state={state} onAnswer={onAnswer} />;
     case "입력":
       return <InputBlock block={block} onAnswer={onAnswer} isPlayer={state.나.역할 === "플레이어"} />;
+    case "투표":
+      return <VoteBlock block={block} state={state} onAnswer={onAnswer} />;
     case "카드목록":
       return <CardsBlock block={block} state={state} onAnswer={onAnswer} />;
     case "현황":
@@ -69,6 +71,62 @@ function TextBlock({ block }: { block: Block }) {
     <section className="block" aria-label={text(block.이름) || "글"}>
       <Title block={block} />
       <p className="prose">{text(block.내용)}</p>
+    </section>
+  );
+}
+
+/** 비공개 투표. 후보를 고르고 "투표"를 누르며, 다음 단계로 넘어가기 전에는 다시 골라 바꿀 수 있다. 남의 표는 보이지 않는다. */
+function VoteBlock({ block, state, onAnswer }: { block: Block; state: GameState; onAnswer: Props["onAnswer"] }) {
+  const items = (block.항목 as Item[] | undefined) ?? [];
+  const mine = typeof block.내_선택 === "number" ? block.내_선택 : null;
+  const [picked, setPicked] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const isPlayer = state.나.역할 === "플레이어";
+  const chosen = picked ?? mine;
+  const nameOf = (value: unknown) => items.find((i) => i.값 === value)?.이름 ?? "";
+
+  return (
+    <section className="block" aria-label={text(block.이름)}>
+      <Title block={block} />
+      {text(block.질문) && <p>{text(block.질문)}</p>}
+      <ul className="choice-list">
+        {items.map((item, index) => (
+          <li key={index}>
+            <button
+              type="button"
+              className={`choice${chosen === item.값 ? " on" : ""}`}
+              aria-pressed={chosen === item.값}
+              disabled={!isPlayer || item.비활성 === true || busy}
+              onClick={() => setPicked(item.값 as number)}
+            >
+              <strong>{text(item.이름) || "이름 없음"}</strong>
+              <span className="muted">{[item.직업, item.나이 != null ? `${item.나이}세` : null, item.성별].filter(Boolean).join(" · ")}</span>
+              {mine === item.값 && <span className="chip accent">내 투표</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {isPlayer ? (
+        <div className="row start">
+          <button
+            type="button"
+            disabled={busy || chosen === null || chosen === mine}
+            onClick={async () => {
+              setBusy(true);
+              const ok = await onAnswer(text(block.질문ID), chosen);
+              setBusy(false);
+              if (ok) setPicked(null);
+            }}
+          >
+            {mine === null ? "투표" : "투표 바꾸기"}
+          </button>
+          <span className="muted">
+            {mine === null ? "아직 투표하지 않았습니다." : `${nameOf(mine)}에게 투표했습니다. 다음 단계로 넘어가기 전에는 바꿀 수 있습니다.`}
+          </span>
+        </div>
+      ) : (
+        <p className="muted">관전 중에는 투표할 수 없습니다.</p>
+      )}
     </section>
   );
 }

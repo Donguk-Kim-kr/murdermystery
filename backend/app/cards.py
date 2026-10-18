@@ -50,10 +50,10 @@ class CardRun:
 
 # ---- 호스트(스크립트가 부르는 엔진 기능) -------------------------------------------------------
 
-MUTATING = {"배정", "조사", "양도", "공개설정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
+MUTATING = {"배정", "투표", "투표초기화", "조사", "양도", "공개설정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
 FUNCTION_NAMES = {
     "플레이어들", "플레이어수", "인물들", "공통스토리", "서사들", "배정된_플레이어수", "인물_없는_플레이어가_있다",
-    "글", "선택지", "입력", "카드목록", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "보유목록", "받은공개", "읽기", "기다리기",
+    "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "보유목록", "받은공개", "인물찾기", "투표", "투표수", "최다득표", "투표초기화", "결과", "읽기", "기다리기",
     "단계_끝내기", "게임_종료",
 }
 CONSTANT_NAMES = {"통과", ALL}
@@ -119,6 +119,27 @@ class CardHost:
         """이 플레이어가 지금 가진 단서·증언(얻은 순서). 각 항목은 {종류, 이름, 내용, 장소}."""
         return clues.holdings_of(self.game, self._player_account(플레이어))
 
+    def fn_인물찾기(self, 순서: Any) -> Ref | None:
+        """인물의 순서 번호로 인물을 찾는다(NPC 포함). 없으면 None. 카드 설정에 적힌 번호를 인물로 바꿀 때 쓴다."""
+        if not _is_int(순서) or not any(c["순서"] == 순서 for c in self.game.snapshot.get("인물") or []):
+            return None
+        return Ref("인물", 순서)
+
+    def fn_투표수(self, 이름: str) -> int:
+        """이 투표에 투표한 사람 수."""
+        return len(self.game.votes.get(str(이름), {}))
+
+    def fn_최다득표(self, 이름: str) -> list[Ref]:
+        """가장 많은 표를 받은 인물들(동률이면 여럿, 투표가 없으면 빈 목록)."""
+        counts = _tally(self.game, str(이름))
+        top = max(counts.values(), default=0)
+        return [Ref("인물", slot) for slot, n in sorted(counts.items()) if n == top and top > 0]
+
+    def fn_결과(self, 이름: str) -> Ref | None:
+        """이 투표에서 가장 많은 표를 받은 인물. 동률이거나 투표가 없으면 None(구속 없음). 지금 있는 표로 그때그때 계산한다."""
+        top = self.fn_최다득표(이름)
+        return top[0] if len(top) == 1 else None
+
     def fn_받은공개(self, 플레이어: Any) -> list[dict[str, Any]]:
         """다른 사람이 이 플레이어에게(또는 전체에게) 보여 준 단서. 각 항목은 {종류, 이름, 내용, 장소, 주인}."""
         return clues.revealed_to(self.game, self._player_account(플레이어))
@@ -182,6 +203,16 @@ class CardHost:
             block.update({"동작": actions, "질문ID": f"{self.run.key}:{name}"})
         return block
 
+    def fn_투표칸(self, 이름: str, 후보: Any, 질문: Any = "") -> dict[str, Any]:
+        """비공개 투표 칸. 후보는 인물 목록이다. 플레이어는 다음 단계로 가기 전까지 다시 골라 바꿀 수 있고, 자기 인물은 고를 수 없다.
+        투표하면 `기다리기(이름)` 이 `{플레이어, 값: 고른 인물 순서}` 를 돌려준다."""
+        name = str(이름)
+        if ":" in name or name in ("확인", ""):
+            raise ScriptError("투표칸의 이름은 비워 둘 수 없고 ':' 이나 '확인' 일 수 없습니다")
+        if not isinstance(후보, (list, tuple)) or not all(isinstance(c, Ref) and c.kind == "인물" for c in 후보):
+            raise ScriptError("투표칸의 후보는 인물 목록이어야 합니다")
+        return {"종류": "투표", "이름": name, "질문": _text(질문), "항목": list(후보), "질문ID": f"{self.run.key}:{name}"}
+
     def fn_현황(self, 이름: str, 완료: int, 전체: int) -> dict[str, Any]:
         return {"종류": "현황", "이름": str(이름), "완료": int(완료), "전체": int(전체)}
 
@@ -213,6 +244,21 @@ class CardHost:
         if isinstance(대상, (list, tuple)):
             대상 = [t.key if isinstance(t, Ref) and t.kind == "플레이어" else t for t in 대상]
         return clues.set_reveal(self.game, owner, 단서, 대상, self.io)
+
+    def fn_투표(self, 이름: str, 플레이어: Any, 인물: Any) -> bool:
+        """플레이어의 표를 기록한다(이미 했으면 바꾼다). 없는 인물이거나 자기 인물이면 False."""
+        account = self._player_account(플레이어)
+        slot = 인물.key if isinstance(인물, Ref) and 인물.kind == "인물" else 인물
+        if not _is_int(slot) or not any(c["순서"] == slot for c in self.game.snapshot.get("인물") or []):
+            return False
+        if self.game.players[account].character == slot:
+            return False
+        self.game.votes.setdefault(str(이름), {})[account] = slot
+        return True
+
+    def fn_투표초기화(self, 이름: str) -> None:
+        """이 투표의 표를 모두 지운다(재투표를 시작할 때)."""
+        self.game.votes.pop(str(이름), None)
 
     def fn_배정(self, 플레이어: Any, 인물: Any) -> bool:
         from .engine import AssignError, assign_character
@@ -345,6 +391,13 @@ class CardHost:
         if ref.key not in self.game.players:
             raise ScriptError("게임에 없는 플레이어입니다")
         return [ref.key]
+
+
+def _tally(game, name: str) -> dict[int, int]:
+    counts: dict[int, int] = {}
+    for slot in game.votes.get(name, {}).values():
+        counts[slot] = counts.get(slot, 0) + 1
+    return counts
 
 
 def _is_int(value: Any) -> bool:
@@ -498,6 +551,9 @@ def answer(game, account_id: int, qid: str, value: Any, io) -> None:
     action_block = _card_action_block(game, run, rest)
     if action_block is not None:
         value = _clean_card_action(game, account_id, action_block, value)
+    vote_block = next((b for t in run.screens.values() for b in t.values() if b.get("종류") == "투표" and b.get("이름") == rest), None)
+    if vote_block is not None and not _is_int(value):
+        raise AnswerError("invalid", "고른 인물을 읽을 수 없습니다")
     block = next((b for t in run.screens.values() for b in t.values() if b.get("종류") == "입력" and b.get("이름") == rest), None)
     if block is not None:
         if not isinstance(value, str) or not value.strip():
@@ -540,6 +596,16 @@ def _block(game, viewer: int, block: dict[str, Any]) -> dict[str, Any]:
         player = game.players.get(viewer)
         picks_character = any(isinstance(i, Ref) and i.kind == "인물" for i in items)
         out["내_선택_끝남"] = bool(picks_character and player and player.character is not None)
+    elif kind == "투표":
+        player = game.players.get(viewer)
+        mine = player.character if player else None
+        items = [_item(game, viewer, i) for i in block.get("항목", [])]
+        for item in items:
+            item.pop("선택한_계정", None)
+            item["비활성"] = player is None or item["값"] == mine          # 관전자는 고르지 못하고 자기 인물에게는 투표할 수 없다
+        out["항목"] = items
+        out["내_선택"] = game.votes.get(block["이름"], {}).get(viewer)
+        out["투표수"] = len(game.votes.get(block["이름"], {}))
     elif kind == "카드목록":
         out["항목"] = list(block.get("항목", []))
     elif kind == "읽기":

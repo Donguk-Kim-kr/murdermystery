@@ -84,6 +84,8 @@ class Game:
     holdings: dict[int, list[dict[str, Any]]] = field(default_factory=dict, repr=False)
     # (주인 계정, 단서 순서) → 볼 수 있는 대상. 계정 번호들의 집합이거나 "전체" 가 들어 있으면 모두에게 공개
     reveals: dict[tuple[int, int], set] = field(default_factory=dict, repr=False)
+    # 투표 이름 → {투표한 계정: 고른 인물 순서}. 투표는 비공개라 스크립트가 `득표`·`결과` 로 읽을 때만 드러난다(app/cards.py)
+    votes: dict[str, dict[int, int]] = field(default_factory=dict, repr=False)
 
     @property
     def phases(self) -> list[dict[str, Any]]:

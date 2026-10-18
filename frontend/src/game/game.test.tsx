@@ -467,3 +467,49 @@ describe("단서 보여 주기·양도", () => {
     expect(screen.queryByRole("button", { name: "양도" })).toBeNull();
   });
 });
+
+describe("투표 블록", () => {
+  const box = (over: Record<string, unknown> = {}) => ({
+    종류: "투표", 이름: "최종 투표", 질문: "범인은 누구입니까?", 질문ID: "1:7:최종 투표", 내_선택: null, 투표수: 0,
+    항목: [
+      { 값: 10, 이름: "의사", 직업: "의사", 나이: 40, 성별: null, 비활성: true },       // 내 인물
+      { 값: 11, 이름: "집사", 직업: "집사", 나이: 60, 성별: null, 비활성: false },
+      { 값: 12, 이름: "하녀", 직업: "하녀", 나이: 20, 성별: null, 비활성: false },
+    ],
+    ...over,
+  });
+
+  it("후보를 고르고 투표를 눌러야 보내고, 내 인물은 고를 수 없다", async () => {
+    state = makeState({ 화면: [box()] });
+    render(<GamePage />);
+    const user = userEvent.setup();
+    const send = await screen.findByRole("button", { name: "투표" });
+    expect(send).toBeDisabled();
+    expect(screen.getByRole("button", { name: /의사/ })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: /집사/ }));
+    expect(posts).toEqual([]);
+    await user.click(send);
+    await waitFor(() => expect(posts).toEqual([{ path: "/api/game/me/answer", body: { 질문ID: "1:7:최종 투표", 값: 11 } }]));
+  });
+
+  it("투표한 뒤에는 내 투표가 표시되고 다른 후보로 바꿀 수 있다", async () => {
+    state = makeState({ 화면: [box({ 내_선택: 11 })] });
+    render(<GamePage />);
+    const user = userEvent.setup();
+    expect(await screen.findByText("내 투표")).toBeInTheDocument();
+    expect(screen.getByText(/집사에게 투표했습니다/)).toBeInTheDocument();
+    const change = screen.getByRole("button", { name: "투표 바꾸기" });
+    expect(change).toBeDisabled();                                         // 같은 후보로는 바꿀 수 없다
+    await user.click(screen.getByRole("button", { name: /하녀/ }));
+    await user.click(change);
+    await waitFor(() => expect(posts.at(-1)?.body).toEqual({ 질문ID: "1:7:최종 투표", 값: 12 }));
+  });
+
+  it("관전자는 투표할 수 없다", async () => {
+    state = makeState({ 나: { 계정_번호: 9, 역할: "관전자", 인물_순서: null, 방장: false, 진행_권한: false }, 화면: [box()] });
+    render(<GamePage />);
+    await screen.findByText("관전 중에는 투표할 수 없습니다.");
+    expect(screen.queryByRole("button", { name: "투표" })).toBeNull();
+    expect(screen.getByRole("button", { name: /집사/ })).toBeDisabled();
+  });
+});

@@ -362,13 +362,15 @@ def phase_display_names(phases: list[dict], cards: list[dict]) -> dict[int, str 
     return out
 
 
-KNOWN_SETTINGS = ("개인서사공개", "내용유지")
+KNOWN_SETTINGS = ("개인서사공개", "내용유지", "후보")
 
 
 def used_settings(rule: Any) -> list[str]:
     """진행단계 스크립트가 글자로 가리키는 알려진 카드 설정 이름. 스크립트를 실행하지 않고 글에서 찾는다."""
     source = rule.get("스크립트") if isinstance(rule, dict) else None
-    return [key for key in KNOWN_SETTINGS if isinstance(source, str) and key in source]
+    if not isinstance(source, str):
+        return []
+    return [key for key in KNOWN_SETTINGS if f'"{key}"' in source or f"'{key}'" in source]       # 설정 이름을 글자로 적은 곳만 센다
 
 
 @router.get("")

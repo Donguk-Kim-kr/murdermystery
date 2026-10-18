@@ -10,6 +10,10 @@ from app.default_phases import COMMON_PHASES
 def conn(test_dbname):
     with psycopg.connect(f"dbname={test_dbname}", autocommit=True) as c:
         yield c
+        # 같은 시험 DB 를 쓰는 다른 시험이 "공통 항목이 없다"고 보고 있으므로 만든 것을 치운다
+        c.execute('ALTER TABLE "진행단계" DISABLE TRIGGER USER')
+        c.execute('DELETE FROM "진행단계" WHERE "계정_번호" IS NULL')
+        c.execute('ALTER TABLE "진행단계" ENABLE TRIGGER USER')
 
 
 def test_registers_every_common_phase_once_and_is_repeatable(conn):
