@@ -2,6 +2,8 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ConfirmProvider } from "../confirm/ConfirmContext";
+import { answerConfirm } from "../confirmTest";
 import { CharacterForm, type Character } from "./CharacterForm";
 
 const json = (body: unknown, status = 200) =>
@@ -26,7 +28,7 @@ const saved = (parts: { ID: string | null; 본문: string }[]) =>
   ({ 순서: 1, 이름: "의사", 서사: "", 서사_부분: parts, 범인: false, NPC: false }) as unknown as Character;
 
 const renderForm = (character?: Character) =>
-  render(<CharacterForm workId={7} character={character} onSaved={() => undefined} onCancel={() => undefined} />);
+  render(<ConfirmProvider><CharacterForm workId={7} character={character} onSaved={() => undefined} onCancel={() => undefined} /></ConfirmProvider>);
 
 describe("서사 입력", () => {
   it("처음에는 서사 1 하나이고 10000자까지 쓸 수 있다고 알린다", () => {
@@ -54,15 +56,14 @@ describe("서사 입력", () => {
   });
 
   it("추가하면 기존 서사가 새 제한을 넘을 때 미리 알리고, 취소하면 추가하지 않는다", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     renderForm(saved([{ ID: "abc123", 본문: "가".repeat(6000) }]));
     expect(screen.getByText(/지금 서사 1이 넘습니다/)).toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "서사 추가하기" }));
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("각 서사는 5000자까지"));
+    expect(await answerConfirm(false)).toContain("각 서사는 5000자까지");
     expect(screen.queryByText("서사 2")).toBeNull();
-    confirm.mockReturnValue(true);
     await user.click(screen.getByRole("button", { name: "서사 추가하기" }));
+    await answerConfirm(true);
     expect(screen.getByText("서사 2")).toBeInTheDocument();
     expect(screen.getByText("6000/5000자")).toHaveClass("error");
   });

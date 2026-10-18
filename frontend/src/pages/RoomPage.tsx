@@ -4,8 +4,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, errorMessage } from "../api/client";
 import { GamePage } from "../game/GamePage";
 import { useRoom } from "../rooms/RoomContext";
+import { useConfirm } from "../confirm/ConfirmContext";
 
 export function RoomPage() {
+  const confirm = useConfirm();
   const { room, refresh } = useRoom();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export function RoomPage() {
   }
 
   async function leave() {
-    if (room!.내가_방장 && !window.confirm("방장이 나가면 방이 닫히고 모두 나가게 됩니다. 계속할까요?")) return;
+    if (room!.내가_방장 && !(await confirm("방장이 나가면 방이 닫히고 모두 나가게 됩니다. 계속할까요?"))) return;
     setError(null);
     const { error } = await api.POST("/api/rooms/leave");
     if (error) {

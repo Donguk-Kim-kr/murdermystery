@@ -7,6 +7,7 @@ import {
   type FieldMeta, type Part, type ResourceMeta, type Row, type Workspace,
 } from "./workspace";
 import { josa } from "../josa";
+import { useConfirm } from "../confirm/ConfirmContext";
 
 /** 작업공간의 한 탭: 주어진 종류의 항목들을 목록과 입력 양식으로 보여 준다. 순서와 무관하게 아무거나 먼저 채울 수 있다. */
 export function ContentPanel({ workId, keys }: { workId: number; keys: string[] }) {
@@ -26,13 +27,14 @@ export function ContentPanel({ workId, keys }: { workId: number; keys: string[] 
 }
 
 export function ResourceSection({ workId, ws, meta }: { workId: number; ws: Workspace; meta: ResourceMeta }) {
+  const confirm = useConfirm();
   const rows = rowsOf(ws, meta.key);
   // null: 폼 닫힘, "new": 새 항목, 숫자: 그 항목 수정
   const [editing, setEditing] = useState<null | "new" | number>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function remove(row: Row) {
-    if (!window.confirm("이 항목을 삭제할까요?")) return;
+    if (!(await confirm("이 항목을 삭제할까요?\n삭제된 내용은 복구할 수 없습니다."))) return;
     setError(null);
     const res = await http("DELETE", `/api/works/${workId}/content/${meta.key}/${row[meta.key_col]}`);
     if (res.error) setError(errorMessage(res.error, "삭제하지 못했습니다"));

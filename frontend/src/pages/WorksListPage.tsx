@@ -4,6 +4,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, errorMessage, http } from "../api/client";
 import type { components } from "../api/schema";
 import { SPACES } from "../spaces";
+import { useConfirm } from "../confirm/ConfirmContext";
+import { josa } from "../josa";
 
 type Work = components["schemas"]["WorkOut"];
 
@@ -12,6 +14,7 @@ export function WorksListPage() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const navigate = useNavigate();
+  const confirm = useConfirm();
 
   useEffect(() => {
     let cancelled = false;
@@ -36,7 +39,7 @@ export function WorksListPage() {
   }
 
   async function remove(w: Work) {
-    if (!window.confirm(`'${w.제목}' 작품을 삭제할까요?\n인물·장소·단서·흐름 등 만들어 둔 내용이 모두 지워지고 되돌릴 수 없습니다.`)) return;
+    if (!(await confirm(`${josa(`'${w.제목}'`, "을/를")} 삭제할까요?\n삭제된 내용은 복구할 수 없습니다.`))) return;
     setError(null);
     const res = await http("DELETE", `/api/works/${w.번호}`);
     if (res.error) setError(errorMessage(res.error, "삭제하지 못했습니다"));

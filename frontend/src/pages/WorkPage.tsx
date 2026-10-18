@@ -12,6 +12,8 @@ import { CommonStoryEditor } from "./CommonStoryEditor";
 import { RoomPanel } from "./RoomPanel";
 import { TestersPanel } from "./TestersPanel";
 import { VisibilityPanel } from "./VisibilityPanel";
+import { useConfirm } from "../confirm/ConfirmContext";
+import { josa } from "../josa";
 
 type Work = components["schemas"]["WorkOut"];
 
@@ -41,6 +43,7 @@ const ALL_TABS = [...TABS, ...PENDING_TABS];
 type TabId = (typeof ALL_TABS)[number]["id"];
 
 export function WorkPage() {
+  const confirm = useConfirm();
   const workId = Number(useParams().id);
   const { state } = useAuth();
   const role = state.status === "authenticated" ? state.account.권한 : "사용자";
@@ -80,7 +83,7 @@ export function WorkPage() {
   if (!work) return <p className="center">불러오는 중…</p>;
 
   async function removeCharacter(c: Character) {
-    if (!window.confirm(`'${c.이름}' 인물을 삭제할까요?`)) return;
+    if (!(await confirm(`${josa(`'${c.이름}'`, "을/를")} 삭제할까요?\n삭제된 내용은 복구할 수 없습니다.`))) return;
     setDeleteError(null);
     const res = await http("DELETE", `/api/works/${workId}/characters/${c.순서}`);
     if (res.error) setDeleteError(errorMessage(res.error, "삭제하지 못했습니다"));

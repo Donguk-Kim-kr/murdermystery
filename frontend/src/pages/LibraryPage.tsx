@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { errorMessage, http } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ScriptEditor } from "./ScriptEditor";
+import { useConfirm } from "../confirm/ConfirmContext";
 
 interface Item {
   번호: number;
@@ -42,6 +43,7 @@ export function LibraryPage() {
 }
 
 function KindSection({ kind }: { kind: (typeof KINDS)[number] }) {
+  const confirm = useConfirm();
   const { state } = useAuth();
   const operator = state.status === "authenticated" && state.account.권한 === "운영자";
   const [items, setItems] = useState<Item[]>([]);
@@ -146,7 +148,7 @@ function KindSection({ kind }: { kind: (typeof KINDS)[number] }) {
                   <span className="row start">
                     <button type="button" className="small secondary" onClick={() => setRenaming({ id: head.번호, name: head.이름 })}>이름 바꾸기</button>
                     <button type="button" className="small secondary"
-                      onClick={() => window.confirm(`'${head.이름}'의 모든 버전을 삭제할까요?`) && void act("DELETE", `/api/library/${kind.key}/${head.번호}?scope=lineage`)}>
+                      onClick={async () => (await confirm(`'${head.이름}'의 모든 버전을 삭제할까요?\n삭제된 내용은 복구할 수 없습니다.`)) && void act("DELETE", `/api/library/${kind.key}/${head.번호}?scope=lineage`)}>
                       계열 삭제
                     </button>
                   </span>

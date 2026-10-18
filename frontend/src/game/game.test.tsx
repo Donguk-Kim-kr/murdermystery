@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ConfirmProvider } from "../confirm/ConfirmContext";
 import { RoomProvider } from "../rooms/RoomContext";
 import { RoomPage } from "../pages/RoomPage";
 import { GamePage } from "./GamePage";
@@ -313,9 +314,11 @@ describe("대기실에서 게임 시작", () => {
     });
     return render(
       <MemoryRouter>
-        <RoomProvider>
-          <RoomPage />
-        </RoomProvider>
+        <ConfirmProvider>
+          <RoomProvider>
+            <RoomPage />
+          </RoomProvider>
+        </ConfirmProvider>
       </MemoryRouter>,
     );
   }

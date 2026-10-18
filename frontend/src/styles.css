@@ -726,3 +726,8 @@ button.clue-head:hover { background: transparent; }
 .fold-head:hover:not(:disabled) { background: var(--surface-2); text-decoration: none; }
 .fold-head:active:not(:disabled) { transform: none; }
 .fold-body { margin: 0; padding: 0 12px 12px; white-space: pre-wrap; }
+
+/* 확인 팝업 */
+.row.end { justify-content: flex-end; }
+.confirm-message p { margin: 0 0 0.35rem; }
+.confirm-dialog { width: min(100%, 24rem); }

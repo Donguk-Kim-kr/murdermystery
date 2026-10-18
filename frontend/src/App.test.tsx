@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 import { AuthProvider } from "./auth/AuthContext";
+import { answerConfirm } from "./confirmTest";
 
 type Handler = (req: Request) => Response | Promise<Response>;
 const json = (body: unknown, status = 200) =>
@@ -300,14 +301,15 @@ describe("작품", () => {
     routes["GET /api/works"] = () => json([work, { ...work, 번호: 8, 제목: "방이 있는 작품" }]);
     routes["DELETE /api/works/7"] = () => new Response(null, { status: 204 });
     routes["DELETE /api/works/8"] = () => json({ detail: "이 작품으로 만든 방이나 플레이 기록이 있어 삭제할 수 없습니다" }, 409);
-    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValue(true);
     renderApp("/make/games");
     await userEvent.click(await screen.findByRole("button", { name: "저택의 비밀 삭제" }));
+    await answerConfirm(false);
     expect(calls.filter((c) => c.key === "DELETE /api/works/7")).toHaveLength(0);                         // 취소하면 보내지 않는다
     await userEvent.click(screen.getByRole("button", { name: "저택의 비밀 삭제" }));
+    expect(await answerConfirm(true)).toBe("'저택의 비밀'을 삭제할까요?삭제된 내용은 복구할 수 없습니다.");              // 짧은 두 줄, 조사는 작품 이름에 맞춘다
     await waitFor(() => expect(screen.queryByText("저택의 비밀")).not.toBeInTheDocument());
-    expect(confirm.mock.calls[1][0]).toContain("저택의 비밀");
     await userEvent.click(screen.getByRole("button", { name: "방이 있는 작품 삭제" }));
+    await answerConfirm(true);
     expect(await screen.findByRole("alert")).toHaveTextContent("방이나 플레이 기록이 있어");
     expect(screen.getByText("방이 있는 작품")).toBeInTheDocument();             // 목록에 그대로 남는다
   });
@@ -829,7 +831,6 @@ describe("방", () => {
   });
 
   it("방장이 방 닫기를 누르면 확인 후 서버에 알리고 목록으로 돌아간다", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     let open = true;
     routes["GET /api/rooms/me"] = () => json(open ? baseRoom : null);
     routes["POST /api/rooms/leave"] = () => {
@@ -838,15 +839,16 @@ describe("방", () => {
     };
     renderApp("/room");
     await userEvent.click(await screen.findByRole("button", { name: "방 닫기" }));
+    await answerConfirm(true);
     expect(await screen.findByRole("heading", { name: "플레이" })).toBeInTheDocument();     // 방을 닫으면 플레이공간으로
     expect(calls.map((c) => c.key)).toContain("POST /api/rooms/leave");
   });
 
   it("확인을 취소하면 방을 닫지 않는다", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
     routes["GET /api/rooms/me"] = () => json(baseRoom);
     renderApp("/room");
     await userEvent.click(await screen.findByRole("button", { name: "방 닫기" }));
+    await answerConfirm(false);
     expect(calls.map((c) => c.key)).not.toContain("POST /api/rooms/leave");
   });
 

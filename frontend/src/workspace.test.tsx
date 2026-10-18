@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 import { AuthProvider } from "./auth/AuthContext";
+import { answerConfirm } from "./confirmTest";
 
 type Handler = (req: Request) => Response | Promise<Response>;
 const json = (body: unknown, status = 200) =>
@@ -378,10 +379,10 @@ describe("작업공간 탭", () => {
       bundle.places = [];
       return new Response(null, { status: 204 });
     };
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderApp("/works/7?tab=places");
     expect(await screen.findByText("지하실")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "삭제" }));
+    await answerConfirm(true);
     await waitFor(() => expect(screen.queryByText("지하실")).not.toBeInTheDocument());
     expect(sent("DELETE /api/works/7/content/places/3")).toHaveLength(1);
   });
@@ -758,12 +759,11 @@ describe("진행 탭", () => {
 
     it("페이즈 삭제는 확인창 없이 바로 서버에 요청하고 수정 패널을 닫는다", async () => {
       routes["DELETE /api/works/7/phases/2"] = () => json({ phases: [] });
-      const confirm = vi.spyOn(window, "confirm");
       renderApp("/works/7?tab=phases");
       await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 2" }));
       await userEvent.click(screen.getByRole("button", { name: "페이즈 2 삭제" }));
       await waitFor(() => expect(sent("DELETE /api/works/7/phases/2")).toHaveLength(1));
-      expect(confirm).not.toHaveBeenCalled();
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
       await waitFor(() => expect(screen.queryByRole("region", { name: "페이즈 편집" })).not.toBeInTheDocument());
     });
 
@@ -1117,10 +1117,10 @@ describe("개요·인물 탭", () => {
   });
 
   it("인물을 삭제하면 확인 후 서버에 알리고, 거부되면 사유를 보여 준다", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     routes["DELETE /api/works/7/characters/1"] = () => json({ detail: "다른 항목이 이 인물을 사용하고 있어 지울 수 없습니다" }, 409);
     renderApp("/works/7?tab=characters");
     await userEvent.click(await screen.findByRole("button", { name: "삭제" }));
+    await answerConfirm(true);
     expect(await screen.findByText(/다른 항목이 이 인물을 사용하고 있어/)).toBeInTheDocument();
   });
 });

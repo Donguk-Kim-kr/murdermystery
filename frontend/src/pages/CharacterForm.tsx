@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import { api, errorMessage } from "../api/client";
 import type { components } from "../api/schema";
 import { josa } from "../josa";
+import { useConfirm } from "../confirm/ConfirmContext";
 
 export type Character = components["schemas"]["CharacterOut"];
 
@@ -39,6 +40,7 @@ interface Props {
 }
 
 export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
+  const confirm = useConfirm();
   const [name, setName] = useState(character?.이름 ?? "");
   const [age, setAge] = useState(character?.나이?.toString() ?? "");
   const [parts, setParts] = useState<PartDraft[]>(() => {
@@ -60,14 +62,14 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
   const nextLimit = partLimit(parts.length + 1);
   const overAfterAdd = parts.flatMap((p, i) => (length(p.text) > nextLimit ? [i + 1] : []));
 
-  function addPart() {
+  async function addPart() {
     if (parts.length >= MAX_PARTS) return;
     if (
       overAfterAdd.length > 0 &&
-      !window.confirm(
+      !(await confirm(
         `서사를 ${parts.length + 1}개로 나누면 각 서사는 ${nextLimit}자까지 쓸 수 있습니다. ` +
           `${josa(`지금 서사 ${overAfterAdd.join(", ")}`, "이/가")} 넘으므로 줄여야 저장할 수 있습니다. 추가할까요?`,
-      )
+      ))
     )
       return;
     setParts([...parts, { key: nextKey, id: null, text: "" }]);

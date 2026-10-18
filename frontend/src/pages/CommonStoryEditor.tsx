@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { api, errorMessage } from "../api/client";
 import type { components } from "../api/schema";
+import { useConfirm } from "../confirm/ConfirmContext";
 
 type Work = components["schemas"]["WorkOut"];
 
@@ -19,6 +20,7 @@ interface PartDraft {
 
 /** 작품의 공통 스토리 편집. 어느 부분을 언제 보여 줄지는 흐름의 "공통 스토리" 카드 설정에서 번호로 고른다. */
 export function CommonStoryEditor({ work, onSaved }: { work: Work; onSaved: () => void | Promise<void> }) {
+  const confirm = useConfirm();
   const [parts, setParts] = useState<PartDraft[]>(() => {
     const saved = work.공통스토리_부분 ?? [];
     return (saved.length > 0 ? saved : [{ ID: null, 본문: "" }]).map((p, key) => ({ key, id: p.ID ?? null, text: p.본문 }));
@@ -32,14 +34,14 @@ export function CommonStoryEditor({ work, onSaved }: { work: Work; onSaved: () =
   const nextLimit = partLimit(parts.length + 1);
   const overAfterAdd = parts.flatMap((p, i) => (length(p.text) > nextLimit ? [i + 1] : []));
 
-  function addPart() {
+  async function addPart() {
     if (parts.length >= MAX_PARTS) return;
     if (
       overAfterAdd.length > 0 &&
-      !window.confirm(
+      !(await confirm(
         `공통 스토리를 ${parts.length + 1}개로 나누면 각 부분은 ${nextLimit}자까지 쓸 수 있습니다. ` +
           `지금 ${overAfterAdd.join(", ")}번째 부분이 넘으므로 줄여야 저장할 수 있습니다. 추가할까요?`,
-      )
+      ))
     )
       return;
     setParts([...parts, { key: nextKey, id: null, text: "" }]);
