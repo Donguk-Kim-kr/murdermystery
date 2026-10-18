@@ -271,7 +271,8 @@ def test_profile_shows_only_my_own_narrative(client, make_scripted_game):
     index_of = {slot: i for i, slot in enumerate(slots)}
     for who in people:
         slot, text = mine[who.number]
-        assert text == f"{index_of[slot]}번의 서사 하나"                         # 서사 1 만, 자기 인물의 것만
+        n = index_of[slot]
+        assert text == f"▶ 서사\n{n}번의 서사 하나\n\n{n}번의 서사 둘\n\n▶ 비밀\n비밀{n}"   # 따로 고르지 않으면 서사 전체와 비밀이 보인다, 자기 인물의 것만
         others_text = [v[1] for k, v in mine.items() if k != who.number]
         assert not any(o in state(client, who).text for o in others_text)        # 다른 사람의 서사는 응답 어디에도 없다
 
@@ -292,9 +293,10 @@ def test_profile_card_setting_chooses_parts_per_character(client, make_scripted_
         v = state(client, who).json()
         texts[v["나"]["인물_순서"]] = block(v, "개인 서사")["내용"]
     names = {s: i for i, s in enumerate(slots)}
-    assert texts[slots[0]] == f"{names[slots[0]]}번의 서사 하나\n\n{names[slots[0]]}번의 서사 둘"
-    assert texts[slots[1]] == f"{names[slots[1]]}번의 서사 둘"
-    assert texts[slots[2]] == f"{names[slots[2]]}번의 서사 하나"
+    section = lambda s, body: f"▶ 서사\n{body}\n\n▶ 비밀\n비밀{names[s]}"
+    assert texts[slots[0]] == section(slots[0], f"{names[slots[0]]}번의 서사 하나\n\n{names[slots[0]]}번의 서사 둘")
+    assert texts[slots[1]] == section(slots[1], f"{names[slots[1]]}번의 서사 둘")
+    assert texts[slots[2]] == section(slots[2], f"{names[slots[2]]}번의 서사 하나\n\n{names[slots[2]]}번의 서사 둘")      # 고르지 않은 인물은 전체
 
 
 def test_profile_read_progress_counts_across_players(client, make_scripted_game):
@@ -473,3 +475,35 @@ def test_every_common_phase_script_passes_the_same_check_as_confirm():
     assert len(names) == len(set(names))
     for name, description, source, _settings in COMMON_PHASES:
         assert description and "실행" in compile_source(source, known_names()).funcs, name
+
+
+def test_profile_shows_the_chosen_items_in_one_tab_with_sections(client, make_scripted_game):
+    def setup(client_, host, wid):
+        for slot in (1, 2, 3):
+            res = client_.patch(f"/api/works/{wid}/characters/{slot}", headers=host.headers, json={"타임라인": f"타임라인{slot}", "목표": f"목표{slot}", "능력": f"능력{slot}"})
+            assert res.status_code == 200, res.text
+    cards = [("캐릭터 선택", CHARACTER_SELECT, None), ("프로필 숙지", PROFILE, {"보일항목": ["비밀", "능력"]})]
+    host, others, _, _ = make_scripted_game(cards, setup=setup)
+    people = [host, *others]
+    all_pick(client, people)
+    assert advance(client, host).status_code == 200
+    for who in people:
+        view = state(client, who).json()
+        n = view["나"]["인물_순서"]
+        text = tab(view, "개인 서사")["내용"]
+        assert text.startswith("▶ 비밀\n") and f"▶ 능력\n능력{n}" in text
+        assert "▶ 서사" not in text and "타임라인" not in text and "목표" not in text            # 고르지 않은 항목은 보이지 않는다
+
+
+def test_profile_default_shows_every_item_in_order(client, make_scripted_game):
+    def setup(client_, host, wid):
+        res = client_.patch(f"/api/works/{wid}/characters/1", headers=host.headers, json={"타임라인": "밤 9시 서재", "목표": "유산을 지킨다", "능력": "거짓말을 알아챈다"})
+        assert res.status_code == 200
+    host, others, _, _ = make_scripted_game([("캐릭터 선택", CHARACTER_SELECT, None), ("프로필 숙지", PROFILE, None)], setup=setup)
+    people = [host, *others]
+    all_pick(client, people)
+    assert advance(client, host).status_code == 200
+    mine = next(state(client, w).json() for w in people if state(client, w).json()["나"]["인물_순서"] == 1)
+    text = tab(mine, "개인 서사")["내용"]
+    heads = [line for line in text.split("\n") if line.startswith("▶ ")]
+    assert heads == ["▶ 서사", "▶ 타임라인", "▶ 비밀", "▶ 목표", "▶ 능력"]

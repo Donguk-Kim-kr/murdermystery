@@ -644,9 +644,10 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
         return;
       }
     }
-    // 기본(서사 1)과 같은 선택은 따로 저장하지 않는다.
+    // 기본(서사 전체)과 같은 선택은 따로 저장하지 않는다.
+    const totals = Object.fromEntries(characters.map((c) => [String(c.순서), Math.max(Number(c.서사_부분수 ?? 0), 1)]));
     const changed = Object.fromEntries(
-      Object.entries(picked).filter(([, nums]) => !(nums.length === 1 && nums[0] === 1)),
+      Object.entries(picked).filter(([key, nums]) => !(nums.length === (totals[key] ?? 1) && nums.every((n, i) => n === i + 1))),
     );
     let next: Record<string, unknown> = showPicks && Object.keys(changed).length ? { ...extra, [STORY_PICKS]: changed } : extra;
     // 기본(플레이어가 맡는 인물 모두)과 같은 선택은 따로 저장하지 않는다.
@@ -954,13 +955,13 @@ function StoryPicks({ characters, picked, onChange }: {
   return (
     <fieldset className="story-picks">
       <legend>개인 서사 공개</legend>
-      <p className="muted">이 카드가 인물마다 보여 줄 서사를 고릅니다. 고르지 않으면 서사 1을 보여 줍니다.</p>
+      <p className="muted">이 카드가 인물마다 보여 줄 서사를 고릅니다. 따로 고르지 않으면 서사 전체를 보여 줍니다.</p>
       {players.length === 0 && <p className="muted">플레이할 수 있는 인물이 없습니다.</p>}
       {players.map((c) => {
         const key = String(c.순서);
         const total = Number(c.서사_부분수 ?? 0);
-        const chosen = picked[key] ?? [1];
         const slots = Array.from({ length: Math.max(total, 1) }, (_, i) => i + 1);
+        const chosen = picked[key] ?? slots;                     // 기본은 서사 전체
         const missing = chosen.filter((n) => n > total);
         return (
           <div key={key} className="story-pick" role="group" aria-label={`${String(c.이름)}의 개인 서사 공개`}>

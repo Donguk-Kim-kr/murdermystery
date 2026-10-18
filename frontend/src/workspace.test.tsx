@@ -782,7 +782,7 @@ describe("진행 탭", () => {
       expect(await sent("PATCH /api/works/7/content/phase-steps/10")[0].req.json()).toEqual({ 설정: null });
     });
 
-    it("스크립트가 개인 서사 공개를 쓰는 카드는 인물마다 보여 줄 서사를 고르고, 기본(서사 1)이면 저장하지 않는다", async () => {
+    it("스크립트가 개인 서사 공개를 쓰는 카드는 인물마다 보여 줄 서사를 고르고, 기본(서사 전체)이면 저장하지 않는다", async () => {
       routes["PATCH /api/works/7/content/phase-steps/9"] = () => json({});
       twoPhases();
       (bundle.library as { phases: Record<string, object> }).phases[5] = { 번호: 5, 이름: "프로필 숙지", 버전: 1, 설명: "d", 삭제됨: false, 사용설정: ["개인서사공개"] };
@@ -797,11 +797,14 @@ describe("진행 탭", () => {
       const card = within(editor().getByRole("group", { name: "1차 조사 수정" }));
       expect(card.queryByRole("group", { name: "피해자의 개인 서사 공개" })).not.toBeInTheDocument();   // NPC 는 고르지 않는다
       const doctor = within(card.getByRole("group", { name: "의사의 개인 서사 공개" }));
-      expect(doctor.getByLabelText("서사 1")).toBeChecked();
-      expect(doctor.getByLabelText("서사 2")).not.toBeChecked();
+      expect(doctor.getByLabelText("서사 1")).toBeChecked();                                          // 기본은 전체
+      expect(doctor.getByLabelText("서사 2")).toBeChecked();
+      await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: null });   // 기본과 같으면 저장하지 않는다
       await userEvent.click(doctor.getByLabelText("서사 2"));
       await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
-      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: { 개인서사공개: { 1: [1, 2] } } });
+      await waitFor(() => expect(sent("PATCH /api/works/7/content/phase-steps/9")).toHaveLength(2));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[1].req.json()).toEqual({ 설정: { 개인서사공개: { 1: [1] } } });
     });
 
     it("개인 서사 공개를 쓰지 않는 카드에는 서사 선택이 없고, 없는 서사를 고른 설정은 경고한다", async () => {

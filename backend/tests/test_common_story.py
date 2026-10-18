@@ -101,7 +101,7 @@ def test_profile_card_tab_name_and_append_mode(client, make_scripted_game):
     assert tab(state(client, people[0]).json(), "개인 서사") is not None
     assert advance(client, host).status_code == 200
     me = state(client, people[0]).json()
-    assert tab(me, "개인 서사")["내용"].count("서사") == 2 and "2차 개인 서사" not in [t["이름"] for t in me["탭"]]   # 같은 탭에 이어 붙음
+    assert tab(me, "개인 서사")["내용"].count("▶ 서사") == 2 and "2차 개인 서사" not in [t["이름"] for t in me["탭"]]   # 같은 탭에 이어 붙음
     cards[2] = ("프로필 숙지", PROFILE, {"개인서사공개": {"1": [2], "2": [2], "3": [2]}})
     host, others, _, _ = make_scripted_game(cards)
     people = players_of(host, others)
