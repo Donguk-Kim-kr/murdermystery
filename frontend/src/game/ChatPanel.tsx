@@ -128,8 +128,9 @@ export function ChatPanel() {
       <ul className="chat-log" aria-label={`${viewing} 대화`} ref={listRef}>
         {shown.length === 0 && <li className="muted">아직 대화가 없습니다.</li>}
         {shown.map((m) => (
-          <li key={m.번호} className={colorOf(m.보낸이.계정_번호)}>
-            <strong>{label(people.get(m.보낸이.계정_번호) ?? m.보낸이)}</strong> <span>{m.내용}</span>
+          <li key={m.번호} className={`chat-msg ${colorOf(m.보낸이.계정_번호)}`}>
+            <strong className="chat-name">{label(people.get(m.보낸이.계정_번호) ?? m.보낸이)}</strong>
+            <span className="chat-text">{m.내용}</span>
           </li>
         ))}
       </ul>

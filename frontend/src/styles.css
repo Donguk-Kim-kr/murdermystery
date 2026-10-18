@@ -782,8 +782,6 @@ button.clue-head:hover { background: transparent; }
 .chat-place-people { font-size: 0.8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-place.on .chat-place-people { color: inherit; }
 .chat-log { list-style: none; margin: 0; padding: 0.5rem 0.6rem; display: grid; gap: 0.35rem; align-content: start; height: 16rem; overflow-y: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.9rem; }
-.chat-log li { overflow-wrap: anywhere; }
-.chat-log strong { font-weight: 600; margin-right: 0.25rem; }
 .chat-form { display: flex; gap: 0.4rem; }
 .chat-form input { flex: 1; min-width: 0; }
 
@@ -793,11 +791,16 @@ button.clue-head:hover { background: transparent; }
 .chat.big .chat-places { grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
 .chat.big .chat-log { height: auto; min-height: 0; font-size: 1.05rem; }
 .chat.big .chat-form input { font-size: 1.05rem; }
-.chat-c0 { color: var(--chat-0); }
-.chat-c1 { color: var(--chat-1); }
-.chat-c2 { color: var(--chat-2); }
-.chat-c3 { color: var(--chat-3); }
-.chat-c4 { color: var(--chat-4); }
-.chat-c5 { color: var(--chat-5); }
-.chat-c6 { color: var(--chat-6); }
-.chat-c7 { color: var(--chat-7); }
+.chat-c0 { --c: var(--chat-0); color: var(--c); }
+.chat-c1 { --c: var(--chat-1); color: var(--c); }
+.chat-c2 { --c: var(--chat-2); color: var(--c); }
+.chat-c3 { --c: var(--chat-3); color: var(--c); }
+.chat-c4 { --c: var(--chat-4); color: var(--c); }
+.chat-c5 { --c: var(--chat-5); color: var(--c); }
+.chat-c6 { --c: var(--chat-6); color: var(--c); }
+.chat-c7 { --c: var(--chat-7); color: var(--c); }
+
+/* 대화 한 줄: 사람 색의 옅은 배경 말풍선, 이름은 윗줄에 사람 색으로 */
+.chat-log .chat-msg { color: var(--text); background: color-mix(in srgb, var(--c) 13%, transparent); border-radius: 10px; padding: 0.35rem 0.65rem; overflow-wrap: anywhere; }
+.chat-log .chat-name { display: block; font-weight: 700; font-size: 0.8rem; color: var(--c); margin: 0 0 0.05rem; }
+.chat-log .chat-text { display: block; }

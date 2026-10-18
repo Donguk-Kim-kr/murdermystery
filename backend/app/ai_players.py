@@ -31,10 +31,13 @@ RULES = """당신은 머더 미스터리 게임에 참여한 **플레이어**입
 - 토론 단계에서는 전체 채팅으로 이야기하고, 도움이 되는 단서는 share_clue 로 보여 줄 수 있습니다. 불리한 단서는 보여 주지 않아도 됩니다.
 - 투표 단계에서는 토론에서 얻은 근거로 **가장 범인일 것 같은 사람**을 고르세요(자기 자신은 고를 수 없습니다).
 
-## 채팅 장소
+## 채팅 장소와 밀담
 - 채팅 장소는 "전체"와 "밀담 A, B …"입니다. 한 번에 한 곳에만 있고, 같은 장소에 있는 사람의 말만 보입니다. 모든 사람의 위치는 보입니다.
-- 밀담 장소에는 두 사람만 들어갈 수 있습니다. 밀담을 하고 싶으면 전체에서 상대에게 말로 제안한 뒤 둘이 같은 밀담 장소로 go 로 이동하세요. 끝나면 "전체"로 돌아오세요.
-- 밀담에 가 있는 동안 전체에서 오간 말은 영영 볼 수 없습니다.
+- 밀담 장소에는 두 사람만 들어갈 수 있습니다. 밀담에 가 있는 동안 전체에서 오간 말은 영영 볼 수 없습니다.
+- **밀담은 이 게임의 중요한 재미입니다. 토론 단계에서 한두 번은 꼭 활용하세요.** 비밀을 나눌 상대, 의심스러운 사람의 속내를 떠볼 상대, 내 편으로 만들 사람이 있을 때 밀담을 제안합니다.
+- **제안하는 방법**: 전체 채팅에서 상대를 지목해 짧게 제안하고("○○ 씨, 밀담 A에서 잠깐 얘기해요"), **같은 턴에** go 로 그 밀담 장소로 먼저 이동해 기다리세요.
+- **제안을 받았을 때**: 대화에 나를 지목한 밀담 제안이 있으면, 그 사람이 있는 밀담 장소로 go 로 이동하세요(가기 싫으면 전체에서 거절한다고 말하세요).
+- 밀담 안에서는 두세 마디 속 이야기를 나눈 뒤 go 로 "전체"에 돌아오세요. 밀담 내용은 전체에서 말하거나 숨길 수 있습니다.
 """
 
 TOOLS = [
@@ -324,11 +327,23 @@ class Agent:
         for p in state["플레이어"]:
             where = next((r["이름"] for r in chat.get("장소들", []) if any(m["계정_번호"] == p["계정_번호"] for m in r["사람들"])), "?")
             lines.append(f"  - {p['계정_번호']} · {p['닉네임']} · {p.get('인물_이름') or '미정'} · {where}" + (" (나)" if p["계정_번호"] == self.me else ""))
+        here = chat.get("내_위치")
+        recent = [m for m in self.messages if m["장소"] == here][-15:]
+        names = [x for x in (mine["이름"] if mine else None, self.nickname) if x]
+        invited = [m for m in recent[-8:] if m["보낸이"]["계정_번호"] != self.me and "밀담" in m["내용"] and any(n in m["내용"] for n in names)]
+        in_secret = any(r["사람들"] for r in chat.get("장소들", []) if r["이름"] != "전체")
+        hints: list[str] = []
+        if here and here != "전체":
+            hints.append(f"지금 {here}에 있습니다. 할 말을 마쳤으면 go 로 '전체'에 돌아가세요.")
+        elif invited:
+            hints.append("나를 지목한 밀담 제안이 있습니다. 제안한 사람이 있는 밀담 장소를 위치 목록에서 찾아 go 로 이동하세요(가기 싫으면 전체에서 거절한다고 말하세요).")
+        elif "토론" in str(phase.get("이름") or "") and not in_secret:
+            hints.append("토론 단계인데 아직 아무도 밀담을 하지 않습니다. 확인하고 싶은 사람이 있다면 전체에서 지목해 밀담을 제안하고 go 로 먼저 이동해 기다려 보세요.")
+        if hints:
+            lines += ["", "## 참고"] + [f"- {h}" for h in hints]
         if notices:
             lines += ["", "## 알림"] + [f"- {n['글']}" for n in notices]
         lines += ["", "## 지금 할 수 있는 일", "```json", json.dumps(actions, ensure_ascii=False, indent=1), "```"]
-        here = chat.get("내_위치")
-        recent = [m for m in self.messages if m["장소"] == here][-15:]
         lines += ["", f"## 대화 (내 위치: {here or '관전'})"]
         lines += [f"- {m['보낸이']['닉네임']}{'(' + m['보낸이']['인물_이름'] + ')' if m['보낸이'].get('인물_이름') else ''}{'[나]' if m['보낸이']['계정_번호'] == self.me else ''}: {m['내용']}" for m in recent] or ["(아직 대화가 없습니다)"]
         if self.memory:

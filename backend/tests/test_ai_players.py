@@ -236,3 +236,20 @@ def test_a_choice_the_card_refuses_is_reported_as_not_accepted_not_as_success(cl
     assert second._answer(qid, slot, "'캐릭터 선택'에서 같은 인물 선택") is False
     assert "받아들여지지 않음" in logs[-1] and "이미 다른 사람이 고른 인물" in logs[-1]
     assert state(client, people[1]).json()["나"]["인물_순서"] is None
+
+
+def test_rules_and_cues_push_the_ai_to_use_private_talk():
+    assert "밀담은 이 게임의 중요한 재미" in RULES and "같은 턴에" in RULES and "제안을 받았을 때" in RULES
+    agent = Agent("AI 2", None, {}, SimpleBrain(), log=lambda _t: None)
+    agent.me = 5
+    state_ = {"나": {"인물_순서": 3, "계정_번호": 5}, "인물": [{"순서": 3, "이름": "황칠성", "직업": "사장", "나이": 51}], "탭": [], "화면": [], "알림": [],
+              "페이즈": {"위치": 6, "전체": 9, "이름": "토론"}, "시간": {"남은_초": 100},
+              "플레이어": [{"계정_번호": 5, "닉네임": "AI 2", "인물_이름": "황칠성"}, {"계정_번호": 6, "닉네임": "AI 3", "인물_이름": "한유진"}]}
+    people = [{"계정_번호": 5, "닉네임": "AI 2", "인물_이름": "황칠성"}, {"계정_번호": 6, "닉네임": "AI 3", "인물_이름": "한유진"}]
+    chat = {"내_위치": "전체", "장소들": [{"이름": "전체", "최대인원": None, "사람들": people}, {"이름": "밀담 A", "최대인원": 2, "사람들": []}], "메시지": []}
+    assert "아직 아무도 밀담을 하지 않습니다" in agent.prompt(state_, chat, [], [])[1]                  # 토론인데 밀담이 없으면 권한다
+    agent.messages = [{"번호": 1, "장소": "전체", "보낸이": people[1], "내용": "황칠성 씨, 밀담 A에서 잠깐 얘기해요."}]
+    assert "나를 지목한 밀담 제안" in agent.prompt(state_, chat, [], [])[1]                          # 제안을 받았다
+    chat["내_위치"] = "밀담 A"
+    agent.messages = []
+    assert "'전체'에 돌아가세요" in agent.prompt(state_, chat, [], [])[1]
