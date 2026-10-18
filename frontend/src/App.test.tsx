@@ -708,7 +708,7 @@ describe("방", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("입장코드가 올바르지 않습니다");
   });
 
-  it("방 만들기: 방장 참여를 끄고 만들면 그 값을 보내고 대기실로 간다", async () => {
+  it("방 만들기: 방장도 플레이어로 참여하는 것으로 만들고 대기실로 간다(설명 글과 참여 선택은 없다)", async () => {
     let inRoom = false;
     routes["GET /api/rooms/me"] = () => json(inRoom ? baseRoom : null);
     routes["POST /api/rooms"] = () => {
@@ -716,10 +716,14 @@ describe("방", () => {
       return json(baseRoom, 201);
     };
     renderApp("/rooms/new/7");
-    await userEvent.click(await screen.findByLabelText("나도 플레이어로 참여"));
+    expect(await screen.findByText(/입장 코드는 4~10자로 지정 가능합니다\./)).toBeInTheDocument();
+    expect(screen.getByText(/미 입력시 자동 생성됩니다\./)).toBeInTheDocument();
+    expect(screen.queryByLabelText("나도 플레이어로 참여")).not.toBeInTheDocument();
+    expect(screen.queryByText(/으로 방을 만듭니다/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("입장코드")).not.toHaveAttribute("placeholder");
     await userEvent.click(screen.getByRole("button", { name: "방 만들기" }));
     expect(await screen.findByRole("heading", { name: "저택의 비밀" })).toBeInTheDocument();
-    expect(await calls.find((c) => c.key === "POST /api/rooms")!.req.json()).toEqual({ 작품_번호: 7, 방장_참여: false, 입장코드: null });
+    expect(await calls.find((c) => c.key === "POST /api/rooms")!.req.json()).toEqual({ 작품_번호: 7, 방장_참여: true, 입장코드: null });
   });
 
   it("방장이 입장코드를 정하면 대문자로 바꿔 보내고, 이미 쓰는 코드면 이유를 보여 준다", async () => {
