@@ -25,6 +25,18 @@ from .testers import router as testers_router
 from .works import router as works_router
 
 
+def close_orphan_games(pool) -> int:
+    """서버가 켜질 때 DB 에 '진행 중'으로 남은 게임과 방을 종료한다.
+
+    진행 중인 게임의 상태(현재 단계, 입력, 투표 …)는 서버 메모리에만 있어서 서버를 다시 켜면 이어갈 수 없다. 그대로 두면 방장이
+    "참여 중인 방"에 갇힌다(진행 중인 방은 나갈 수 없고 새 방도 만들 수 없다). 기록(참여·획득·투표)은 그대로 남는다.
+    """
+    with pool.connection() as conn:
+        conn.execute('UPDATE "진행" SET "상태" = \'종료\' WHERE "상태" = \'진행\'')
+        closed = conn.execute('UPDATE "방" SET "상태" = \'종료\' WHERE "상태" = \'진행\' RETURNING "번호"').fetchall()
+    return len(closed)
+
+
 def sweep_rooms(app: FastAPI) -> None:
     """만료된 방을 종료하고, 이미 닫힌 방의 대기실을 메모리에서 지운다."""
     with app.state.pool.connection() as conn:
@@ -75,6 +87,7 @@ async def lifespan(app: FastAPI):
     pool = create_pool(settings)
     pool.open(wait=True, timeout=10)
     app.state.pool = pool
+    close_orphan_games(pool)
     app.state.rooms = RoomRegistry(settings.room_member_timeout_seconds)
     app.state.games = GameRegistry(away_seconds=settings.game_away_seconds)
     app.state.join_limiter = JoinLimiter(settings.room_join_fail_limit, settings.room_join_fail_window_seconds)

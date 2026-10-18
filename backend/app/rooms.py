@@ -198,7 +198,7 @@ def create_room(body: RoomCreateIn, conn: Conn, me: CurrentUser, request: Reques
     expire_stale(request)
     lock_account(conn, me.계정.번호)
     if find_my_room(conn, reg, me) is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "이미 참여 중인 방이 있습니다. 먼저 나가 주세요")
+        raise HTTPException(status.HTTP_409_CONFLICT, "이미 참여 중인 방이 있습니다.")
 
     work = conn.execute(
         'SELECT "번호", "계정_번호", "공개여부", "공개권한" FROM "작품" WHERE "번호" = %s AND "상태" <> \'삭제\'', (body.작품_번호,)

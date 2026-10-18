@@ -989,3 +989,26 @@ def test_a_work_with_a_game_is_hidden_when_deleted_and_its_play_records_stay(cli
     assert state(client, others[0]).status_code == 404                                  # 진행 중이던 게임은 닫혔다
     assert client.get("/api/rooms/me", headers=others[0].headers).json() is None
     assert client.get(f"/api/works/{wid}", headers=host.headers).status_code == 404
+
+
+def test_games_left_running_in_the_database_are_closed_when_the_server_restarts(client, make_account, make_game_work, db):
+    """서버를 다시 켜면 메모리의 게임이 사라지므로, DB 에 진행 중으로 남은 방이 방장을 가두지 않게 종료한다. 기록은 남는다."""
+    from app.main import close_orphan_games
+    from app.roomstate import RoomRegistry
+
+    host, others, room, wid = full_room(client, make_account, make_game_work)
+    assert start(client, host).status_code == 200
+    state_ = client.app.state
+    kept = (state_.rooms, state_.games)
+    try:
+        state_.rooms = RoomRegistry(kept[0].member_timeout)                              # 서버를 다시 켠 것처럼 메모리를 비운다
+        state_.games = type(kept[1])()
+        before = client.get("/api/rooms/me", headers=host.headers).json()
+        assert before is not None and before["상태"] == "진행"                              # 정리하기 전에는 방장이 갇혀 있다
+        assert close_orphan_games(state_.pool) >= 1
+        assert client.get("/api/rooms/me", headers=host.headers).json() is None
+        assert client.post("/api/rooms", headers=host.headers, json={"작품_번호": wid}).status_code == 201   # 새 방을 만들 수 있다
+    finally:
+        state_.rooms, state_.games = kept                                                # 다른 시험에 영향을 주지 않게 되돌린다
+    assert db.execute('SELECT "상태" FROM "방" WHERE "번호" = %s', (room["번호"],)).fetchone()[0] == "종료"
+    assert db.execute('SELECT count(*) FROM "참여" WHERE "작품_번호" = %s', (wid,)).fetchone()[0] == 3        # 참여 기록은 남는다
