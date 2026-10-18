@@ -715,7 +715,7 @@ button.clue-head:hover { background: transparent; }
 .field-hint { display: block; margin-top: 0.25rem; font-size: 0.8125rem; font-weight: 400; color: var(--muted); }
 .notice-ok { margin: 0; padding: 0.6rem 0.8rem; border-radius: var(--radius-sm); background: var(--success-soft); color: var(--success); font-size: 0.875rem; }
 .join-plain { display: grid; gap: 0.9rem; }
-.join-dialog { width: min(20rem, 72vw); }                       /* 입장코드 창은 다른 창의 2/3 정도 폭이다 */
+.join-dialog { width: min(15rem, 54vw); }                       /* 입장코드 창은 다른 창(30rem)의 절반 정도 폭이다. 10자 코드도 한 줄에 들어간다 */
 .join-title { text-align: center; margin: 0; }
 .join-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }      /* 입장(왼쪽)·닫기(오른쪽)가 입력칸 너비를 반씩 나눈다 */
 .join-buttons button { width: 100%; }
