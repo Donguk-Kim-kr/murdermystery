@@ -2,6 +2,8 @@
 import psycopg
 import pytest
 
+from app import narrative
+
 
 def work(client, headers, **kw):
     res = client.post("/api/works", headers=headers, json={"제목": "저택의 비밀", **kw})
@@ -89,7 +91,7 @@ def test_snapshot_is_a_frozen_copy_of_the_work(client, headers, test_dbname):
     assert confirm(client, headers, w).status_code == 201
     snap = snapshot(test_dbname, w, "1.0")
     assert snap["형식버전"] == 1
-    assert snap["작품"]["제목"] == "저택의 비밀" and snap["작품"]["공통스토리"] == "모두 모였다"
+    assert snap["작품"]["제목"] == "저택의 비밀" and [p.text for p in narrative.split(snap["작품"]["공통스토리"])] == ["모두 모였다"]   # 공통 스토리는 부분 표기가 붙은 채 복사된다
     assert [c["이름"] for c in snap["인물"]] == ["집사", "요리사"] and snap["인물"][1]["NPC"] is True
     assert snap["단서"] == [{"순서": 1, "이름": "편지", "공개이름": None, "내용": None, "기능": None, "인물_순서": a, "장소_순서": place["순서"]}]
     assert snap["진행순서"] == [{"순서": 1, "이름": None, "진행시간": 20, "표시이름": lib["이름"]}]
