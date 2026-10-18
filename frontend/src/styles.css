@@ -562,11 +562,11 @@ a.work-card:hover {
 .tab.pending { color: var(--muted); font-style: italic; }
 .tabs { display: flex; gap: 0.25rem; overflow-x: auto; border-bottom: 1px solid var(--border); margin: 0.75rem 0 1rem; }
 button.tab {
-  background: none; color: var(--text-2); border-radius: 0.5rem 0.5rem 0 0; border-bottom: 2px solid transparent;
+  background: none; color: var(--text-2); border-radius: 0.5rem 0.5rem 0 0;
   padding: 0.55rem 0.9rem; white-space: nowrap; font-weight: 550;
 }
 button.tab:hover:not(:disabled) { background: var(--surface-2); }
-button.tab.active { color: var(--accent); border-bottom-color: var(--accent); background: none; }
+button.tab.active { color: var(--accent); background: none; }       /* 고른 탭은 글자색으로만 표시한다(밑줄 없음) */
 .stack { display: grid; gap: 1.25rem; }
 .item-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
 .item { display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 0.6rem; }
