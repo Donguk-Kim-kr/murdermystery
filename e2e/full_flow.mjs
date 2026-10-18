@@ -119,6 +119,7 @@ await pages[1].screenshot({ path: `${OUT}/full-discussion-mobile.png` });
 await next("밀담");
 check((await text(p1)).includes("밀담 가능"), "밀담: 밀담 가능 표시");
 await next("추리 발표");
+check((await text(p1)).includes("추리 발표 중"), "추리 발표: 추리 발표 중 표시");
 await next("최종 투표");
 const vote = async (p, who) => { try { await p.getByRole("button", { name: new RegExp(who) }).first().click({ timeout: 8000 }); } catch (e) { console.log("투표 화면:", (await text(p)).slice(0, 2000)); await p.screenshot({ path: `${OUT}/vote-fail.png` }); throw e; } await p.getByRole("button", { name: /^투표/ }).click(); };
 await vote(host, "사고사"); await host.getByText("사고사에게 투표했습니다").waitFor({ timeout: 8000 });
