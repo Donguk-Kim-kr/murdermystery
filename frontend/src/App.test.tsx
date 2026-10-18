@@ -596,7 +596,7 @@ describe("방", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "입장코드" }));
     await user.type(screen.getByLabelText("입장코드"), "k7m2qx");
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "입장하기" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "입장" }));
     expect(await screen.findByRole("heading", { name: "저택의 비밀" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(await calls.find((c) => c.key === "POST /api/rooms/join")!.req.json()).toEqual({ 입장코드: "K7M2QX", 관전: false });
@@ -608,7 +608,7 @@ describe("방", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "입장코드" }));
     await user.type(screen.getByLabelText("입장코드"), "ZZZZZZ");
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "입장하기" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "입장" }));
     expect(await within(screen.getByRole("dialog")).findByRole("alert")).toHaveTextContent("입장코드가 올바르지 않습니다");
   });
 
@@ -633,7 +633,7 @@ describe("방", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "입장코드" }));
     await user.type(screen.getByLabelText("입장코드"), "k7m2qx");
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "입장하기" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "입장" }));
     expect(await within(screen.getByRole("dialog")).findByRole("alert")).toHaveTextContent("진행 중인 방입니다.");
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "관전 참여" }));
     await waitFor(() => expect(calls.filter((c) => c.key === "POST /api/rooms/join")).toHaveLength(2));
@@ -646,7 +646,7 @@ describe("방", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "입장코드" }));
     await user.type(screen.getByLabelText("입장코드"), "k7m2qx");
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "입장하기" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "입장" }));
     expect(await within(screen.getByRole("dialog")).findByRole("alert")).toHaveTextContent("다른 방에 참여 중입니다.");
     expect(screen.queryByRole("button", { name: "관전 참여" })).not.toBeInTheDocument();
   });
@@ -710,7 +710,7 @@ describe("방", () => {
     renderApp("/rooms/join");
     await userEvent.type(await screen.findByLabelText("입장코드"), "k7m2qx");
     expect(screen.getByLabelText("입장코드")).toHaveValue("K7M2QX");
-    await userEvent.click(screen.getByRole("button", { name: "입장하기" }));
+    await userEvent.click(screen.getByRole("button", { name: "입장" }));
     expect(await screen.findByRole("heading", { name: "저택의 비밀" })).toBeInTheDocument();
     expect(await calls.find((c) => c.key === "POST /api/rooms/join")!.req.json()).toEqual({ 입장코드: "K7M2QX", 관전: false });
     expect(screen.getByRole("button", { name: "나가기" })).toBeInTheDocument();
@@ -720,7 +720,7 @@ describe("방", () => {
     routes["POST /api/rooms/join"] = () => json({ detail: "입장코드가 올바르지 않습니다" }, 404);
     renderApp("/rooms/join");
     await userEvent.type(await screen.findByLabelText("입장코드"), "ZZZZZZ");
-    await userEvent.click(screen.getByRole("button", { name: "입장하기" }));
+    await userEvent.click(screen.getByRole("button", { name: "입장" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("입장코드가 올바르지 않습니다");
   });
 

@@ -72,7 +72,7 @@ const code = (await host.getByLabel("입장코드", { exact: false }).locator("x
 for (const p of pages.slice(1)) {
   await p.goto(BASE + "/rooms/join");
   await p.getByLabel("입장코드").fill(code);
-  await p.getByRole("button", { name: "입장하기" }).click();
+  await p.getByRole("button", { name: "입장" }).click();
   await p.getByRole("region", { name: "참가자" }).waitFor();
 }
 await host.getByText("플레이어 3/3명").waitFor({ timeout: 8000 });

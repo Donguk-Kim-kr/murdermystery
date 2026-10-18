@@ -716,7 +716,9 @@ button.clue-head:hover { background: transparent; }
 .notice-ok { margin: 0; padding: 0.6rem 0.8rem; border-radius: var(--radius-sm); background: var(--success-soft); color: var(--success); font-size: 0.875rem; }
 .join-plain { display: grid; gap: 0.9rem; }
 .join-dialog { width: min(20rem, 72vw); }                       /* 입장코드 창은 다른 창의 2/3 정도 폭이다 */
-.join-plain button[type=submit] { justify-self: center; width: auto; padding-inline: 2.2rem; }   /* 입장하기 버튼은 끝까지 늘리지 않고 가운데에 둔다 */
+.join-title { text-align: center; margin: 0; }
+.join-buttons { justify-content: space-between; }                          /* 입장은 왼쪽, 닫기는 오른쪽 */
+.join-buttons button { width: auto; padding-inline: 1.8rem; }
 
 /* 구역보기: 엔딩·후일담·전체 단서·전체 서사처럼 한 탭 안의 구역들. 구역마다 상자로 나뉘고, 항목은 카드로 늘어서며 누르면 열린다. */
 .section-view { border: 1px solid var(--border-strong); border-radius: 8px; padding: 12px 14px; margin: 12px 0; }

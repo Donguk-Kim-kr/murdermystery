@@ -32,7 +32,7 @@ function JoinProblem({ message, onObserve, busy }: { message: string; onObserve:
 }
 
 /** 입장코드로 방에 들어가는 양식. 방 입장 페이지와 플레이공간 첫 화면의 입장 창이 함께 쓴다. */
-export function JoinCodeForm({ plain = false, autoFocus = false }: { plain?: boolean; autoFocus?: boolean }) {
+export function JoinCodeForm({ plain = false, autoFocus = false, onClose }: { plain?: boolean; autoFocus?: boolean; onClose?: () => void }) {
   const enter = useEnterRoom();
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +71,14 @@ export function JoinCodeForm({ plain = false, autoFocus = false }: { plain?: boo
         />
       </label>
       {error && <JoinProblem message={error} busy={busy} onObserve={() => void submit(true)} />}
-      <button type="submit" disabled={busy}>입장하기</button>
+      {onClose ? (
+        <div className="row join-buttons">
+          <button type="submit" disabled={busy}>입장</button>
+          <button type="button" className="secondary" onClick={onClose}>닫기</button>
+        </div>
+      ) : (
+        <button type="submit" disabled={busy}>입장</button>
+      )}
     </form>
   );
 }
@@ -125,11 +132,8 @@ export function JoinCodeDialog({ onClose }: { onClose: () => void }) {
   return (
     <div className="overlay" onClick={onClose}>
       <div className="dialog join-dialog" role="dialog" aria-modal="true" aria-label="입장코드로 입장" onClick={(e) => e.stopPropagation()}>
-        <div className="row">
-          <h2>입장코드</h2>
-          <button type="button" className="small secondary" onClick={onClose}>닫기</button>
-        </div>
-        <JoinCodeForm plain autoFocus />
+        <h2 className="join-title">입장코드</h2>
+        <JoinCodeForm plain autoFocus onClose={onClose} />
       </div>
     </div>
   );
