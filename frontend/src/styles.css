@@ -736,6 +736,7 @@ button.clue-head:hover { background: transparent; }
 
 /* 확인 팝업 */
 .row.end { justify-content: flex-end; }
+.row.center { justify-content: center; }
 .confirm-message p { margin: 0 0 0.35rem; }
 .confirm-dialog { width: min(100%, 24rem); }
 

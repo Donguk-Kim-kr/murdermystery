@@ -4,16 +4,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, errorMessage } from "../api/client";
 import { GamePage } from "../game/GamePage";
 import { useRoom } from "../rooms/RoomContext";
-import { useConfirm } from "../confirm/ConfirmContext";
 
 export function RoomPage() {
-  const confirm = useConfirm();
   const { room, refresh } = useRoom();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   // 체크박스는 누르면 바로 바뀌고, 서버가 거부하면 원래대로 돌아간다 (서버 응답을 기다리면 반응이 느려 보인다).
-  const [pending, setPending] = useState<boolean | null>(null);
 
   const [starting, setStarting] = useState(false);
 
@@ -41,7 +38,6 @@ export function RoomPage() {
   }
 
   async function leave() {
-    if (room!.내가_방장 && !(await confirm("방장이 나가면 방이 닫히고 모두 나가게 됩니다. 계속할까요?"))) return;
     setError(null);
     const { error } = await api.POST("/api/rooms/leave");
     if (error) {
@@ -60,17 +56,6 @@ export function RoomPage() {
     await refresh();
     setStarting(false);
   }
-
-  async function togglePlaying(playing: boolean) {
-    setError(null);
-    setPending(playing);
-    const { error } = await api.PATCH("/api/rooms/me", { body: { 플레이: playing } });
-    if (error) setError(errorMessage(error, "바꾸지 못했습니다"));
-    await refresh();
-    setPending(null);
-  }
-
-  const hostPlaying = room.참가자.find((m) => m.방장)?.플레이 ?? false;
 
   return (
     <main className="page narrow">
@@ -119,25 +104,17 @@ export function RoomPage() {
             </li>
           ))}
         </ul>
-        <p className="muted">
-          플레이어 수가 {room.작품.최소인원 === room.작품.최대인원 ? `${room.작품.최대인원}명` : `${room.작품.최소인원}명 이상 ${room.작품.최대인원}명 이하`}이어야 시작할 수 있습니다.
-        </p>
-        {room.내가_방장 && (
-          <label className="check">
-            <input type="checkbox" checked={pending ?? hostPlaying} onChange={(e) => void togglePlaying(e.target.checked)} />
-            나도 플레이어로 참여
-          </label>
-        )}
         {error && <p role="alert" className="error">{error}</p>}
-        <div className="row start">
-          {room.내가_방장 && (
+        <div className="row center">
+          {room.내가_방장 ? (
             <button type="button" disabled={starting} onClick={() => void startGame()}>
               게임 시작
             </button>
+          ) : (
+            <button type="button" className="secondary" onClick={() => void leave()}>
+              나가기
+            </button>
           )}
-          <button type="button" className="secondary" onClick={() => void leave()}>
-            {room.내가_방장 ? "방 닫기" : "나가기"}
-          </button>
         </div>
       </section>
     </main>

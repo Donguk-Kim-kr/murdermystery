@@ -701,6 +701,19 @@ describe("방", () => {
     expect(screen.queryByText(/누구나 입장할 수 있습니다/)).not.toBeInTheDocument();      // 안내 문구는 두지 않는다
   });
 
+  it("방장이 아닌 참가자는 나가기로 방을 나가 플레이공간으로 돌아간다", async () => {
+    let inRoom = true;
+    routes["GET /api/rooms/me"] = () => json(inRoom ? { ...baseRoom, 내가_방장: false } : null);
+    routes["POST /api/rooms/leave"] = () => {
+      inRoom = false;
+      return new Response(null, { status: 204 });
+    };
+    renderApp("/room");
+    await userEvent.click(await screen.findByRole("button", { name: "나가기" }));
+    expect(await screen.findByRole("heading", { name: "플레이" })).toBeInTheDocument();
+    expect(calls.map((c) => c.key)).toContain("POST /api/rooms/leave");
+  });
+
   it("대기실의 링크 복사 버튼은 입장 링크를 복사한다", async () => {
     routes["GET /api/rooms/me"] = () => json(baseRoom);
     const writeText = vi.fn(async () => undefined);
@@ -819,7 +832,7 @@ describe("방", () => {
     expect(within(panel).getByText(/관리자가 비공개 처리한 작품은/)).toBeInTheDocument();
   });
 
-  it("대기실: 방장은 코드와 참가자, 인원, 방 닫기를 본다", async () => {
+  it("대기실: 방장은 코드와 참가자, 인원을 보고 가운데의 게임 시작만 누를 수 있다", async () => {
     routes["GET /api/rooms/me"] = () => json({
       ...baseRoom,
       참가자: [
@@ -833,8 +846,10 @@ describe("방", () => {
     const list = screen.getByRole("region", { name: "참가자" });
     expect(within(list).getByText("의사")).toBeInTheDocument();
     expect(within(list).getByText("플레이어 2/4명")).toBeInTheDocument();
-    expect(within(list).getByRole("button", { name: "방 닫기" })).toBeInTheDocument();
-    expect(within(list).getByLabelText("나도 플레이어로 참여")).toBeChecked();
+    expect(within(list).getByRole("button", { name: "게임 시작" })).toBeInTheDocument();
+    expect(within(list).queryByRole("button", { name: "방 닫기" })).not.toBeInTheDocument();            // 방 닫기·참여 선택·시작 조건 안내는 없다
+    expect(within(list).queryByLabelText("나도 플레이어로 참여")).not.toBeInTheDocument();
+    expect(within(list).queryByText(/시작할 수 있습니다/)).not.toBeInTheDocument();
   });
 
   it("대기실은 주기적으로 갱신되어 새 입장자를 보여 준다", async () => {
@@ -854,37 +869,6 @@ describe("방", () => {
     await screen.findByRole("heading", { name: "저택의 비밀" });
     open = false;
     expect(await screen.findByText("참여 중인 방이 없습니다.")).toBeInTheDocument();
-  });
-
-  it("방장이 방 닫기를 누르면 확인 후 서버에 알리고 목록으로 돌아간다", async () => {
-    let open = true;
-    routes["GET /api/rooms/me"] = () => json(open ? baseRoom : null);
-    routes["POST /api/rooms/leave"] = () => {
-      open = false;
-      return new Response(null, { status: 204 });
-    };
-    renderApp("/room");
-    await userEvent.click(await screen.findByRole("button", { name: "방 닫기" }));
-    await answerConfirm(true);
-    expect(await screen.findByRole("heading", { name: "플레이" })).toBeInTheDocument();     // 방을 닫으면 플레이공간으로
-    expect(calls.map((c) => c.key)).toContain("POST /api/rooms/leave");
-  });
-
-  it("확인을 취소하면 방을 닫지 않는다", async () => {
-    routes["GET /api/rooms/me"] = () => json(baseRoom);
-    renderApp("/room");
-    await userEvent.click(await screen.findByRole("button", { name: "방 닫기" }));
-    await answerConfirm(false);
-    expect(calls.map((c) => c.key)).not.toContain("POST /api/rooms/leave");
-  });
-
-  it("방장은 플레이 참여 여부를 바꾼다", async () => {
-    routes["GET /api/rooms/me"] = () => json(baseRoom);
-    routes["PATCH /api/rooms/me"] = () => json(baseRoom);
-    renderApp("/room");
-    await userEvent.click(await screen.findByLabelText("나도 플레이어로 참여"));
-    await waitFor(() => expect(calls.map((c) => c.key)).toContain("PATCH /api/rooms/me"));
-    expect(await calls.find((c) => c.key === "PATCH /api/rooms/me")!.req.json()).toEqual({ 플레이: false });
   });
 
   it("방에 있으면 상단에 내 방 코드가 보인다", async () => {
