@@ -5,6 +5,7 @@
 * 경로는 이 파일 위치를 기준으로 계산하므로 컨테이너 밖에서도 같은 방식으로 시험할 수 있다.
 """
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -32,10 +33,18 @@ def wait_for_database() -> None:
             time.sleep(2)
 
 
+def seed_demo_work() -> None:
+    """기본 진행단계를 등록하고 시연용 샘플 작품을 만든다(이미 있으면 아무것도 하지 않는다). 실패해도 서버는 켠다."""
+    done = subprocess.run([sys.executable, str(ROOT / "backend" / "scripts" / "seed_demo_work.py")], cwd=ROOT / "backend")
+    if done.returncode != 0:
+        print("샘플 작품을 만들지 못했습니다(서버는 그대로 켭니다). 위 오류를 확인하세요.", flush=True)
+
+
 def main() -> None:
     wait_for_database()
     applied = migrate.run(DBNAME, ROOT / "db" / "migrations")
     print(f"마이그레이션 적용 {len(applied)}건", flush=True)
+    seed_demo_work()
     port = os.environ.get("PORT", "8000")
     os.chdir(ROOT / "backend")
     os.execvp(sys.executable, [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", port])
