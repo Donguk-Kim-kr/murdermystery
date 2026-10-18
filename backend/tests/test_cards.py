@@ -22,7 +22,7 @@ def db(test_dbname):
 def make_scripted_game(client, make_account, db):
     """카드(이름, 스크립트, 설정)를 페이즈 하나에 하나씩 놓은 확정 작품으로 방을 열어 게임을 시작한다."""
 
-    def make(cards, players=3, observer_host=False, story="모두가 읽는 공통 스토리", unchecked=(), setup=None, edit=None, characters=None, start_status=200):
+    def make(cards, players=3, observer_host=False, story="모두가 읽는 공통 스토리", unchecked=(), setup=None, edit=None, characters=None, start_status=200, host_gm=False, watcher_modes=()):
         """`unchecked` 에 든 카드 이름의 스크립트는 확정(검사)을 통과한 뒤 스냅샷에서 바꿔 넣는다(검사를 통과하지 못할 스크립트를 실행해 보려고)."""
         host = make_account()
         wid = client.post("/api/works", headers=host.headers, json={"제목": "스크립트 시험", "공통스토리": story}).json()["번호"]
@@ -66,6 +66,14 @@ def make_scripted_game(client, make_account, db):
             db.execute('ALTER TABLE "버전" ENABLE TRIGGER USER')
         room = create_room(client, host, wid, **({"방장_참여": False} if observer_host else {}))
         others = [make_account() for _ in range(players - (0 if observer_host else 1))]
+        if host_gm:                                                                 # 방장이 GM 관전(observer_host 와 함께 쓴다)
+            assert client.patch("/api/rooms/me", headers=host.headers, json={"GM관전": True}).status_code == 200
+        make.watchers = []                                                          # 플레이하지 않고 지켜보는 사람들: "일반" 또는 "GM" (자리가 차기 전에 들어와 관전으로 옮긴다)
+        for mode in watcher_modes:
+            watcher = make_account()
+            join(client, watcher, room["입장코드"])
+            assert client.patch("/api/rooms/me", headers=watcher.headers, json={"플레이": False, "GM관전": mode == "GM"}).status_code == 200
+            make.watchers.append(watcher)
         for o in others:
             join(client, o, room["입장코드"])
         res = start(client, host)
@@ -519,3 +527,55 @@ def test_profile_default_shows_every_item_in_order(client, make_scripted_game):
     text = tab(mine, "개인 서사")["내용"]
     heads = [line for line in text.split("\n") if line.startswith("▶ ")]
     assert heads == ["▶ 서사", "▶ 타임라인", "▶ 비밀", "▶ 목표", "▶ 능력"]
+
+
+# ---- GM 관전 ------------------------------------------------------------------------------------
+
+def test_gm_observer_sees_every_players_personal_narrative_but_cannot_act(client, make_scripted_game):
+    host, others, _, _ = two_phase_game(make_scripted_game, players=3, watcher_modes=("GM", "일반"))
+    gm, normal = make_scripted_game.watchers
+    people = [host, *others]
+    all_pick(client, people)
+    assert advance(client, host).status_code == 200
+    assert state(client, gm).json()["나"] == {**state(client, gm).json()["나"], "역할": "관전자", "관전방식": "GM", "진행_권한": False}
+    assert state(client, normal).json()["나"]["관전방식"] == "일반"
+    view = state(client, gm).json()
+    narratives = [t for t in view["탭"] if t["이름"].startswith("개인 서사 · ")]
+    assert len(narratives) == 3                                                    # 플레이어마다 하나, 인물 이름이 붙는다
+    expected = {state(client, who).json()["나"]["인물_순서"]: block(state(client, who).json(), "개인 서사")["내용"] for who in people}
+    assert sorted(t["내용"] for t in narratives) == sorted(expected.values())      # 각자 보는 것과 같은 내용이다
+    assert all("동작" not in t and "질문ID" not in t for t in narratives)          # 읽기 전용: 읽음 확인 같은 동작은 없다
+    assert block(view, "개인 서사") is None                                         # 화면(동작이 있는 블록)에는 나오지 않는다
+    normal_view = state(client, normal).json()                                     # 일반 관전은 개인 서사를 보지 못한다
+    assert not any(t["이름"].startswith("개인 서사") for t in normal_view["탭"]) and "서사 하나" not in state(client, normal).text
+    qid = block(state(client, host).json(), "개인 서사")["질문ID"]
+    assert answer(client, gm, qid).status_code == 403                              # GM 관전도 게임에 참여하지는 못한다
+
+
+def test_host_who_is_gm_observer_advances_the_game_directly(client, make_scripted_game):
+    host, others, _, _ = two_phase_game(make_scripted_game, players=2, observer_host=True, host_gm=True)
+    all_pick(client, others)
+    assert state(client, host).json()["나"]["진행_권한"] is True                  # 일반 관전이면 첫 플레이어가 갖는다(위 시험)
+    assert state(client, others[0]).json()["나"]["진행_권한"] is False
+    assert advance(client, others[0]).status_code == 403
+    assert advance(client, host).status_code == 200
+    narratives = [t for t in state(client, host).json()["탭"] if t["이름"].startswith("개인 서사 · ")]
+    assert len(narratives) == 2
+
+
+def test_gm_observer_does_not_see_clues_not_yet_found_or_votes(client, make_scripted_game):
+    host, others, _, _ = two_phase_game(make_scripted_game, players=2, watcher_modes=("GM",))
+    gm = make_scripted_game.watchers[0]
+    all_pick(client, [host, *others][:2])
+    text = state(client, gm).text
+    assert "서사 하나" not in text and "비밀" not in text                          # 아직 개인 서사 단계가 아니면 아무 개인 정보도 없다
+
+
+def test_gm_host_can_take_authority_back_after_handing_it_over(client, make_scripted_game):
+    host, others, _, _ = two_phase_game(make_scripted_game, players=2, observer_host=True, host_gm=True)
+    handover = lambda who, target: client.post("/api/game/me/authority", headers=who.headers, json={"계정_번호": target})
+    all_pick(client, others)
+    assert handover(host, others[0].number).status_code == 200
+    assert state(client, others[0]).json()["나"]["진행_권한"] is True
+    assert handover(host, host.number).status_code == 200                           # 자기 자신(GM 관전)에게 되돌린다
+    assert state(client, host).json()["나"]["진행_권한"] is True

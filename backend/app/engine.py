@@ -45,6 +45,7 @@ class Player:
 class Observer:
     account_id: int
     nickname: str
+    gm: bool = False   # GM 관전: 모든 플레이어의 개인 탭(개인 서사 등)까지 본다. 방장이면 진행 권한도 가질 수 있다
 
 
 @dataclass
@@ -149,11 +150,14 @@ class Game:
     def eligible(self) -> list[int]:
         """진행 권한을 가질 수 있는 사람의 우선순서. 맡겨진 사람 → 방장 → 입장한 순서의 플레이어.
 
-        관전자는 갖지 못한다(관전 모드는 일반 관전뿐이다). 방장이 플레이하지 않으면 방장은 빠지고 첫 플레이어가 된다.
+        관전자는 갖지 못한다. 다만 방장이 **GM 관전**이면 방장이 직접 진행한다(일반 관전이면 방장은 빠지고 첫 플레이어가 된다).
         """
+        host_gm = self.host_id in self.observers and self.observers[self.host_id].gm
         order: list[int] = []
         for account in [self.designated_id, self.host_id, *self.players]:
-            if account in self.players and account not in order:
+            if account in order:
+                continue
+            if account in self.players or (account == self.host_id and host_gm):
                 order.append(account)
         return order
 
@@ -248,6 +252,7 @@ def view_for(game: Game, account_id: int) -> dict[str, Any]:
             "나": {
                 "계정_번호": account_id,
                 "역할": "플레이어" if player else "관전자",
+                "관전방식": None if player else ("GM" if game.observers[account_id].gm else "일반"),
                 "인물_순서": player.character if player else None,
                 "방장": account_id == game.host_id,
                 "진행_권한": account_id == game.authority_id,
@@ -452,7 +457,8 @@ def hand_over_authority(game: Game, account_id: int, target: int) -> None:
     with game.lock:
         if account_id != game.host_id:
             raise AdvanceError("forbidden", "방장만 진행 권한을 맡길 수 있습니다")
-        if target not in game.players:
+        host_gm = target == game.host_id and target in game.observers and game.observers[target].gm   # GM 관전인 방장은 직접 맡을 수 있다
+        if target not in game.players and not host_gm:
             raise AdvanceError("unknown", "플레이어에게만 맡길 수 있습니다")
         game.designated_id = target
         game.bump()

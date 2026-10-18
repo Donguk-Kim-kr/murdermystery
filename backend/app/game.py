@@ -201,7 +201,7 @@ def start_game(conn: Conn, me: CurrentUser, request: Request) -> StartOut:
         id=created["번호"], room_id=row["번호"], work_id=row["작품_번호"], version=row["버전_버전"], host_id=room.host_id,
         snapshot=snapshot, npc_slots=npc_slots,
         players={m.account_id: Player(m.account_id, m.nickname) for m in joined},
-        observers={m.account_id: Observer(m.account_id, m.nickname) for m in room.members.values() if not m.playing},
+        observers={m.account_id: Observer(m.account_id, m.nickname, m.gm) for m in room.members.values() if not m.playing},
     )
     games(request).add(game)
     with game.lock:
@@ -234,6 +234,7 @@ class GameMeOut(BaseModel):
     인물_순서: int | None
     방장: bool
     진행_권한: bool
+    관전방식: str | None = None   # 관전자일 때 "GM" 또는 "일반"
 
 
 class GamePhaseOut(BaseModel):

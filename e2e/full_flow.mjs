@@ -83,7 +83,7 @@ await watcher.getByLabel("아이디").fill(watcherId); await watcher.getByLabel(
 await watcher.getByText("진행 중인 방입니다.").waitFor({ timeout: 8000 });
 await watcher.getByRole("button", { name: "관전 참여" }).click();
 await watcher.locator("h1", { hasText: "공통 스토리" }).first().waitFor({ timeout: 8000 });
-check((await text(watcher)).includes("관전자"), "입장: 진행 중인 방에는 관전 참여로 들어가 관전자로 보인다");
+check((await text(watcher)).includes("일반 관전"), "입장: 진행 중인 방에는 관전 참여로 들어가 관전자로 보인다");
 check((await watcher.getByRole("button", { name: "다음 단계" }).count()) === 0, "입장: 관전자에게는 진행 버튼이 없다");
 for (const p of pages) await p.getByRole("button", { name: "확인", exact: true }).click();
 await host.getByText("확인 3/3").waitFor({ timeout: 8000 });

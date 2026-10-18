@@ -74,7 +74,7 @@ function Play({ game, state }: { game: GameApi; state: GameState }) {
                 {state.시간.시간_종료 ? "시간 종료" : formatTime(remaining)}
               </span>
             )}
-            <span className="chip">{me.역할}</span>
+            <span className="chip">{me.역할 === "관전자" && me.관전방식 ? `${me.관전방식} 관전` : me.역할}</span>
           </div>
         </div>
         {!canDrive && <p className="muted">진행은 {state.권한.닉네임}님{state.권한.임시 ? "(임시)" : ""}이 맡고 있습니다.</p>}

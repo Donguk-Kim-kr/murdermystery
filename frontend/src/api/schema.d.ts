@@ -1017,6 +1017,8 @@ export interface components {
             "\uBC29\uC7A5": boolean;
             /** 진행 권한 */
             "\uC9C4\uD589_\uAD8C\uD55C": boolean;
+            /** 관전방식 */
+            "\uAD00\uC804\uBC29\uC2DD"?: string | null;
         };
         /** GameMemberRef */
         GameMemberRef: {

@@ -202,7 +202,7 @@ def test_state_for_player(client, make_account, make_game_work):
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["상태_버전"] == 1
-    assert body["나"] == {"계정_번호": others[0].number, "역할": "플레이어", "인물_순서": None, "방장": False, "진행_권한": False}
+    assert body["나"] == {"계정_번호": others[0].number, "역할": "플레이어", "인물_순서": None, "방장": False, "진행_권한": False, "관전방식": None}
     assert body["페이즈"]["위치"] == 1 and body["페이즈"]["전체"] == 3 and body["페이즈"]["진행시간"] == 30
     assert [p["계정_번호"] for p in body["플레이어"]] == [host.number] + [o.number for o in others]
     assert [c["이름"] for c in body["인물"]] == ["p0", "p1", "p2"]

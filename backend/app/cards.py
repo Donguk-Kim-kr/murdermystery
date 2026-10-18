@@ -1008,6 +1008,17 @@ def card_view(game, viewer: int) -> dict[str, Any]:
             shown.pop("동작", None)                  # 이전 단계에서 남은 탭의 버튼은 더 이상 받지 않는다(관전자에게도 없다)
             shown.pop("질문ID", None)
         tabs.append(shown)
+    observer = game.observers.get(viewer)
+    if observer is not None and observer.gm:
+        by_slot = {c["순서"]: c["이름"] for c in game.characters}
+        for p in game.players.values():       # GM 관전: 각 플레이어의 개인 탭을 이름을 붙여 읽기 전용으로 더한다
+            label = by_slot.get(p.character) or p.nickname
+            for name, tab in sorted(game.tabs.get(p.account_id, {}).items(), key=lambda kv: kv[1]["순번"]):
+                if tab["유지"] or tab["위치"] == game.phase_index:
+                    shown = {**_block(game, p.account_id, tab["내용"]), "이름": f"{name} · {label}", "카드": tab["카드"]}
+                    shown.pop("동작", None)
+                    shown.pop("질문ID", None)
+                    tabs.append(shown)
     errors = []
     if viewer in (game.host_id, game.authority_id):
         errors = [{"카드": r.title, "메시지": r.error} for r in game.runs.values() if r.error]
