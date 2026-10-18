@@ -731,3 +731,9 @@ button.clue-head:hover { background: transparent; }
 .row.end { justify-content: flex-end; }
 .confirm-message p { margin: 0 0 0.35rem; }
 .confirm-dialog { width: min(100%, 24rem); }
+
+/* 일까지·월까지 형식의 시간 입력 */
+.time-parts { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.time-parts input[type=number] { width: 4.5rem; flex: none; }
+.time-parts input[type=time] { width: 9rem; flex: none; }
+.time-parts .inline { display: inline-flex; align-items: center; gap: 0.25rem; }

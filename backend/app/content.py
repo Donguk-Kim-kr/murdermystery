@@ -493,7 +493,9 @@ def content_bundle(work_id: int, conn: Conn, me: CurrentUser) -> dict:
     out["characters"] = conn.execute(
         'SELECT "순서", "이름", "직업", "NPC", "범인", "서사" FROM "인물" WHERE "작품_번호" = %s ORDER BY "순서"', (work_id,)
     ).fetchall()
-    story = conn.execute('SELECT "공통스토리" FROM "작품" WHERE "번호" = %s', (work_id,)).fetchone()["공통스토리"]
+    info = conn.execute('SELECT "공통스토리", "시간형식" FROM "작품" WHERE "번호" = %s', (work_id,)).fetchone()
+    story = info["공통스토리"]
+    out["time_format"] = info["시간형식"]                                                 # 시간 칸을 어디까지 적을지(시간만·일까지·월까지·연도까지)
     out["story"] = {"공통스토리_부분수": len(narrative.split(story or ""))}              # 공통 스토리 카드가 고를 부분 번호의 범위를 알려면 개수가 필요하다
     for person in out["characters"]:
         person["서사_부분수"] = len(narrative.split(person.pop("서사")))      # 프로필 숙지 설정 화면이 고를 번호를 알려면 개수가 필요하다

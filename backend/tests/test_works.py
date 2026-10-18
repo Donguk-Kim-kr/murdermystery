@@ -139,3 +139,19 @@ def test_work_with_a_room_cannot_be_deleted(client, headers, confirm):
     res = client.delete(f"/api/works/{w}", headers=headers)
     assert res.status_code == 409 and "방" in res.json()["detail"]
     assert client.get(f"/api/works/{w}", headers=headers).status_code == 200
+
+
+def test_time_format_defaults_to_time_only_and_can_be_changed_to_the_allowed_values(client, headers):
+    work = create(client, headers)
+    assert work["시간형식"] == "시간만"
+    for value in ("일까지", "월까지", "연도까지", "시간만"):
+        res = client.patch(f"/api/works/{work['번호']}", headers=headers, json={"시간형식": value})
+        assert res.status_code == 200 and res.json()["시간형식"] == value
+    assert client.patch(f"/api/works/{work['번호']}", headers=headers, json={"시간형식": "분까지"}).status_code == 422
+    assert client.patch(f"/api/works/{work['번호']}", headers=headers, json={"시간형식": None}).status_code == 422
+    assert create(client, headers, 시간형식="월까지")["시간형식"] == "월까지"
+
+
+def test_content_bundle_tells_the_screen_which_time_format_to_use(client, headers):
+    work = create(client, headers, 시간형식="일까지")
+    assert client.get(f"/api/works/{work['번호']}/content", headers=headers).json()["time_format"] == "일까지"

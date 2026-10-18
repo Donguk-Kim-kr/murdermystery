@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 
 import { errorMessage, http } from "../api/client";
 import { ConditionPicker } from "./ConditionPicker";
@@ -7,6 +7,7 @@ import {
   type FieldMeta, type Part, type ResourceMeta, type Row, type Workspace,
 } from "./workspace";
 import { josa } from "../josa";
+import { composeTime, displayTime, isTimeFormat, readTime, type TimeFormat } from "../timeFormat";
 import { useConfirm } from "../confirm/ConfirmContext";
 
 /** 작업공간의 한 탭: 주어진 종류의 항목들을 목록과 입력 양식으로 보여 준다. 순서와 무관하게 아무거나 먼저 채울 수 있다. */
@@ -90,6 +91,9 @@ export function ResourceSection({ workId, ws, meta }: { workId: number; ws: Work
   );
 }
 
+/** 이 작품이 고른 시간 형식. 알 수 없으면 예전처럼 연도까지 다룬다. */
+const timeFormatOf = (ws: Workspace): TimeFormat => (isTimeFormat(ws.bundle.time_format) ? ws.bundle.time_format : "연도까지");
+
 /** 목록 한 줄에 보여 줄 부가 설명: 제목이 아닌 칸 중 값이 있는 것들. */
 function summary(ws: Workspace, meta: ResourceMeta, row: Row): string {
   const parts: string[] = [];
@@ -100,6 +104,7 @@ function summary(ws: Workspace, meta: ResourceMeta, row: Row): string {
     else if (f.kind === "libref") continue;
     else if (f.kind === "json") parts.push(`${f.label}: ${JSON.stringify(v)}`.slice(0, 60));
     else if (f.kind === "text" || f.kind === "long") parts.push(`${f.label}: ${String(v).slice(0, 40)}`);
+    else if (f.kind === "ts") parts.push(`${f.label}: ${displayTime(v, timeFormatOf(ws))}`);
     else parts.push(`${f.label}: ${String(v)}`);
   }
   if (meta.has_parts) {
@@ -238,15 +243,55 @@ function FieldInput({ f, ws, value, onChange }: {
     );
   } else if (f.kind === "int")
     control = <input type="number" value={String(value)} min={f.min ?? undefined} max={f.max ?? undefined} onChange={(e) => onChange(e.target.value)} />;
-  else if (f.kind === "ts")
-    control = <input type="datetime-local" value={String(value)} onChange={(e) => onChange(e.target.value)} />;
-  else control = <input value={String(value)} maxLength={f.max ?? undefined} onChange={(e) => onChange(e.target.value)} />;
+  else if (f.kind === "ts") {
+    const format = timeFormatOf(ws);
+    if (format === "연도까지")
+      control = <input type="datetime-local" value={String(value)} onChange={(e) => onChange(e.target.value)} />;
+    else if (format === "시간만")
+      control = <input type="time" value={readTime(value)?.time ?? ""} onChange={(e) => onChange(composeTime({ time: e.target.value }, format))} />;
+    else
+      return <TimeParts key={format} label={f.label} hint={hint} wide={wide} format={format} value={String(value)} onChange={onChange} />;
+  } else control = <input value={String(value)} maxLength={f.max ?? undefined} onChange={(e) => onChange(e.target.value)} />;
   return (
     <div className={wide ? "field wide" : "field"}>
       <label>
         {text}
         {control}
       </label>
+      {hint}
+    </div>
+  );
+}
+
+/** 일까지·월까지 형식의 시간 입력: 월(월까지일 때), 일, 시각 칸이 따로 있고, 모두 맞게 적혀야 값이 된다. */
+function TimeParts({ label, hint, wide, format, value, onChange }: {
+  label: string; hint: ReactNode; wide: string | undefined; format: "일까지" | "월까지"; value: string; onChange: (v: string) => void;
+}) {
+  const stored = readTime(value);
+  const [month, setMonth] = useState(stored ? String(stored.month) : "");
+  const [day, setDay] = useState(stored ? String(stored.day) : "");
+  const [time, setTime] = useState(stored?.time ?? "");
+  const emit = (next: { month?: string; day?: string; time?: string }) => {
+    const m = next.month ?? month, d = next.day ?? day, t = next.time ?? time;
+    onChange(composeTime({ month: m, day: d, time: t }, format));
+  };
+  return (
+    <div className={wide ? "field wide" : "field"}>
+      <div className="time-parts" role="group" aria-label={label}>
+        <span>{label}</span>
+        {format === "월까지" && (
+          <label className="inline">
+            <input type="number" min={1} max={12} value={month} aria-label={`${label} 월`}
+              onChange={(e) => { setMonth(e.target.value); emit({ month: e.target.value }); }} />월
+          </label>
+        )}
+        <label className="inline">
+          <input type="number" min={1} max={31} value={day} aria-label={`${label} 일`}
+            onChange={(e) => { setDay(e.target.value); emit({ day: e.target.value }); }} />일
+        </label>
+        <input type="time" value={time} aria-label={`${label} 시각`}
+          onChange={(e) => { setTime(e.target.value); emit({ time: e.target.value }); }} />
+      </div>
       {hint}
     </div>
   );

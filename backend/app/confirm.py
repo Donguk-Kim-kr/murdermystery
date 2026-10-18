@@ -230,7 +230,7 @@ def script_errors(conn: Connection, work_id: int) -> list[str]:
 
 def build_snapshot(conn: Connection, work_id: int) -> dict[str, Any]:
     work = conn.execute(
-        'SELECT "제목", "시놉시스", "장르", "최소인원", "최대인원", "예상시간", "공통스토리" FROM "작품" WHERE "번호" = %s',
+        'SELECT "제목", "시놉시스", "장르", "최소인원", "최대인원", "예상시간", "시간형식", "공통스토리" FROM "작품" WHERE "번호" = %s',
         (work_id,),
     ).fetchone()
     snap: dict[str, Any] = {"형식버전": FORMAT_VERSION, "작품": work}

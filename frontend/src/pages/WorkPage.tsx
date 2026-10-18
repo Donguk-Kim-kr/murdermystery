@@ -14,6 +14,7 @@ import { TestersPanel } from "./TestersPanel";
 import { VisibilityPanel } from "./VisibilityPanel";
 import { useConfirm } from "../confirm/ConfirmContext";
 import { josa } from "../josa";
+import { TIME_FORMATS, type TimeFormat } from "../timeFormat";
 
 type Work = components["schemas"]["WorkOut"];
 
@@ -244,6 +245,7 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
   const [synopsis, setSynopsis] = useState(work.시놉시스);
   const [genre, setGenre] = useState(work.장르);
   const [time, setTime] = useState(work.예상시간);
+  const [timeFormat, setTimeFormat] = useState<TimeFormat>(work.시간형식);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -255,7 +257,7 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
     setSaved(false);
     const { error } = await api.PATCH("/api/works/{work_id}", {
       params: { path: { work_id: work.번호 } },
-      body: { 제목: title, 시놉시스: synopsis, 장르: genre, 예상시간: time },
+      body: { 제목: title, 시놉시스: synopsis, 장르: genre, 예상시간: time, 시간형식: timeFormat },
     });
     setBusy(false);
     if (error) setError(errorMessage(error, "저장하지 못했습니다"));
@@ -286,6 +288,15 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
           예상 시간
           <input value={time} onChange={(e) => setTime(e.target.value)} maxLength={50} required />
         </label>
+        <div className="field">
+          <label>
+            시간 형식
+            <select value={timeFormat} onChange={(e) => setTimeFormat(e.target.value as TimeFormat)}>
+              {TIME_FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </label>
+          <span className="hint">타임라인 같은 시간 칸을 어디까지 적을지 고릅니다.</span>
+        </div>
         <div className="capacity">
           <span className="capacity-label">플레이 인원</span>
           <span className="chip accent">{work.최소인원 === work.최대인원 ? `${work.최대인원}명` : `${work.최소인원}~${work.최대인원}명`}</span>

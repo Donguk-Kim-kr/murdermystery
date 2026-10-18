@@ -1416,6 +1416,12 @@ export interface components {
              */
             "\uC608\uC0C1\uC2DC\uAC04"?: string;
             /**
+             * 시간형식
+             * @default 시간만
+             * @enum {string}
+             */
+            "\uC2DC\uAC04\uD615\uC2DD"?: "시간만" | "일까지" | "월까지" | "연도까지";
+            /**
              * 공통스토리
              * @default
              */
@@ -1439,6 +1445,11 @@ export interface components {
             "\uCD5C\uB300\uC778\uC6D0": number;
             /** 예상시간 */
             "\uC608\uC0C1\uC2DC\uAC04": string;
+            /**
+             * 시간형식
+             * @enum {string}
+             */
+            "\uC2DC\uAC04\uD615\uC2DD": "시간만" | "일까지" | "월까지" | "연도까지";
             /** 상태 */
             "\uC0C1\uD0DC": string;
             /** 공개여부 */
@@ -1475,6 +1486,8 @@ export interface components {
             "\uC7A5\uB974"?: string | null;
             /** 예상시간 */
             "\uC608\uC0C1\uC2DC\uAC04"?: string | null;
+            /** 시간형식 */
+            "\uC2DC\uAC04\uD615\uC2DD"?: ("시간만" | "일까지" | "월까지" | "연도까지") | null;
             /** 공통스토리 */
             "\uACF5\uD1B5\uC2A4\uD1A0\uB9AC"?: string | null;
             /** 공통스토리 부분 */

@@ -21,10 +21,13 @@ from .visibility import Level, actor_level
 router = APIRouter(prefix="/api/works", tags=["works"])
 
 WORK_COLUMNS = (
-    '"번호", "제목", "시놉시스", "장르", "최소인원", "최대인원", "예상시간", "상태", "공개여부", "공개권한", "공통스토리", "생성일시", "수정일시", '
+    '"번호", "제목", "시놉시스", "장르", "최소인원", "최대인원", "예상시간", "시간형식", "상태", "공개여부", "공개권한", "공통스토리", "생성일시", "수정일시", '
     'EXISTS (SELECT 1 FROM "버전" v WHERE v."작품_번호" = "작품"."번호") AS "확정버전_있음"'
 )
 
+
+TIME_FORMATS = ("시간만", "일까지", "월까지", "연도까지")
+TimeFormat = Literal["시간만", "일까지", "월까지", "연도까지"]      # 타임라인 같은 시간을 어디까지 적을지(윗단위는 2000-01-01 로 채움)
 
 UNTITLED = "제목없음"   # 임시 저장 이름. 제목을 비워서 만들면 이 이름으로 시작한다. 특별한 이름이 아니라 평범한 제목이며 같은 이름이 여럿이어도, 직접 "제목없음"으로 지어도 된다(제목은 언제든 고칠 수 있다)
 
@@ -64,6 +67,7 @@ class WorkIn(BaseModel):
     시놉시스: str = Field(default="", max_length=5000)
     장르: str = Field(default="", max_length=50)
     예상시간: str = Field(default="3시간", min_length=1, max_length=50)
+    시간형식: TimeFormat = "시간만"
     공통스토리: str = Field(default="", max_length=narrative.COMMON_TOTAL_LIMIT + 400)
     공통스토리_부분: list[PartIn] | None = None
 
@@ -73,6 +77,7 @@ class WorkPatch(BaseModel):
     시놉시스: Annotated[str, Field(max_length=5000)] | None = None
     장르: Annotated[str, Field(max_length=50)] | None = None
     예상시간: Annotated[str, Field(min_length=1, max_length=50)] | None = None
+    시간형식: TimeFormat | None = None
     공통스토리: Annotated[str, Field(max_length=narrative.COMMON_TOTAL_LIMIT + 400)] | None = None
     공통스토리_부분: list[PartIn] | None = None
 
@@ -85,6 +90,7 @@ class WorkOut(BaseModel):
     최소인원: int
     최대인원: int
     예상시간: str
+    시간형식: TimeFormat
     상태: str
     공개여부: bool
     공개권한: Literal["제작자", "관리자", "운영자"]
@@ -143,9 +149,9 @@ def load_work_for_actor(
 def create_work(body: WorkIn, conn: Conn, me: CurrentUser) -> dict:
     # 인물이 0명인 동안 최대인원은 임시로 1 이다. `최대 >= 최소` 제약 때문에 최소인원도 1 로 시작한다.
     return conn.execute(
-        f'INSERT INTO "작품" ("제목", "시놉시스", "장르", "예상시간", "공통스토리", "최소인원", "최대인원", "계정_번호") '
-        f"VALUES (%s, %s, %s, %s, %s, 1, 1, %s) RETURNING {WORK_COLUMNS}",
-        (body.제목.strip() or UNTITLED, body.시놉시스, body.장르, body.예상시간,
+        f'INSERT INTO "작품" ("제목", "시놉시스", "장르", "예상시간", "시간형식", "공통스토리", "최소인원", "최대인원", "계정_번호") '
+        f"VALUES (%s, %s, %s, %s, %s, %s, 1, 1, %s) RETURNING {WORK_COLUMNS}",
+        (body.제목.strip() or UNTITLED, body.시놉시스, body.장르, body.예상시간, body.시간형식,
          stored_common_story(body.공통스토리, body.공통스토리_부분) or "", me.계정.번호),
     ).fetchone()
 

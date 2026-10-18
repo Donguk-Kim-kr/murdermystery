@@ -84,6 +84,8 @@ export interface Bundle {
   [key: string]: unknown;
   /** 공통 스토리를 나눈 부분 수(공통 스토리 카드가 보여 줄 부분을 고르는 범위) */
   story?: { 공통스토리_부분수: number };
+  /** 시간 칸(타임라인 등)을 어디까지 적을지. 작품 기본정보에서 고른다 */
+  time_format?: string;
   library: { phases: Record<string, LibraryRef>; gimmicks: Record<string, LibraryRef> };
 }
 

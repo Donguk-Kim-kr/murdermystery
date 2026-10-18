@@ -371,6 +371,20 @@ describe("작품", () => {
     expect(within(form).getByLabelText("장르")).toHaveValue("추리!");
   });
 
+  it("기본정보에서 시간 형식을 고르면 저장할 때 함께 보낸다", async () => {
+    routes["GET /api/works/7"] = () => json({ ...work, 시간형식: "시간만" });
+    routes["GET /api/works/7/characters"] = () => json([]);
+    routes["PATCH /api/works/7"] = () => json({ ...work, 시간형식: "월까지" });
+    renderApp("/works/7?tab=confirm");
+    const form = await screen.findByRole("form", { name: "기본정보" });
+    expect(within(form).getByLabelText("시간 형식")).toHaveValue("시간만");
+    expect(within(form).getAllByRole("option").filter((o) => ["시간만", "일까지", "월까지", "연도까지"].includes(o.textContent ?? ""))).toHaveLength(4);
+    await userEvent.selectOptions(within(form).getByLabelText("시간 형식"), "월까지");
+    await userEvent.click(within(form).getByRole("button", { name: "저장" }));
+    await within(form).findByRole("status");
+    expect((await calls.find((c) => c.key === "PATCH /api/works/7")!.req.json()).시간형식).toBe("월까지");
+  });
+
   it("기본정보 저장은 공개여부를 보내지 않는다", async () => {
     routes["GET /api/works/7"] = () => json(work);
     routes["GET /api/works/7/characters"] = () => json([]);

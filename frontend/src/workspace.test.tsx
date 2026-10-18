@@ -54,6 +54,9 @@ const schema = {
     { key: "gimmick-uses", label: "페이즈에 붙은 기믹", key_col: "순서", title_fields: [], group_by: "진행순서_순서", help: null, fields: [
       field("기믹_번호", "libref", { ref: "gimmicks", required: true }), field("진행순서_순서", "ref", { ref: "phases", required: true }),
     ] },
+    { key: "timelines", label: "타임라인(사건의 진상)", key_col: "순서", title_fields: ["설명"], group_by: null, help: null, fields: [
+      field("시작시간", "ts"), field("종료시간", "ts"), field("설명", "long", { required: true }),
+    ] },
     { key: "endings", label: "엔딩 분기", key_col: "순서", title_fields: ["이름", "내용"], group_by: null, help: null, fields: [
       field("이름", "text", { required: true }), field("조건", "json", { required: true, default: {} }), field("내용", "long", { required: true }),
     ] },
@@ -62,7 +65,7 @@ const schema = {
 };
 let bundle: Record<string, unknown>;
 const emptyBundle = () => ({
-  places: [], clues: [], testimonies: [], combos: [], "combo-parts": [], relations: [], phases: [], "phase-steps": [], "gimmick-uses": [], endings: [], characters: [person],
+  places: [], clues: [], testimonies: [], combos: [], "combo-parts": [], relations: [], phases: [], "phase-steps": [], "gimmick-uses": [], timelines: [], endings: [], characters: [person],
   library: { phases: {}, gimmicks: {} },
 });
 
@@ -147,6 +150,64 @@ describe("작업공간 탭", () => {
       "흐름", "인물", "장소", "조사", "정리", "사건", "자료", "결말",
     ]);
     expect(screen.queryByRole("tab", { name: "개요" })).not.toBeInTheDocument();    // 개요는 정리 탭으로 합쳤다
+  });
+
+  describe("시간 형식", () => {
+    const open = async () => {
+      routes["POST /api/works/7/content/timelines"] = () => json({ 순서: 1 }, 201);
+      renderApp("/works/7?tab=incidents");
+      await userEvent.click(await screen.findByRole("button", { name: "타임라인(사건의 진상) 추가" }));
+      return within(screen.getByRole("form", { name: "타임라인(사건의 진상) 추가" }));
+    };
+    const body = async () => await sent("POST /api/works/7/content/timelines")[0].req.json();
+
+    it("시간만: 시각 칸 하나만 있고 윗단위는 2000-01-01 로 채워 저장한다", async () => {
+      bundle.time_format = "시간만";
+      const form = await open();
+      expect(form.queryByLabelText("시작시간 일")).not.toBeInTheDocument();
+      await userEvent.type(form.getByLabelText("시작시간"), "2130");
+      await userEvent.type(form.getByLabelText("설명"), "범행");
+      await userEvent.click(form.getByRole("button", { name: "저장" }));
+      await waitFor(() => expect(sent("POST /api/works/7/content/timelines")).toHaveLength(1));
+      expect((await body()).시작시간).toBe("2000-01-01T21:30");
+    });
+
+    it("일까지: 일과 시각을 적고 월·연도는 채운다", async () => {
+      bundle.time_format = "일까지";
+      const form = await open();
+      expect(form.queryByLabelText("시작시간 월")).not.toBeInTheDocument();
+      await userEvent.type(form.getByLabelText("시작시간 일"), "3");
+      await userEvent.type(form.getByLabelText("시작시간 시각"), "2130");
+      await userEvent.type(form.getByLabelText("설명"), "범행");
+      await userEvent.click(form.getByRole("button", { name: "저장" }));
+      await waitFor(() => expect(sent("POST /api/works/7/content/timelines")).toHaveLength(1));
+      expect((await body()).시작시간).toBe("2000-01-03T21:30");
+    });
+
+    it("월까지: 월·일·시각을 적고, 없는 날짜(2월 30일)는 값이 되지 않는다", async () => {
+      bundle.time_format = "월까지";
+      const form = await open();
+      await userEvent.type(form.getByLabelText("시작시간 월"), "2");
+      await userEvent.type(form.getByLabelText("시작시간 일"), "30");
+      await userEvent.type(form.getByLabelText("시작시간 시각"), "2130");
+      await userEvent.type(form.getByLabelText("설명"), "범행");
+      await userEvent.click(form.getByRole("button", { name: "저장" }));
+      await waitFor(() => expect(sent("POST /api/works/7/content/timelines")).toHaveLength(1));
+      expect((await body()).시작시간).toBeNull();                                   // 없는 날짜는 비운 것으로 본다
+    });
+
+    it("연도까지: 날짜와 시각을 한 칸으로 적는다(예전과 같다)", async () => {
+      bundle.time_format = "연도까지";
+      const form = await open();
+      expect(form.getByLabelText("시작시간")).toHaveAttribute("type", "datetime-local");
+    });
+
+    it("목록에는 고른 형식만큼만 보인다", async () => {
+      bundle.time_format = "일까지";
+      bundle.timelines = [{ 순서: 1, 시작시간: "2026-03-12T21:30:00", 종료시간: null, 설명: "범행" }];
+      renderApp("/works/7?tab=incidents");
+      expect(await screen.findByText(/시작시간: 12일 21:30/)).toBeInTheDocument();
+    });
   });
 
   it("인물 탭에서 관계를 설정하고, 장소 탭에는 장소만, 조사 탭에는 단서·증언·조합이 있다", async () => {
