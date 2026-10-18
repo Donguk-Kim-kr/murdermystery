@@ -52,11 +52,14 @@ const login = async (p, id) => { await p.goto(BASE); await p.getByLabel("아이�
 const pages = [await mk({ width: 1100, height: 900 }), await mk({ width: 390, height: 800 }), await mk({ width: 1000, height: 800 })];
 for (const [i, p] of pages.entries()) await login(p, ids[i]);
 const [host, p1, p2] = pages;
+const mshot = (name) => p1.screenshot({ path: `${OUT}/m-${name}.png`, fullPage: true });        // 모바일(390px) 화면을 눈으로 확인하려고 남긴다
+await mshot("home");
 await host.getByRole("link", { name: "방 만들기" }).first().click();
 await host.getByRole("button", { name: "방 만들기" }).click();
 const code = (await host.getByLabel("입장코드", { exact: false }).locator("xpath=self::strong").textContent()).trim();
 for (const p of pages.slice(1)) { await p.goto(BASE + "/rooms/join"); await p.getByLabel("입장코드").fill(code); await p.getByRole("button", { name: "입장하기" }).click(); await p.getByRole("region", { name: "참가자" }).waitFor(); }
 await host.getByText("플레이어 3/3명").waitFor({ timeout: 8000 });
+await mshot("lobby");
 await host.getByRole("button", { name: "게임 시작" }).click();
 
 const title = (p) => p.locator("h1").first().textContent();
@@ -94,6 +97,7 @@ check((await text(p1)).includes("안경 내용입니다") && !(await text(p1)).i
 await p2.getByRole("tab", { name: "내 단서" }).click(); await openCards(p2);
 check((await text(p2)).includes("그날 밤 누군가를 보았습니다") && !(await text(p2)).includes("편지 내용입니다"), "조사: 셋째는 정원의 증언을 얻었고 남의 단서는 모른다");
 await pages[0].screenshot({ path: `${OUT}/full-investigate.png` });
+await mshot("investigate");
 await next("토론");
 // 방장이 편지를 둘째에게 보여 준다
 await host.getByRole("tab", { name: "내 단서" }).click();
@@ -133,11 +137,13 @@ await vote(host, "집사"); await host.getByText("집사에게 투표했습니�
 await vote(host, "사고사"); await host.getByText("사고사에게 투표했습니다").waitFor({ timeout: 8000 });
 check(true, "최종 투표: 다음 단계 전에는 바꿀 수 있다");
 await pages[0].screenshot({ path: `${OUT}/full-vote.png` });
+await mshot("vote");
 await next("엔딩");
 for (const [i, p] of pages.entries()) { const t = await text(p); check(t.includes("범인이 달아났습니다.") && !t.includes("범인이 잡혔습니다."), `엔딩: ${nicks[i]} 화면에 조건에 맞는 엔딩만 보인다`); }
 await next("후일담");
 check((await text(p1)).includes("모두의 이후 이야기"), "후일담: 조건 없는 후일담이 보인다");
 await p1.getByRole("tab", { name: "결말" }).click();
+await mshot("ending");
 check(await p1.getByRole("group", { name: "엔딩" }).isVisible() && await p1.getByRole("group", { name: "후일담" }).isVisible(), "결말: 엔딩과 후일담이 한 탭의 두 구역에 모인다");
 await next("전체 공개");
 await p1.getByRole("tab", { name: "전체 단서" }).click(); await openFolds(p1);
