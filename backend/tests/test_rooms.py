@@ -189,6 +189,19 @@ def test_room_capacity_counts_players_only(client, make_account, make_work):
     assert res.status_code == 409 and "가득" in res.json()["detail"]
 
 
+def test_a_full_waiting_room_can_be_joined_as_an_observer(client, make_account, make_work):
+    host, a, b = make_account(), make_account(), make_account()
+    code = create(client, host, make_work(host, players=2)).json()["입장코드"]
+    assert join(client, a, code).status_code == 200
+    assert join(client, b, code).status_code == 409                                    # 플레이어로는 못 들어간다
+    res = client.post("/api/rooms/join", headers=b.headers, json={"입장코드": code, "관전": True})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["플레이어_수"] == 2                                                      # 관전자는 자리를 차지하지 않는다
+    watcher = [m for m in body["참가자"] if m["계정_번호"] == b.number][0]
+    assert watcher["플레이"] is False and watcher["방장"] is False
+
+
 def test_observer_host_leaves_room_for_one_more_player(client, make_account, make_work):
     host, a, b = make_account(), make_account(), make_account()
     code = create(client, host, make_work(host, players=2), 방장_참여=False).json()["입장코드"]

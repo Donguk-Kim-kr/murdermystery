@@ -640,6 +640,17 @@ describe("방", () => {
     expect(await calls.filter((c) => c.key === "POST /api/rooms/join")[1].req.json()).toEqual({ 입장코드: "K7M2QX", 관전: true });
   });
 
+  it("자리가 가득 찬 방이면 그렇게 안내하고 관전 참여 버튼이 나온다", async () => {
+    routes["POST /api/rooms/join"] = () => json({ detail: "방이 가득 찼습니다." }, 409);
+    renderApp();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "입장코드" }));
+    await user.type(screen.getByLabelText("입장코드"), "k7m2qx");
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "입장" }));
+    expect(await within(screen.getByRole("dialog")).findByRole("alert")).toHaveTextContent("방이 가득 찼습니다.");
+    expect(within(screen.getByRole("dialog")).getByRole("button", { name: "관전 참여" })).toBeInTheDocument();
+  });
+
   it("다른 이유로 입장하지 못하면 관전 참여 버튼은 나오지 않는다", async () => {
     routes["POST /api/rooms/join"] = () => json({ detail: "다른 방에 참여 중입니다." }, 409);
     renderApp();

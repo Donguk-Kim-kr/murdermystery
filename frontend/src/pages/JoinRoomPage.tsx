@@ -5,8 +5,9 @@ import { api, errorMessage } from "../api/client";
 import { useRoom } from "../rooms/RoomContext";
 import { SPACES } from "../spaces";
 
-/** 서버가 진행 중인 방에 플레이어로 들어가려 할 때 돌려주는 안내. 이때는 관전으로 들어가는 버튼을 보인다. */
+/** 서버가 진행 중인 방이나 자리가 가득 찬 방에 플레이어로 들어가려 할 때 돌려주는 안내. 이때는 관전으로 들어가는 버튼을 보인다. */
 export const ROOM_IN_PROGRESS = "진행 중인 방입니다.";
+export const ROOM_FULL = "방이 가득 찼습니다.";
 
 /** 코드로 방에 들어가는 요청 하나. 성공하면 내 방 상태를 새로 읽고 방 화면으로 보낸다. 실패하면 안내 글을 돌려준다. */
 function useEnterRoom() {
@@ -21,12 +22,12 @@ function useEnterRoom() {
   };
 }
 
-/** 입장 실패 안내. 진행 중인 방이면 관전으로 들어가는 버튼이 함께 나온다. */
+/** 입장 실패 안내. 진행 중이거나 가득 찬 방이면 관전으로 들어가는 버튼이 함께 나온다. */
 function JoinProblem({ message, onObserve, busy }: { message: string; onObserve: () => void; busy: boolean }) {
   return (
     <>
       <p role="alert" className="error">{message}</p>
-      {message === ROOM_IN_PROGRESS && <button type="button" className="secondary" disabled={busy} onClick={onObserve}>관전 참여</button>}
+      {(message === ROOM_IN_PROGRESS || message === ROOM_FULL) && <button type="button" className="secondary" disabled={busy} onClick={onObserve}>관전 참여</button>}
     </>
   );
 }

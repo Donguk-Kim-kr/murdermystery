@@ -80,7 +80,8 @@ class RoomRegistry:
             self._room_of[host_id] = room_id
             return room
 
-    def join(self, room_id: int, account_id: int, nickname: str, capacity: int) -> WaitingRoom:
+    def join(self, room_id: int, account_id: int, nickname: str, capacity: int, observe: bool = False) -> WaitingRoom:
+        """대기실에 들어간다. `observe` 면 관전으로 들어가며 자리가 가득 차도 들어갈 수 있다."""
         with self._lock:
             self._prune()
             room = self._rooms.get(room_id)
@@ -91,9 +92,9 @@ class RoomRegistry:
                 return room
             if account_id in self._room_of:
                 raise RoomError("in_other_room", "다른 방에 참여 중입니다.")
-            if room.player_count() >= capacity:
-                raise RoomError("full", "방이 가득 찼습니다")
-            room.members[account_id] = Member(account_id, nickname, True, self.clock())
+            if not observe and room.player_count() >= capacity:
+                raise RoomError("full", "방이 가득 찼습니다.")
+            room.members[account_id] = Member(account_id, nickname, not observe, self.clock())
             self._room_of[account_id] = room_id
             return room
 

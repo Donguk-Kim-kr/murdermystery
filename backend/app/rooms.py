@@ -63,7 +63,7 @@ class RoomCreateIn(BaseModel):
 
 class JoinIn(BaseModel):
     입장코드: str = Field(min_length=1, max_length=20)
-    # 이미 진행 중인 방에 관전자로 들어간다(진행 중인 방은 플레이어로 들어갈 수 없다)
+    # 관전자로 들어간다: 진행 중인 방(플레이어로는 못 들어간다)이나 자리가 가득 찬 대기실에서 쓴다
     관전: bool = False
 
 
@@ -303,7 +303,7 @@ def join_room(body: JoinIn, conn: Conn, me: CurrentUser, request: Request) -> Ro
     if reg.get(row["번호"]) is None:  # 서버 재시작 등으로 대기실이 사라졌고, 방장이 돌아오면 DB 로 복원된다
         raise HTTPException(status.HTTP_409_CONFLICT, "방장이 아직 대기실에 돌아오지 않았습니다. 잠시 뒤에 다시 시도해 주세요")
     try:
-        room = reg.join(row["번호"], me.계정.번호, me.계정.닉네임, row["최대인원"])
+        room = reg.join(row["번호"], me.계정.번호, me.계정.닉네임, row["최대인원"], observe=body.관전)
     except RoomError as err:
         raise_room_error(err)
     return build_room_out(row, room, me.계정.번호)
