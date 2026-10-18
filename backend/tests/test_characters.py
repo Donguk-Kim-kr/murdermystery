@@ -231,5 +231,5 @@ def test_npc_rank_rules(client, headers, work):
 
 def test_pick_intro_is_stored_separately_from_the_self_introduction(client, headers, work):
     wid = work["번호"]
-    c = add(client, headers, wid, "A", 소개="자기소개 멘트", 선택소개="선택 화면 소개")
-    assert (c["소개"], c["선택소개"]) == ("자기소개 멘트", "선택 화면 소개")
+    c = add(client, headers, wid, "A", 소개="자기소개 멘트", 캐릭터설명="캐릭터 설명")
+    assert (c["소개"], c["캐릭터설명"]) == ("자기소개 멘트", "캐릭터 설명")

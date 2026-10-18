@@ -5,12 +5,12 @@ import type { components } from "../api/schema";
 
 export type Character = components["schemas"]["CharacterOut"];
 
-const TEXT_FIELDS = ["직업", "성별", "선택소개", "소개", "타임라인", "능력", "비밀", "목표"] as const;
-const LONG = new Set<string>(["선택소개", "소개", "타임라인", "능력", "비밀", "목표"]);
+const TEXT_FIELDS = ["직업", "성별", "캐릭터설명", "소개", "타임라인", "능력", "비밀", "목표"] as const;
+const LONG = new Set<string>(["캐릭터설명", "소개", "타임라인", "능력", "비밀", "목표"]);
 // 화면에 보이는 이름(칸 이름과 다른 것만)
-const LABEL: Record<string, string> = { 선택소개: "선택 화면 소개", 소개: "자기소개 멘트" };
+const LABEL: Record<string, string> = { 캐릭터설명: "캐릭터 설명", 소개: "자기소개 멘트" };
 const HINT: Record<string, string> = {
-  선택소개: "캐릭터를 고를 때 인물 카드에 함께 보여 줄 수 있는 소개입니다(보일지는 흐름의 캐릭터 선택 카드 설정에서 정합니다)",
+  캐릭터설명: "캐릭터를 고를 때 인물 카드에 함께 보여 줄 수 있는 설명입니다(보일지는 흐름의 캐릭터 선택 카드 설정에서 정합니다)",
   소개: "자기소개 단계에서 이 인물을 소개할 때 보여 주는 멘트입니다. 비우면 플레이어가 스스로 소개합니다",
 };
 
@@ -85,7 +85,7 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
       직업: orNull(texts.직업),
       성별: orNull(texts.성별),
       소개: orNull(texts.소개),
-      선택소개: orNull(texts.선택소개),
+      캐릭터설명: orNull(texts.캐릭터설명),
       타임라인: orNull(texts.타임라인),
       능력: orNull(texts.능력),
       비밀: orNull(texts.비밀),

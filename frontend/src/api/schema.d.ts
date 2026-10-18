@@ -880,8 +880,8 @@ export interface components {
             NPC?: boolean;
             /** 소개 */
             "\uC18C\uAC1C"?: string | null;
-            /** 선택소개 */
-            "\uC120\uD0DD\uC18C\uAC1C"?: string | null;
+            /** 캐릭터설명 */
+            "\uCE90\uB9AD\uD130\uC124\uBA85"?: string | null;
             /** Npc순위 */
             "NPC\uC21C\uC704"?: number | null;
         };
@@ -922,8 +922,8 @@ export interface components {
             NPC?: boolean;
             /** 소개 */
             "\uC18C\uAC1C"?: string | null;
-            /** 선택소개 */
-            "\uC120\uD0DD\uC18C\uAC1C"?: string | null;
+            /** 캐릭터설명 */
+            "\uCE90\uB9AD\uD130\uC124\uBA85"?: string | null;
             /** Npc순위 */
             "NPC\uC21C\uC704"?: number | null;
             /** 순서 */
@@ -957,8 +957,8 @@ export interface components {
             NPC?: boolean | null;
             /** 소개 */
             "\uC18C\uAC1C"?: string | null;
-            /** 선택소개 */
-            "\uC120\uD0DD\uC18C\uAC1C"?: string | null;
+            /** 캐릭터설명 */
+            "\uCE90\uB9AD\uD130\uC124\uBA85"?: string | null;
             /** Npc순위 */
             "NPC\uC21C\uC704"?: number | null;
         };

@@ -20,7 +20,7 @@ MAX_ANSWER_BYTES = 2000
 MAX_NOTICES = 20
 ALL = "모두"
 PUBLIC_FIELDS = ("이름", "직업", "나이", "성별")
-CHARACTER_FIELDS = ("이름", "직업", "나이", "성별", "타임라인", "능력", "비밀", "목표", "범인", "NPC", "소개", "선택소개")
+CHARACTER_FIELDS = ("이름", "직업", "나이", "성별", "타임라인", "능력", "비밀", "목표", "범인", "NPC", "소개", "캐릭터설명")
 
 
 class AnswerError(Exception):
@@ -343,12 +343,12 @@ class CardHost:
     def fn_글(self, 이름: str, 내용: Any) -> dict[str, Any]:
         return {"종류": "글", "이름": str(이름), "내용": _text(내용)}
 
-    def fn_선택지(self, 이름: str, 항목: Any, 한사람당: int = 1, 확인필요: bool = False, 소개보임: bool = False) -> dict[str, Any]:
-        """고르는 칸. 인물을 고르는 칸이면 `소개보임` 으로 인물의 선택 화면 소개(`선택소개`)를 함께 보여 줄 수 있다."""
+    def fn_선택지(self, 이름: str, 항목: Any, 한사람당: int = 1, 확인필요: bool = False, 설명보임: bool = False) -> dict[str, Any]:
+        """고르는 칸. 인물을 고르는 칸이면 `설명보임` 으로 인물의 캐릭터 설명(`캐릭터설명`)를 함께 보여 줄 수 있다."""
         if not isinstance(항목, (list, tuple)):
             raise ScriptError("선택지의 항목은 목록이어야 합니다")
         return {
-            "종류": "선택지", "이름": str(이름), "항목": list(항목), "한사람당": 한사람당, "확인필요": bool(확인필요), "소개보임": bool(소개보임),
+            "종류": "선택지", "이름": str(이름), "항목": list(항목), "한사람당": 한사람당, "확인필요": bool(확인필요), "설명보임": bool(설명보임),
             "질문ID": f"{self.run.key}:확인",
         }
 
@@ -843,7 +843,7 @@ def _item(game, viewer: int, item: Any, show_intro: bool = False) -> dict[str, A
     if isinstance(item, Ref) and item.kind == "인물":
         row = next((c for c in game.snapshot.get("인물") or [] if c["순서"] == item.key), None)
         taken = next((p.account_id for p in game.players.values() if p.character == item.key), None)
-        shown = {"선택소개": (row or {}).get("선택소개")} if show_intro else {}
+        shown = {"캐릭터설명": (row or {}).get("캐릭터설명")} if show_intro else {}
         return {"값": item.key, **{f: (row or {}).get(f) for f in PUBLIC_FIELDS}, **shown, "선택한_계정": taken}
     if isinstance(item, Ref) and item.kind == "장소":
         place = next((p for p in game.snapshot.get("장소") or [] if p["순서"] == item.key), None) or {}
@@ -867,7 +867,7 @@ def _block(game, viewer: int, block: dict[str, Any]) -> dict[str, Any]:
     kind = block.get("종류")
     if kind == "선택지":
         items = block.get("항목", [])
-        out["항목"] = [_item(game, viewer, i, bool(block.get("소개보임"))) for i in items]
+        out["항목"] = [_item(game, viewer, i, bool(block.get("설명보임"))) for i in items]
         player = game.players.get(viewer)
         picks_character = any(isinstance(i, Ref) and i.kind == "인물" for i in items)
         out["내_선택_끝남"] = bool(picks_character and player and player.character is not None)

@@ -278,7 +278,7 @@
 | 13 | 범인 | boolean | 불가 | false |
 | 14 | NPC | boolean | 불가 | false |
 | 15 | 소개 | text | 가능 |  |
-| 16 | 선택소개 | text | 가능 |  |
+| 16 | 캐릭터설명 | text | 가능 |  |
 | 17 | NPC순위 | integer | 가능 |  |
 
 **제약조건**

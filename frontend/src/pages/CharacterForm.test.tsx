@@ -121,10 +121,10 @@ describe("인물 종류와 소개", () => {
   });
 
   it("저장된 순위가 있는 인물은 NPC가 될 수 있는 인물로 열리고, 소개는 두 칸이다", () => {
-    renderForm({ ...saved([]), NPC순위: 3, 소개: "자기소개", 선택소개: "선택 화면" } as unknown as Character);
+    renderForm({ ...saved([]), NPC순위: 3, 소개: "자기소개", 캐릭터설명: "선택 화면" } as unknown as Character);
     expect(screen.getByLabelText("NPC가 될 수 있는 인물")).toBeChecked();
     expect(screen.getByLabelText(/NPC 순위/)).toHaveValue(3);
     expect(screen.getByLabelText("자기소개 멘트")).toHaveValue("자기소개");
-    expect(screen.getByLabelText("선택 화면 소개")).toHaveValue("선택 화면");
+    expect(screen.getByLabelText("캐릭터 설명")).toHaveValue("선택 화면");
   });
 });

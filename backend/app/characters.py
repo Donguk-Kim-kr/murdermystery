@@ -18,7 +18,7 @@ from .works import lock_work, not_found
 
 router = APIRouter(prefix="/api/works/{work_id}/characters", tags=["characters"])
 
-COLUMNS = '"순서", "이름", "직업", "나이", "성별", "서사", "타임라인", "능력", "비밀", "목표", "범인", "NPC", "소개", "선택소개", "NPC순위"'
+COLUMNS = '"순서", "이름", "직업", "나이", "성별", "서사", "타임라인", "능력", "비밀", "목표", "범인", "NPC", "소개", "캐릭터설명", "NPC순위"'
 
 
 class PartIn(BaseModel):
@@ -47,7 +47,7 @@ class CharacterIn(BaseModel):
     범인: bool = False
     NPC: bool = False
     소개: str | None = Field(default=None, max_length=1000)           # 자기소개 단계의 멘트
-    선택소개: str | None = Field(default=None, max_length=1000)       # 캐릭터 선택 단계에 보여 줄 수 있는 소개
+    캐릭터설명: str | None = Field(default=None, max_length=1000)       # 캐릭터 선택 화면과 캐릭터 설명 탭에 보여 줄 수 있는 설명
     NPC순위: int | None = Field(default=None, ge=1, le=100)
 
 
@@ -65,7 +65,7 @@ class CharacterPatch(BaseModel):
     범인: bool | None = None
     NPC: bool | None = None
     소개: str | None = Field(default=None, max_length=1000)
-    선택소개: str | None = Field(default=None, max_length=1000)
+    캐릭터설명: str | None = Field(default=None, max_length=1000)
     NPC순위: int | None = Field(default=None, ge=1, le=100)
 
 

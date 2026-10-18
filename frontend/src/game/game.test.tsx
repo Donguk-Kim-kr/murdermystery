@@ -153,8 +153,8 @@ describe("플레이 화면", () => {
     await waitFor(() => expect(posts).toEqual([{ path: "/api/game/me/answer", body: { 질문ID: "1:5:확인", 값: "취소" } }]));
   });
 
-  it("카드 설정이 켜져 있으면 인물 카드에 선택 화면 소개가 보인다", async () => {
-    state = makeState({ 화면: [{ ...choice(), 항목: [{ ...choice().항목[0], 선택소개: "마을의 다정한 의사" }, { ...choice().항목[1] }] }] });
+  it("카드 설정이 켜져 있으면 인물 카드에 캐릭터 설명가 보인다", async () => {
+    state = makeState({ 화면: [{ ...choice(), 항목: [{ ...choice().항목[0], 캐릭터설명: "마을의 다정한 의사" }, { ...choice().항목[1] }] }] });
     render(<GamePage />);
     expect(await screen.findByText("마을의 다정한 의사")).toBeInTheDocument();
   });
