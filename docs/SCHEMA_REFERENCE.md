@@ -616,7 +616,6 @@
 |---|---|---|
 | PK | `pk_방` | `PRIMARY KEY ("번호")` |
 | UNIQUE | `uq_방_번호_작품_버전` | `UNIQUE ("번호", "작품_번호", "버전_버전")` |
-| UNIQUE | `uq_방_입장코드` | `UNIQUE ("입장코드")` |
 | FK | `fk_방_계정` | `FOREIGN KEY ("계정_번호") REFERENCES "계정"("번호") ON DELETE RESTRICT` |
 | FK | `fk_방_버전` | `FOREIGN KEY ("작품_번호", "버전_버전") REFERENCES "버전"("작품_번호", "버전") ON DELETE RESTRICT` |
 | FK | `fk_방_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE RESTRICT` |
@@ -624,6 +623,7 @@
 
 **추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
 
+- `uq_방_입장코드_사용중`: `CREATE UNIQUE INDEX "uq_방_입장코드_사용중" ON public."방" USING btree ("입장코드") WHERE ("상태" <> '종료'::text)` — 종료되지 않은 방끼리만 코드가 유일하다(0022)
 - `ix_방_계정`: `CREATE INDEX "ix_방_계정" ON public."방" USING btree ("계정_번호")`
 - `ix_방_버전`: `CREATE INDEX "ix_방_버전" ON public."방" USING btree ("작품_번호", "버전_버전")`
 

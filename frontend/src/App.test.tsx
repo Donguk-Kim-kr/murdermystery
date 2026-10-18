@@ -625,7 +625,25 @@ describe("방", () => {
     await userEvent.click(await screen.findByLabelText("나도 플레이어로 참여"));
     await userEvent.click(screen.getByRole("button", { name: "방 만들기" }));
     expect(await screen.findByRole("heading", { name: "저택의 비밀" })).toBeInTheDocument();
-    expect(await calls.find((c) => c.key === "POST /api/rooms")!.req.json()).toEqual({ 작품_번호: 7, 방장_참여: false });
+    expect(await calls.find((c) => c.key === "POST /api/rooms")!.req.json()).toEqual({ 작품_번호: 7, 방장_참여: false, 입장코드: null });
+  });
+
+  it("방장이 입장코드를 정하면 대문자로 바꿔 보내고, 이미 쓰는 코드면 이유를 보여 준다", async () => {
+    routes["POST /api/rooms"] = () => json({ detail: "이미 사용 중인 입장코드입니다. 다른 코드를 정해 주세요" }, 409);
+    renderApp("/rooms/new/7");
+    await userEvent.type(await screen.findByLabelText("입장코드"), "friends7");
+    expect(screen.getByLabelText("입장코드")).toHaveValue("FRIENDS7");
+    await userEvent.click(screen.getByRole("button", { name: "방 만들기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("이미 사용 중인 입장코드");
+    expect(await calls.find((c) => c.key === "POST /api/rooms")!.req.json()).toEqual({ 작품_번호: 7, 방장_참여: true, 입장코드: "FRIENDS7" });
+  });
+
+  it("입장코드 길이가 맞지 않으면 어느 항목이 왜 안 되는지 알려 준다", async () => {
+    routes["POST /api/rooms"] = () => json({ detail: [{ type: "string_too_short", loc: ["body", "입장코드"], msg: "x", ctx: { min_length: 4 } }] }, 422);
+    renderApp("/rooms/new/7");
+    await userEvent.type(await screen.findByLabelText("입장코드"), "AB");
+    await userEvent.click(screen.getByRole("button", { name: "방 만들기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("입장코드은(는) 4자 이상이어야 합니다");
   });
 
   it("방을 만들 수 없으면 사유를 보여 준다", async () => {

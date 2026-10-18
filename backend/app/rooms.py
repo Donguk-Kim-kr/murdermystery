@@ -13,7 +13,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Request, status
 from psycopg import Connection
 from psycopg.errors import UniqueViolation
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .auth import CurrentSession, CurrentUser
 from .db import Conn
@@ -22,7 +22,7 @@ from .testers import can_private_play
 
 router = APIRouter(prefix="/api/rooms", tags=["rooms"])
 
-# 입장코드: 헷갈리는 글자(I, O, 0, 1)를 뺀 32자 6칸. 방은 종료돼도 코드가 DB 에 남아 재사용되지 않는다(UNIQUE).
+# 입장코드는 방장이 정한다(비우면 헷갈리는 글자(I, O, 0, 1)를 뺀 32자 6칸을 무작위로 만든다). 종료되지 않은 방끼리만 유일하고 종료된 방의 코드는 다시 쓸 수 있다(0022).
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 CODE_LENGTH = 6
 
@@ -39,9 +39,25 @@ def new_code() -> str:
 
 # ---- 모델 -------------------------------------------------------------------------------
 
+CODE_MIN_LENGTH = 4
+CODE_MAX_LENGTH = 10
+# 방장이 정하는 입장코드의 글자: 영문(대문자로 바꿈)·숫자·한글. 공백과 기호는 쓰지 않는다.
+CODE_PATTERN = r"^[A-Z0-9가-힣]+$"
+
+
 class RoomCreateIn(BaseModel):
     작품_번호: int
     방장_참여: bool = True
+    # 방장이 정하는 입장코드. 비우면 서버가 무작위로 만든다.
+    입장코드: str | None = Field(default=None, min_length=CODE_MIN_LENGTH, max_length=CODE_MAX_LENGTH, pattern=CODE_PATTERN)
+
+    @field_validator("입장코드", mode="before")
+    @classmethod
+    def normalize_code(cls, value):
+        if isinstance(value, str):
+            value = value.strip().upper()
+            return value or None                     # 빈 칸은 "자동으로 만들기"
+        return value
 
 
 class JoinIn(BaseModel):
@@ -202,20 +218,27 @@ def create_room(body: RoomCreateIn, conn: Conn, me: CurrentUser, request: Reques
     if version is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "확정된 버전이 없는 작품으로는 방을 만들 수 없습니다")
 
-    for _ in range(10):  # 코드가 겹치면 다시 뽑는다
-        code = new_code()
+    insert = (
+        'INSERT INTO "방" ("계정_번호", "입장코드", "작품_번호", "버전_버전") VALUES (%s, %s, %s, %s) RETURNING "번호"'
+    )
+    if body.입장코드:
+        code = body.입장코드                          # 방장이 정한 코드. 종료되지 않은 방이 이미 쓰고 있으면 거절한다
         try:
             with conn.transaction():
-                created = conn.execute(
-                    'INSERT INTO "방" ("계정_번호", "입장코드", "작품_번호", "버전_버전") VALUES (%s, %s, %s, %s) '
-                    'RETURNING "번호"',
-                    (me.계정.번호, code, work["번호"], version["버전"]),
-                ).fetchone()
-            break
+                created = conn.execute(insert, (me.계정.번호, code, work["번호"], version["버전"])).fetchone()
         except UniqueViolation:
-            continue
+            raise HTTPException(status.HTTP_409_CONFLICT, "이미 사용 중인 입장코드입니다. 다른 코드를 정해 주세요") from None
     else:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "입장코드를 만들지 못했습니다. 다시 시도해 주세요")
+        for _ in range(10):  # 무작위 코드가 겹치면 다시 뽑는다
+            code = new_code()
+            try:
+                with conn.transaction():
+                    created = conn.execute(insert, (me.계정.번호, code, work["번호"], version["버전"])).fetchone()
+                break
+            except UniqueViolation:
+                continue
+        else:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "입장코드를 만들지 못했습니다. 다시 시도해 주세요")
 
     room = reg.open_room(created["번호"], code, me.계정.번호, me.계정.닉네임, body.방장_참여)
     row = conn.execute(ROOM_SELECT + 'WHERE r."번호" = %s', (created["번호"],)).fetchone()
@@ -229,7 +252,10 @@ def join_room(body: JoinIn, conn: Conn, me: CurrentUser, request: Request) -> Ro
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "입장코드를 너무 많이 틀렸습니다. 잠시 뒤에 다시 시도해 주세요")
     expire_stale(request)
     lock_account(conn, me.계정.번호)
-    row = conn.execute(ROOM_SELECT + 'WHERE r."입장코드" = %s', (body.입장코드.strip().upper(),)).fetchone()
+    # 종료된 방의 코드는 다시 쓰일 수 있으므로 종료되지 않은 방만 찾는다(그런 방은 코드마다 하나뿐이다).
+    row = conn.execute(
+        ROOM_SELECT + 'WHERE r."입장코드" = %s AND r."상태" <> \'종료\'', (body.입장코드.strip().upper(),)
+    ).fetchone()
     if row is None:
         lim.record_failure(me.계정.번호)
         raise HTTPException(status.HTTP_404_NOT_FOUND, "입장코드가 올바르지 않습니다")

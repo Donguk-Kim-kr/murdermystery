@@ -11,6 +11,7 @@ export function CreateRoomPage() {
   const location = useLocation();
   const [title, setTitle] = useState<string | null>((location.state as { title?: string } | null)?.title ?? null);
   const [playing, setPlaying] = useState(true);
+  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -30,7 +31,8 @@ export function CreateRoomPage() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const { error } = await api.POST("/api/rooms", { body: { 작품_번호: workId, 방장_참여: playing } });
+    // 입장코드를 비워 두면 서버가 무작위로 만든다.
+    const { error } = await api.POST("/api/rooms", { body: { 작품_번호: workId, 방장_참여: playing, 입장코드: code.trim() || null } });
     setBusy(false);
     if (error) {
       setError(errorMessage(error, "방을 만들지 못했습니다"));
@@ -47,6 +49,22 @@ export function CreateRoomPage() {
         <h1>방 만들기</h1>
         <p>
           <strong>{title ?? "…"}</strong> 으로 방을 만듭니다. 확정된 가장 최근 버전으로 진행됩니다.
+        </p>
+        <label>
+          입장코드
+          <input
+            className="code-input"
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            maxLength={10}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="비워 두면 자동으로 만들어 줍니다"
+          />
+        </label>
+        <p className="muted">
+          참가자가 방에 들어올 때 입력하는 코드입니다. 4~10자의 영문·숫자·한글을 쓸 수 있고, 쉬운 코드는 다른 사람이 맞힐 수 있습니다.
+          방이 끝나면 같은 코드를 다시 쓸 수 있습니다.
         </p>
         <label className="check">
           <input type="checkbox" checked={playing} onChange={(e) => setPlaying(e.target.checked)} />

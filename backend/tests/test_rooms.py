@@ -227,6 +227,57 @@ def test_room_code_collision_is_retried(client, make_account, make_work, monkeyp
     assert create(client, b, make_work(b)).json()["입장코드"] == "ASDFGH"    # 겹친 코드는 건너뛴다
 
 
+# ---- 방장이 정하는 입장코드 ---------------------------------------------------------------------
+
+def test_host_chooses_the_entry_code_and_it_is_normalized_to_upper_case(client, make_account, make_work):
+    host, guest = make_account(), make_account()
+    made = create(client, host, make_work(host), 입장코드="  우리방2024 ")
+    assert made.status_code == 201 and made.json()["입장코드"] == "우리방2024"
+    other = create(client, make_account(), make_work(host), 입장코드="abcd")             # 남의 작품은 비공개라 실패해도 코드 검사가 먼저 걸린다
+    assert other.status_code in (201, 403, 404)
+    assert join(client, guest, "우리방2024").status_code == 200
+    host2 = make_account()
+    lower = create(client, host2, make_work(host2), 입장코드="friends7")
+    assert lower.status_code == 201 and lower.json()["입장코드"] == "FRIENDS7"
+    assert join(client, make_account(), "friends7").status_code == 200                   # 입력은 대소문자를 가리지 않는다
+
+
+@pytest.mark.parametrize("code, ok", [("ABC", False), ("ABCD", True), ("A" * 10, True), ("A" * 11, False), ("AB CD", False), ("AB-CD", False), ("AB!D", False), ("한글방", False), ("한글방1", True)])
+def test_entry_code_length_and_characters(client, make_account, make_work, code, ok):
+    host = make_account()
+    res = create(client, host, make_work(host), 입장코드=code)
+    assert (res.status_code == 201) is ok
+    if not ok:
+        assert res.status_code == 422
+
+
+def test_blank_entry_code_means_automatic(client, make_account, make_work):
+    host = make_account()
+    res = create(client, host, make_work(host), 입장코드="   ")
+    assert res.status_code == 201 and CODE_RE.match(res.json()["입장코드"])
+
+
+def test_an_entry_code_in_use_by_an_open_room_is_refused(client, make_account, make_work):
+    a, b = make_account(), make_account()
+    assert create(client, a, make_work(a), 입장코드="SAMECODE").status_code == 201
+    dup = create(client, b, make_work(b), 입장코드="samecode")
+    assert dup.status_code == 409 and "이미 사용 중인 입장코드" in dup.json()["detail"]
+    assert mine(client, b) is None                                                        # 거절되면 방이 만들어지지 않는다
+
+
+def test_an_entry_code_can_be_reused_after_the_room_is_closed(client, make_account, make_work, db):
+    a, b, guest = make_account(), make_account(), make_account()
+    first = create(client, a, make_work(a), 입장코드="REUSE01").json()
+    assert client.post("/api/rooms/leave", headers=a.headers).status_code == 204            # 방장이 나가 방이 닫힌다
+    assert join(client, guest, "REUSE01").status_code == 404                                 # 닫힌 방의 코드로는 들어갈 수 없다
+    second = create(client, b, make_work(b), 입장코드="REUSE01")
+    assert second.status_code == 201 and second.json()["번호"] != first["번호"]
+    assert join(client, guest, "REUSE01").status_code == 200                                 # 새 방으로 들어간다
+    assert mine(client, guest)["번호"] == second.json()["번호"]
+    rows = db.execute('SELECT 상태 FROM "방" WHERE 입장코드 = %s ORDER BY 번호', ("REUSE01",)).fetchall()
+    assert [r[0] for r in rows] == ["종료", "대기"]
+
+
 # ---- 대기실 상태·나가기·닫기 -------------------------------------------------------------
 
 def test_my_room_is_null_when_not_in_a_room(client, make_account):
@@ -244,7 +295,7 @@ def test_member_leaves_and_host_closes_the_room(client, make_account, make_work,
     assert mine(client, host) is None and mine(client, guest) is None
     state, ended = db.execute('SELECT "상태", "종료일시" IS NOT NULL FROM "방" WHERE "번호" = %s', (room["번호"],)).fetchone()
     assert (state, ended) == ("종료", True)
-    assert join(client, guest, room["입장코드"]).status_code == 409           # 닫힌 방에는 들어갈 수 없다
+    assert join(client, guest, room["입장코드"]).status_code == 404           # 닫힌 방의 코드는 더 이상 방을 가리키지 않는다(다른 방이 다시 쓸 수 있다)
     assert client.post("/api/rooms/leave", headers=host.headers).status_code == 404
 
 
@@ -305,7 +356,7 @@ def test_waiting_room_expires_after_six_hours(client, make_account, make_work, d
     host, guest = make_account(), make_account()
     room = create(client, host, make_work(host)).json()
     db.execute('UPDATE "방" SET "상태변경일시" = CURRENT_TIMESTAMP - interval \'7 hours\' WHERE "번호" = %s', (room["번호"],))
-    assert join(client, guest, room["입장코드"]).status_code == 409       # 만료된 방은 종료된다
+    assert join(client, guest, room["입장코드"]).status_code == 404       # 만료된 방은 종료되어 코드가 더 이상 방을 가리키지 않는다
     assert db.execute('SELECT "상태" FROM "방" WHERE "번호" = %s', (room["번호"],)).fetchone()[0] == "종료"
     assert mine(client, host) is None
 

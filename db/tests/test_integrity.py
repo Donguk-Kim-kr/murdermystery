@@ -296,11 +296,16 @@ class TestMediaVoteGimmick(Builders):
 
 
 class TestRuntimeConstraints(Builders):
-    def test_room_checks_and_unique_code(self):
+    def test_room_checks_and_unique_code_among_open_rooms(self):
         r = self.room(code="ABC123")
         self.assertEqual(self.db.val(f'SELECT "상태" FROM "방" WHERE "번호"={r}'), "대기")
         w = self.db.val(f'SELECT "작품_번호" FROM "방" WHERE "번호"={r}')
-        self.ins_fails("방", "uq_방_입장코드", 계정_번호=self.account(), 입장코드="ABC123", 작품_번호=w, 버전_버전="1.0")
+        # 종료되지 않은 방끼리는 같은 코드를 쓸 수 없다. 종료된 방의 코드는 다시 쓸 수 있다(0022).
+        self.ins_fails("방", "uq_방_입장코드_사용중", 계정_번호=self.account(), 입장코드="ABC123", 작품_번호=w, 버전_버전="1.0")
+        self.db.ok(f'UPDATE "방" SET "상태"=\'종료\' WHERE "번호"={r}')
+        again = self.ins("방", 계정_번호=self.account(), 입장코드="ABC123", 작품_번호=w, 버전_버전="1.0")
+        self.assertEqual(self.db.val(f'SELECT "상태" FROM "방" WHERE "번호"={again}'), "대기")
+        self.ins_fails("방", "uq_방_입장코드_사용중", 계정_번호=self.account(), 입장코드="ABC123", 작품_번호=w, 버전_버전="1.0")
         self.ins_fails("방", "ck_방_상태", 계정_번호=self.account(), 입장코드="X1", 작품_번호=w, 버전_버전="1.0", 상태="폐쇄")
         for st in ("대기", "진행", "종료"):
             self.room(code=f"S_{st}", 상태=st)

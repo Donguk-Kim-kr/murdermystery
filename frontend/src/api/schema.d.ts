@@ -1250,6 +1250,8 @@ export interface components {
              * @default true
              */
             "\uBC29\uC7A5_\uCC38\uC5EC"?: boolean;
+            /** 입장코드 */
+            "\uC785\uC7A5\uCF54\uB4DC"?: string | null;
         };
         /** RoomOut */
         RoomOut: {
