@@ -57,7 +57,9 @@ export function useFlowDrag(
         if (!flow) return null;
         const fr = flow.getBoundingClientRect();
         const tiles: TileBox[] = [...flow.querySelectorAll<HTMLElement>("[data-tile]")]
-          .filter((t) => !t.classList.contains("drag-origin"))   // 끌고 있는 카드의 제자리(빈자리 역할)는 카드로 치지 않는다
+          // 끌고 있는 카드의 제자리(빈자리 역할)는 카드로 치지 않는다. 끌기가 막 시작된 첫 움직임에는 화면이 아직 제자리 표시(drag-origin)로
+          // 바뀌기 전이므로 클래스가 아니라 번호로 거른다(그러지 않으면 자기 오른쪽 절반을 잡았을 때 "자기 뒤"가 엉뚱한 자리로 읽혀 카드들이 밀린다).
+          .filter((t) => !t.classList.contains("drag-origin") && !(payload.kind === "phase" && Number(t.dataset.order) === payload.order))
           .map((t) => {
             const r = t.getBoundingClientRect();
             return { order: Number(t.dataset.order), left: r.left, right: r.right };
