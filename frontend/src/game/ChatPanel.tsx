@@ -24,6 +24,7 @@ export function ChatPanel() {
   const [watching, setWatching] = useState("전체");      // 관전자가 보고 있는 장소(플레이어는 자기 위치를 본다)
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [big, setBig] = useState(false);                  // 큰 창으로 보기(시연할 때 잘 보이도록)
   const last = useRef(0);
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -48,7 +49,13 @@ export function ChatPanel() {
   const shown = messages.filter((m) => m.장소 === viewing);
   useEffect(() => {
     listRef.current?.scrollTo?.({ top: listRef.current.scrollHeight });
-  }, [shown.length, viewing]);
+  }, [shown.length, viewing, big]);
+  useEffect(() => {
+    if (!big) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setBig(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [big]);
 
   if (!chat) return <section className="card chat" aria-label="채팅"><h2>채팅</h2><p className="muted">불러오는 중…</p></section>;
   const gm = chat.역할 === "GM 관전";
@@ -79,8 +86,15 @@ export function ChatPanel() {
   }
 
   return (
-    <section className="card chat" aria-label="채팅">
-      <h2>채팅</h2>
+    <>
+    {big && <div className="overlay chat-backdrop" onClick={() => setBig(false)} />}
+    <section className={`card chat${big ? " big" : ""}`} aria-label="채팅">
+      <div className="row">
+        <h2>채팅</h2>
+        <button type="button" className="small secondary" aria-pressed={big} onClick={() => setBig(!big)}>
+          {big ? "작게" : "크게 보기"}
+        </button>
+      </div>
       <ul className="chat-places" aria-label="채팅 장소">
         {chat.장소들.map((room) => {
           const here = room.이름 === viewing;
@@ -122,5 +136,6 @@ export function ChatPanel() {
         <p className="muted">{gm ? "GM 관전: 모든 장소의 대화를 볼 수 있고, 쓸 수는 없습니다." : "관전자는 전체 대화를 볼 수만 있습니다."}</p>
       )}
     </section>
+    </>
   );
 }

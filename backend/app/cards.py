@@ -986,6 +986,27 @@ def _block(game, viewer: int, block: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def phase_completion(game) -> bool | None:
+    """이 페이즈에서 **모두가 해야 하는 일**(읽기 확인, 인물 고르기, 투표·답변)을 모두 끝냈는가.
+
+    그런 일이 없는 페이즈(조사·토론·자기소개 …)는 None 이다. 자동 진행이 시간이 끝나기를 기다리지 않고 넘어가는 기준이다.
+    """
+    done: list[bool] = []
+    for run in game.runs.values():
+        for blocks in run.screens.values():
+            for block in blocks.values():
+                kind = block.get("종류")
+                if kind == "읽기":
+                    record = game.reads.get(block.get("질문ID"))
+                    if record and record["필요"]:
+                        done.append(record["필요"] <= record["확인"])
+                elif kind == "선택지" and block.get("확인필요") and any(isinstance(i, Ref) and i.kind == "인물" for i in block.get("항목", [])):
+                    done.append(bool(game.players) and all(p.character is not None for p in game.players.values()))
+                elif kind == "투표":
+                    done.append(bool(game.players) and len(game.votes.get(block.get("이름"), {})) >= len(game.players))
+    return None if not done else all(done)
+
+
 def card_view(game, viewer: int) -> dict[str, Any]:
     """`viewer` 에게 보여도 되는 화면 블록·탭·알림·오류. 다른 플레이어에게만 보이도록 한 것은 들어가지 않는다."""
     screens: list[dict[str, Any]] = []

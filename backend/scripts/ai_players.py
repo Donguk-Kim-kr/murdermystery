@@ -49,7 +49,7 @@ def main() -> None:
     ap.add_argument("--model", default=os.environ.get("MM_AI_MODEL", "claude-opus-5-5"))
     ap.add_argument("--effort", default=os.environ.get("MM_AI_EFFORT", "low"), choices=["low", "medium", "high", "xhigh", "max"])
     ap.add_argument("--nicknames", default="", help="쉼표로 구분한 AI 닉네임(기본 'AI 1, AI 2 …')")
-    ap.add_argument("--think", type=float, default=4.0, help="AI 한 명이 모델을 부르는 최소 간격(초)")
+    ap.add_argument("--think", type=float, default=8.0, help="AI 한 명이 모델을 부르는 최소 간격(초). 늘리면 호출 수와 비용이 줄어든다")
     ap.add_argument("--verbose", action="store_true", help="AI 에게 준 상황 글도 출력")
     args = ap.parse_args()
 

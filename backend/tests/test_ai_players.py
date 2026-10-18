@@ -183,3 +183,30 @@ def test_choose_accepts_a_number_written_as_text_and_share_targets_as_text(clien
     agent._act([{"tool": "share_clue", "input": {"question_id": "q", "clue": "3", "targets": "12, 15"}}],
                [{"질문ID": "q", "종류": "단서 보여주기"}], {"내_위치": "전체"})
     assert posted[0]["값"] == {"동작": "보여주기", "단서": 3, "대상": [12, 15]}
+
+
+def test_claude_brain_backs_off_after_failures_and_explains_a_low_credit_balance():
+    logged = []
+    now = [0.0]
+    client, calls = fake_client(error=RuntimeError("Your credit balance is too low to access the Anthropic API."))
+    brain = ClaudeBrain(client=client, log=logged.append)
+    brain.clock = lambda: now[0]
+    assert brain.decide("s", "u") == [] and len(calls) == 1
+    assert "Plans & Billing" in logged[0] and "5초" in logged[0]
+    now[0] = 2.0
+    assert brain.decide("s", "u") == [] and len(calls) == 1                           # 쉬는 동안에는 호출하지 않는다
+    now[0] = 6.0
+    brain.decide("s", "u")
+    assert len(calls) == 2 and "10초" in logged[1]                                     # 계속 실패하면 쉬는 시간이 늘어난다
+
+
+def test_claude_brain_tallies_token_usage_every_ten_calls():
+    logged = []
+    usage = SimpleNamespace(input_tokens=4000, output_tokens=300, cache_read_input_tokens=0)
+    client, _ = fake_client([SimpleNamespace(type="tool_use", name="wait", input={}, id="t")])
+    base = client.messages.create
+    client.messages.create = lambda **kw: (lambda r: (setattr(r, "usage", usage), r)[1])(base(**kw))
+    brain = ClaudeBrain(client=client, log=logged.append)
+    for _ in range(10):
+        brain.decide("s", "u")
+    assert brain.usage == {"호출": 10, "입력": 40000, "출력": 3000, "캐시읽기": 0} and "사용량" in logged[-1]

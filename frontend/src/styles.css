@@ -771,8 +771,15 @@ button.clue-head:hover { background: transparent; }
 .chat-place-name { font-weight: 600; flex: none; }
 .chat-place-people { font-size: 0.8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-place.on .chat-place-people { color: inherit; }
-.chat-log { list-style: none; margin: 0; padding: 0.5rem 0.6rem; display: grid; gap: 0.35rem; align-content: start; height: 14rem; overflow-y: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.9rem; }
+.chat-log { list-style: none; margin: 0; padding: 0.5rem 0.6rem; display: grid; gap: 0.35rem; align-content: start; height: 16rem; overflow-y: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.9rem; }
 .chat-log li { overflow-wrap: anywhere; }
 .chat-log strong { font-weight: 600; margin-right: 0.25rem; }
 .chat-form { display: flex; gap: 0.4rem; }
 .chat-form input { flex: 1; min-width: 0; }
+
+/* 채팅 크게 보기: 화면 가운데에 큰 창으로 띄운다(뒤는 흐리게) */
+.chat-backdrop { z-index: 40; }
+.chat.big { position: fixed; z-index: 41; inset: 4vh 6vw; max-width: 56rem; margin: 0 auto; grid-template-rows: auto auto minmax(0, 1fr) auto auto; overflow: hidden; }
+.chat.big .chat-places { grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
+.chat.big .chat-log { height: auto; min-height: 0; font-size: 1.05rem; }
+.chat.big .chat-form input { font-size: 1.05rem; }

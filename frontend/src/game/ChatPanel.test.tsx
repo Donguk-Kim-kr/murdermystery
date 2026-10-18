@@ -94,4 +94,19 @@ describe("게임 채팅", () => {
     expect(within(secret).queryByText("공개 말")).not.toBeInTheDocument();
     expect(sent).toEqual([]);                                                       // 옮기는 것이 아니라 보기만 한다
   });
+
+  it("크게 보기를 누르면 큰 창이 되고, 작게나 Esc 로 돌아온다", async () => {
+    view = { 내_위치: "전체", 역할: "플레이어", 장소들: rooms(), 메시지: [msg(1, "전체", ji, "안녕하세요")] };
+    render(<ChatPanel />);
+    await screen.findByRole("button", { name: "크게 보기" });                          // 불러온 뒤의 화면
+    const panel = screen.getByRole("region", { name: "채팅" });
+    expect(panel).not.toHaveClass("big");
+    await userEvent.click(within(panel).getByRole("button", { name: "크게 보기" }));
+    expect(panel).toHaveClass("big");
+    await userEvent.click(within(panel).getByRole("button", { name: "작게" }));
+    expect(panel).not.toHaveClass("big");
+    await userEvent.click(within(panel).getByRole("button", { name: "크게 보기" }));
+    await userEvent.keyboard("{Escape}");
+    expect(panel).not.toHaveClass("big");
+  });
 });

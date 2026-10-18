@@ -422,15 +422,19 @@ def set_auto_advance(game: Game, account_id: int, value: bool) -> None:
 
 
 def auto_advance_if_due(game: Game, io: GameIO) -> bool:
-    """자동 진행이 켜져 있고 시간이 끝났으면 다음 단계로 넘어간다. 진행 조건이 맞지 않거나 마지막 단계면 그대로 기다린다.
+    """자동 진행이 켜져 있고 **시간이 끝났거나 모두가 해야 할 일(읽기 확인·인물 고르기·투표)을 모두 끝냈으면** 다음 단계로 넘어간다.
 
-    일시정지 중이거나 시간 제한이 없는 단계는 넘어가지 않는다. 넘어갔으면 True.
+    진행 조건이 맞지 않거나 마지막 단계면 그대로 기다린다. 일시정지 중에는 넘어가지 않는다. 시간 제한이 없는 단계는 시간으로는
+    넘어가지 않고, 모두 끝냈을 때만 넘어간다. 넘어갔으면 True.
     """
+    from .cards import phase_completion
+
     with game.lock:
         if not game.auto_advance or game.ended or game.paused:
             return False
         remaining = game.remaining()
-        if remaining is None or remaining > 0:
+        time_up = remaining is not None and remaining <= 0
+        if not time_up and phase_completion(game) is not True:
             return False
         try:
             _advance(game, io)

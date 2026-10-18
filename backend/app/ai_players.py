@@ -95,8 +95,12 @@ class ClaudeBrain:
 
             client = anthropic.Anthropic()        # ANTHROPIC_API_KEY 환경변수
         self.client, self.model, self.effort, self.log = client, model, effort, log
+        self.clock, self.failures, self.blocked_until = time.monotonic, 0, 0.0     # 호출이 계속 실패하면 잠시 쉰다
+        self.usage = {"호출": 0, "입력": 0, "출력": 0, "캐시읽기": 0}                 # 누적 사용량(비용 가늠용)
 
     def decide(self, system: str, situation: str) -> list[dict[str, Any]]:
+        if self.clock() < self.blocked_until:
+            return []
         try:
             res = self.client.messages.create(
                 model=self.model, max_tokens=4096,
@@ -106,9 +110,27 @@ class ClaudeBrain:
                 output_config={"effort": self.effort},
                 cache_control={"type": "ephemeral"},
             )
-        except Exception as err:                       # 연결·한도·인증 오류 등: 이번 차례는 건너뛴다
-            self.log(f"  (AI 호출 실패: {type(err).__name__}: {err})")
+        except Exception as err:                       # 연결·한도·인증 오류 등: 이번 차례는 건너뛰고, 계속 실패하면 점점 더 오래 쉰다
+            self.failures += 1
+            wait = min(120.0, 5.0 * 2 ** (self.failures - 1))
+            self.blocked_until = self.clock() + wait
+            hint = ""
+            if "credit balance" in str(err):
+                hint = " → Anthropic 콘솔의 Plans & Billing 에서 크레딧을 충전하세요."
+            elif "authentication" in str(err).lower() or "invalid x-api-key" in str(err).lower():
+                hint = " → ANTHROPIC_API_KEY 가 올바른지 확인하세요."
+            self.log(f"  (AI 호출 실패: {type(err).__name__}: {str(err)[:200]}{hint} — {wait:.0f}초 쉬었다 다시 시도합니다)")
             return []
+        self.failures = 0
+        used = getattr(res, "usage", None)
+        if used is not None:
+            self.usage["호출"] += 1
+            self.usage["입력"] += getattr(used, "input_tokens", 0) or 0
+            self.usage["출력"] += getattr(used, "output_tokens", 0) or 0
+            self.usage["캐시읽기"] += getattr(used, "cache_read_input_tokens", 0) or 0
+            if self.usage["호출"] % 10 == 0:
+                u = self.usage
+                self.log(f"  (사용량: 호출 {u['호출']}회, 입력 {u['입력']:,} · 출력 {u['출력']:,} · 캐시에서 읽음 {u['캐시읽기']:,} 토큰 — 이 AI 한 명 기준)")
         stop = getattr(res, "stop_reason", None)
         calls = [{"tool": b.name, "input": dict(b.input)} for b in res.content if getattr(b, "type", None) == "tool_use"]
         if not calls:                                  # 아무 도구도 부르지 않았다: 이유를 남긴다(글만 썼거나, 토큰이 모자랐거나, 거절)

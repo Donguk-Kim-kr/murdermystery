@@ -169,7 +169,7 @@ function Controls({ game, state, lastPhase }: { game: GameApi; state: GameState;
               checked={state.설정.자동_진행}
               onChange={(e) => void run(() => game.setAutoAdvance(e.target.checked))}
             />
-            시간이 끝나면 자동으로 넘기기
+            자동으로 넘기기
           </label>
           <label className="check">
             진행 맡기기
