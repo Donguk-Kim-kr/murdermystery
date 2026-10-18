@@ -1,4 +1,4 @@
-"""최종 투표: 비공개 동시 투표, 몇 명이 했는지만 보임, 다음 단계 전까지 바꾸기, 후보 지정, 동률 규칙 (app/default_phases.py FINAL_VOTE)."""
+"""최종 투표: 비공개 동시 투표, 몇 명이 했는지만 보임, 다음 단계 전까지 바꾸기, 후보 지정, 동률이면 재투표 (app/default_phases.py FINAL_VOTE)."""
 import pytest
 
 from app.default_phases import CHARACTER_SELECT, FINAL_VOTE
@@ -106,8 +106,6 @@ def test_observer_sees_progress_but_cannot_vote(client, make_scripted_game):
 def test_result_is_the_unique_top_vote_getter_and_none_for_ties_or_no_votes(client, make_scripted_game):
     host, people, slots = voting(make_scripted_game, client)
     a, b, c = people
-    nobody = voting(make_scripted_game, client)       # 투표가 하나도 없는 별도 게임
-    assert result(client, nobody[0]) == "구속 없음"
     vote(client, a, slots[c.number])
     vote(client, b, slots[c.number])
     vote(client, c, slots[a.number])
@@ -115,59 +113,36 @@ def test_result_is_the_unique_top_vote_getter_and_none_for_ties_or_no_votes(clie
     assert result(client, host) == name                                                  # 2표 대 1표
 
 
-def test_tie_without_revote_rule_means_no_arrest(client, make_scripted_game):
+def test_tie_always_revotes_until_one_candidate_leads(client, make_scripted_game):
     host, people, slots = voting(make_scripted_game, client)
     a, b, c = people
-    vote(client, a, slots[b.number])
-    vote(client, b, slots[c.number])
-    vote(client, c, slots[a.number])                                                    # 1-1-1
-    assert block(state(client, a).json(), "투표 완료")["완료"] == 3                       # 기본 동률 규칙은 구속 없음: 다시 투표하지 않는다
-    assert result(client, host) == "구속 없음"
-
-
-def test_partial_votes_can_be_advanced_by_the_host_and_still_count(client, make_scripted_game):
-    host, people, slots = voting(make_scripted_game, client)
-    a, b, c = people
-    vote(client, a, slots[c.number])                                                    # 한 명만 투표했다
-    assert advance(client, host).status_code == 200                                      # 방장은 그대로 넘길 수 있다
-    assert block(state(client, host).json(), "결과")["내용"] != "구속 없음"
-
-
-def test_revote_on_tie_resets_votes_and_notifies_everyone(client, make_scripted_game):
-    host, people, slots = voting(make_scripted_game, client, settings={"동률": "재투표", "재투표한도": 1})
-    a, b, c = people
-    vote(client, a, slots[b.number])
-    vote(client, b, slots[c.number])
-    vote(client, c, slots[a.number])                                                    # 1-1-1 동률 → 재투표
-    for who in people:
-        view = state(client, who).json()
-        assert block(view, "투표 완료")["완료"] == 0 and block(view, "최종 투표")["내_선택"] is None
-        assert block(view, "최종 투표")["질문"].endswith("(2차)")
-        assert view["알림"][-1]["글"] == "동률입니다. 재투표를 진행합니다."
-    vote(client, a, slots[b.number])
-    vote(client, b, slots[c.number])
-    vote(client, c, slots[a.number])                                                    # 또 동률이지만 한도(1)를 넘어 더 하지 않는다
-    assert block(state(client, a).json(), "투표 완료")["완료"] == 3
-    assert result(client, host) == "구속 없음"
-
-
-def test_revote_limit_zero_repeats_until_the_tie_breaks(client, make_scripted_game):
-    host, people, slots = voting(make_scripted_game, client, settings={"동률": "재투표", "재투표한도": 0})
-    a, b, c = people
-    for _ in range(3):                                                                   # 동률이 풀릴 때까지 몇 번이든
+    for round_no in (2, 3):                                                              # 동률이 풀릴 때까지 몇 번이든
         vote(client, a, slots[b.number])
         vote(client, b, slots[c.number])
-        vote(client, c, slots[a.number])
-        assert block(state(client, a).json(), "투표 완료")["완료"] == 0
+        vote(client, c, slots[a.number])                                                 # 1-1-1 동률 → 재투표
+        for who in people:
+            view = state(client, who).json()
+            assert block(view, "투표 완료")["완료"] == 0 and block(view, "최종 투표")["내_선택"] is None
+            assert block(view, "최종 투표")["질문"].endswith(f"({round_no}차)")
+            assert view["알림"][-1]["글"] == "동률입니다. 재투표를 진행합니다."
     vote(client, a, slots[c.number])
     vote(client, b, slots[c.number])
     vote(client, c, slots[a.number])
     assert block(state(client, a).json(), "투표 완료")["완료"] == 3 and result(client, host) != "구속 없음"
 
 
+def test_host_can_still_advance_with_missing_votes_and_the_result_follows_what_was_cast(client, make_scripted_game):
+    """모두 투표하는 것이 전제이지만, 오지 않는 사람이 있어도 방장이 넘기면 그 시점의 표로 결과가 난다."""
+    host, people, slots = voting(make_scripted_game, client)
+    a, b, c = people
+    assert result(client, voting(make_scripted_game, client)[0]) == "구속 없음"         # 아무도 투표하지 않은 별도 게임
+    vote(client, a, slots[c.number])                                                    # 한 명만 투표했다
+    assert result(client, host) != "구속 없음"
+
+
 @pytest.mark.parametrize("scope, expected", [("동률자만", 2), ("전체", 4)])
 def test_revote_candidates_are_the_tied_ones_or_everyone(client, make_scripted_game, scope, expected):
-    host, people, slots = voting(make_scripted_game, client, settings={"동률": "재투표", "재투표후보": scope}, players=4)
+    host, people, slots = voting(make_scripted_game, client, settings={"재투표후보": scope}, players=4)
     p0, p1, p2, p3 = people
     vote(client, p0, slots[p1.number])
     vote(client, p1, slots[p0.number])
@@ -265,7 +240,7 @@ def test_unknown_text_option_is_refused_and_other_option_cannot_be_voted_when_no
 
 
 def test_tie_between_a_character_and_an_option_can_trigger_revote_with_both_as_candidates(client, make_scripted_game):
-    host, people, slots = kinds(make_scripted_game, client, settings={"후보": [1, 2, 3, "사고사"], "동률": "재투표"}, players=4)
+    host, people, slots = kinds(make_scripted_game, client, settings={"후보": [1, 2, 3, "사고사"]}, players=4)
     p0, p1, p2, p3 = people
     vote(client, p0, "사고사")
     vote(client, p1, "사고사")
