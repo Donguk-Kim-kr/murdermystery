@@ -693,10 +693,15 @@ describe("진행 탭", () => {
       expect(card.queryByRole("group", { name: "피해자의 질문" })).not.toBeInTheDocument();          // NPC 는 답하지 않는다
       expect(card.getByLabelText("집사 질문")).toHaveValue("기존 질문");
       await userEvent.type(card.getByLabelText("의사 질문"), "비밀을 알았습니까?");
-      await userEvent.type(card.getByLabelText("의사 선택지"), "예, 아니오");
+      await userEvent.type(card.getByLabelText("의사 새 선택지"), "예, 하지만 늦게{Enter}");              // 쉼표가 들어가도 하나의 선택지이다
+      await userEvent.type(card.getByLabelText("의사 새 선택지"), "아니오");
+      await userEvent.click(card.getByRole("button", { name: "의사 선택지 추가" }));
+      await userEvent.type(card.getByLabelText("의사 새 선택지"), "삭제할 것{Enter}");
+      await userEvent.click(card.getByRole("button", { name: "의사 선택지 삭제할 것 삭제" }));
+      expect(card.getByText("선택지 없음(글로 답함)")).toBeInTheDocument();                              // 집사는 선택지가 없다
       await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
       expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({
-        설정: { 질문: { 1: { 질문: "비밀을 알았습니까?", 선택: ["예", "아니오"] }, 2: "기존 질문" } },
+        설정: { 질문: { 1: { 질문: "비밀을 알았습니까?", 선택: ["예, 하지만 늦게", "아니오"] }, 2: "기존 질문" } },
       });
     });
 
