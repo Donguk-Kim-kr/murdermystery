@@ -464,6 +464,33 @@ describe("진행 탭", () => {
       expect(screen.queryByLabelText("진행단계 카드 조사")).not.toBeInTheDocument();
     });
 
+    it("전체 선택은 이름마다 가장 높은 버전만 고르고, 검색 중이면 보이는 것만, 다시 누르면 해제한다", async () => {
+      routes["GET /api/library/phases"] = () => json([
+        { 번호: 5, 이름: "조사", 버전: 2, 설명: null, 변경내역: null, 공통: false },
+        { 번호: 4, 이름: "조사", 버전: 1, 설명: null, 변경내역: null, 공통: false },
+        { 번호: 6, 이름: "토론", 버전: 1, 설명: null, 변경내역: null, 공통: false },
+        { 번호: 7, 이름: "밀담", 버전: 1, 설명: null, 변경내역: null, 공통: false },
+      ]);
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("button", { name: "진행카드 불러오기" }));
+      const dialog = within(screen.getByRole("dialog", { name: "진행카드 불러오기" }));
+      await userEvent.type(dialog.getByLabelText("이름 검색"), "토");
+      await userEvent.click(dialog.getByRole("button", { name: "전체 선택" }));
+      expect(dialog.getByRole("button", { name: "토론 v1" })).toHaveAttribute("aria-pressed", "true");
+      expect(dialog.getByRole("button", { name: "전체 해제" })).toBeInTheDocument();
+      await userEvent.clear(dialog.getByLabelText("이름 검색"));
+      expect(dialog.getByRole("button", { name: "밀담 v1" })).toHaveAttribute("aria-pressed", "false");   // 검색에서 빠진 것은 그대로
+      await userEvent.click(dialog.getByRole("button", { name: "전체 선택" }));
+      expect(JSON.parse(localStorage.getItem("mm.tray.7")!).steps.sort()).toEqual([5, 6, 7]);                // 조사는 v2(5)만, 옛 버전(4)은 빠진다
+      await userEvent.click(dialog.getByRole("button", { name: "전체 해제" }));
+      expect(JSON.parse(localStorage.getItem("mm.tray.7")!).steps).toEqual([]);
+      await userEvent.click(dialog.getByRole("tab", { name: "기믹" }));
+      expect(dialog.getByRole("button", { name: /전체/ })).toBeDisabled();                                  // 기믹이 없으면 누를 수 없다
+      expect(dialog.queryByRole("button", { name: "닫기" })).not.toBeInTheDocument();                        // 위쪽 닫기는 없고
+      await userEvent.click(dialog.getByRole("button", { name: "확인" }));                                    // 아래 가운데의 확인으로 닫는다
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
     it("라이브러리에 진행단계가 없으면 만들러 가는 길을 안내한다", async () => {
       routes["GET /api/library/phases"] = () => json([]);
       renderApp("/works/7?tab=phases");

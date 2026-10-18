@@ -78,7 +78,10 @@ function useTray(workId: number) {
   };
   const toggle = (kind: "steps" | "gimmicks", id: number) =>
     update({ ...tray, [kind]: tray[kind].includes(id) ? tray[kind].filter((x) => x !== id) : [...tray[kind], id] });
-  return { tray, toggle };
+  /** 여러 개를 한꺼번에 선택하거나(on) 해제한다. */
+  const setMany = (kind: "steps" | "gimmicks", ids: number[], on: boolean) =>
+    update({ ...tray, [kind]: on ? [...tray[kind], ...ids.filter((x) => !tray[kind].includes(x))] : tray[kind].filter((x) => !ids.includes(x)) });
+  return { tray, toggle, setMany };
 }
 
 function PhasesBody({ workId, ws, phaseItems, gimmickItems }: {
@@ -94,7 +97,7 @@ function PhasesBody({ workId, ws, phaseItems, gimmickItems }: {
   const [vertical, setVertical] = useState(false);
   const [loader, setLoader] = useState(false);
   const flowRef = useRef<HTMLOListElement>(null);
-  const { tray, toggle } = useTray(workId);
+  const { tray, toggle, setMany } = useTray(workId);
   const sel = phases.findIndex((p) => p.순서 === selected);
 
   /** 서버 호출. 실패하면 메시지를 보여 주고 undefined 를 돌려준다. */
@@ -213,7 +216,7 @@ function PhasesBody({ workId, ws, phaseItems, gimmickItems }: {
         onOpenLoader={() => setLoader(true)} onUnload={toggle} />
       {error && <p role="alert" className="error">{error}</p>}
       {vertical && <VerticalView ws={ws} onClose={() => setVertical(false)} />}
-      {loader && <CardLoader phaseItems={phaseItems} gimmickItems={gimmickItems} tray={tray} onToggle={toggle} onClose={() => setLoader(false)} />}
+      {loader && <CardLoader phaseItems={phaseItems} gimmickItems={gimmickItems} tray={tray} onToggle={toggle} onSetMany={setMany} onClose={() => setLoader(false)} />}
     </section>
   );
 }
@@ -353,9 +356,10 @@ function TrayCard({ item, label, payload, press, onUnload }: {
 }
 
 /** 라이브러리의 진행단계·기믹을 골라 진행카드로 불러온다. 많아져도 찾을 수 있게 이름으로 검색한다. */
-function CardLoader({ phaseItems, gimmickItems, tray, onToggle, onClose }: {
+function CardLoader({ phaseItems, gimmickItems, tray, onToggle, onSetMany, onClose }: {
   phaseItems: LibraryItem[]; gimmickItems: LibraryItem[]; tray: { steps: number[]; gimmicks: number[] };
-  onToggle: (kind: "steps" | "gimmicks", id: number) => void; onClose: () => void;
+  onToggle: (kind: "steps" | "gimmicks", id: number) => void;
+  onSetMany: (kind: "steps" | "gimmicks", ids: number[], on: boolean) => void; onClose: () => void;
 }) {
   const [kind, setKind] = useState<"steps" | "gimmicks">("steps");
   const [query, setQuery] = useState("");
@@ -367,18 +371,22 @@ function CardLoader({ phaseItems, gimmickItems, tray, onToggle, onClose }: {
   }, [onClose]);
   const all = kind === "steps" ? phaseItems : gimmickItems;
   const shown = all.filter((i) => i.이름.includes(query.trim()));
+  // 전체 선택은 보이는 것 중 이름마다 가장 높은 버전만 고른다(옛 버전까지 한꺼번에 놓이지 않게). 검색 중이면 보이는 것들만 본다.
+  const newest = shown.filter((i) => !shown.some((x) => x.이름 === i.이름 && x.버전 > i.버전));
+  const allLoaded = newest.length > 0 && newest.every((i) => tray[kind].includes(i.번호));
   return (
     <div className="overlay" onClick={onClose}>
       <div className="dialog" role="dialog" aria-modal="true" aria-label="진행카드 불러오기" onClick={(e) => { e.stopPropagation(); setTipOpen(null); }}>
-        <div className="row">
-          <h2>진행카드 불러오기</h2>
-          <button type="button" className="small secondary" onClick={onClose}>닫기</button>
-        </div>
+        <h2>진행카드 불러오기</h2>
         <div className="row start" role="tablist" aria-label="종류">
           <button type="button" role="tab" aria-selected={kind === "steps"} className={`tab${kind === "steps" ? " active" : ""}`}
             onClick={() => setKind("steps")}>진행단계</button>
           <button type="button" role="tab" aria-selected={kind === "gimmicks"} className={`tab${kind === "gimmicks" ? " active" : ""}`}
             onClick={() => setKind("gimmicks")}>기믹</button>
+          <button type="button" className="small secondary push-right" disabled={newest.length === 0}
+            onClick={() => onSetMany(kind, newest.map((i) => i.번호), !allLoaded)}>
+            {allLoaded ? "전체 해제" : "전체 선택"}
+          </button>
         </div>
         <input aria-label="이름 검색" placeholder="이름 검색" value={query} onChange={(e) => setQuery(e.target.value)} />
         {all.length === 0 && (
@@ -415,6 +423,9 @@ function CardLoader({ phaseItems, gimmickItems, tray, onToggle, onClose }: {
             );
           })}
         </ul>
+        <div className="dialog-footer">
+          <button type="button" onClick={onClose}>확인</button>
+        </div>
       </div>
     </div>
   );
