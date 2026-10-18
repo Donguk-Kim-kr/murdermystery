@@ -339,9 +339,17 @@ class Agent:
     def _answer(self, qid: str, value: Any, what: str) -> bool:
         res = self._post("/api/game/me/answer", {"질문ID": qid, "값": value})
         ok = res.status_code == 200
-        self.memory.append(f"{what}: " + ("성공" if ok else f"실패 ({_detail(res)})"))
-        self.log(f"[{self.nickname}] {what}: " + ("성공" if ok else f"실패 ({_detail(res)})"))
-        return ok
+        outcome = "성공" if ok else f"실패 ({_detail(res)})"
+        if ok:                                           # 서버가 받아들였어도 카드가 거절한 일은 알림으로 온다(예: 이미 다른 사람이 고른 인물)
+            try:
+                refused = [n["글"] for n in res.json().get("알림", []) if n["번호"] > self.seen_notice]
+            except Exception:
+                refused = []
+            if refused:
+                outcome = "받아들여지지 않음 → " + " / ".join(refused)
+        self.memory.append(f"{what}: {outcome}")
+        self.log(f"[{self.nickname}] {what}: {outcome}")
+        return ok and outcome == "성공"
 
     def _act(self, decided: list[dict[str, Any]], actions: list[dict[str, Any]], chat: dict[str, Any]) -> str:
         done = []

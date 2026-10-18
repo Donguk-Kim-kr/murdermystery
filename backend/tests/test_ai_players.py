@@ -210,3 +210,28 @@ def test_claude_brain_tallies_token_usage_every_ten_calls():
     for _ in range(10):
         brain.decide("s", "u")
     assert brain.usage == {"호출": 10, "입력": 40000, "출력": 3000, "캐시읽기": 0} and "사용량" in logged[-1]
+
+
+def test_a_choice_the_card_refuses_is_reported_as_not_accepted_not_as_success(client, make_scripted_game):
+    people = game(client, make_scripted_game)
+    host, clock = people[0], Clock()
+    run(agents_for(client, people, clock), clock, 2)
+    advance(client, host)                                                               # 캐릭터 선택
+    slot = block(state(client, host).json(), "캐릭터 선택")["항목"][0]["값"]
+    logs = []
+
+    class Same:
+        def decide(self, system, situation):
+            qid = _json_after(situation, "## 지금 할 수 있는 일")[0]["질문ID"]
+            return [{"tool": "choose", "input": {"question_id": qid, "value": str(slot)}}]
+
+    first = Agent("AI 1", client, people[0].headers, Same(), log=logs.append, clock=clock, think_seconds=0, nudge_seconds=0)
+    second = Agent("AI 2", client, people[1].headers, Same(), log=logs.append, clock=clock, think_seconds=0, nudge_seconds=0)
+    clock.now += 10
+    assert first.tick() == "choose"
+    # 둘째는 첫째가 고르기 전에 목록을 받아 같은 인물을 고른다(동시 선택): 서버는 선착순으로 한 명만 배정한다
+    second.chat_after = 0
+    qid = block(state(client, people[1]).json(), "캐릭터 선택")["질문ID"]
+    assert second._answer(qid, slot, "'캐릭터 선택'에서 같은 인물 선택") is False
+    assert "받아들여지지 않음" in logs[-1] and "이미 다른 사람이 고른 인물" in logs[-1]
+    assert state(client, people[1]).json()["나"]["인물_순서"] is None
