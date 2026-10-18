@@ -631,8 +631,6 @@ body.flow-dragging, body.flow-dragging * { cursor: grabbing !important; user-sel
 .push-right { margin-left: auto; }
 .investigation-place { display: grid; gap: 0.35rem; margin-bottom: 0.6rem; }
 .investigation-place h4 { margin: 0; font-size: 0.9rem; color: var(--muted); }
-.npc-kind { border: 0; padding: 0; margin: 0; display: grid; gap: 0.45rem; }
-.npc-kind legend { padding: 0; font-weight: 600; margin-bottom: 0.25rem; }
 .pick-intro { display: block; margin-top: 0.25rem; font-size: 0.8125rem; font-weight: 400; color: var(--muted); text-align: left; white-space: pre-wrap; }
 /* 팝업 맨 아래 가운데의 확인 버튼: 목록이 길어 스크롤해도 아래에 붙어 있다 */
 .dialog-footer { position: sticky; bottom: -1.2rem; margin: 0 -1.2rem -1.2rem; padding: 0.7rem 1.2rem; display: flex; justify-content: center; background: var(--surface); border-top: 1px solid var(--border); }

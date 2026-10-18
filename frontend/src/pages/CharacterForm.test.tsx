@@ -104,28 +104,23 @@ describe("서사 입력", () => {
 });
 
 describe("인물 종류와 소개", () => {
-  it("NPC가 될 수 있는 인물을 고르면 순위를 입력하고, 항상 NPC로 바꾸면 순위는 보내지 않는다", async () => {
+  it("인물 종류 입력칸은 없고, 새 인물은 플레이하는 인물로 저장한다", async () => {
     renderForm();
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("이름"), "집사");
-    expect(screen.getByLabelText("플레이하는 인물")).toBeChecked();
-    expect(screen.queryByLabelText("NPC 순위")).not.toBeInTheDocument();
-    await user.click(screen.getByLabelText("NPC가 될 수 있는 인물"));
-    await user.type(screen.getByLabelText(/NPC 순위/), "2");
+    expect(screen.queryByText("인물 종류")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/NPC/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "저장" }));
     await waitFor(() => expect(sent).toHaveLength(1));
-    expect(sent[0].body).toMatchObject({ NPC: false, NPC순위: 2 });
-    await user.click(screen.getByLabelText(/항상 NPC/));
-    await user.click(screen.getByRole("button", { name: "저장" }));
-    await waitFor(() => expect(sent).toHaveLength(2));
-    expect(sent[1].body).toMatchObject({ NPC: true, NPC순위: null });
+    expect(sent[0].body).toMatchObject({ NPC: false, NPC순위: null });
   });
 
-  it("저장된 순위가 있는 인물은 NPC가 될 수 있는 인물로 열리고, 소개는 두 칸이다", () => {
+  it("이미 정해진 NPC 값은 입력칸이 없어도 고쳐 저장할 때 그대로 보내고, 소개는 두 칸이다", async () => {
     renderForm({ ...saved([]), NPC순위: 3, 소개: "자기소개", 캐릭터설명: "선택 화면" } as unknown as Character);
-    expect(screen.getByLabelText("NPC가 될 수 있는 인물")).toBeChecked();
-    expect(screen.getByLabelText(/NPC 순위/)).toHaveValue(3);
     expect(screen.getByLabelText("자기소개 멘트")).toHaveValue("자기소개");
     expect(screen.getByLabelText("캐릭터 설명")).toHaveValue("선택 화면");
+    await userEvent.click(screen.getByRole("button", { name: "저장" }));
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0].body).toMatchObject({ NPC: false, NPC순위: 3 });
   });
 });

@@ -52,9 +52,9 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
     Object.fromEntries(TEXT_FIELDS.map((f) => [f, character?.[f] ?? ""])),
   );
   const [culprit, setCulprit] = useState(character?.범인 ?? false);
-  // 인물 종류: 플레이하는 인물 / NPC 가 될 수 있는 인물(인원이 모자라면 순위대로 NPC 가 된다) / 항상 NPC(예: 시작부터 죽은 피해자)
-  const [kind, setKind] = useState<"player" | "maybe" | "npc">(character?.NPC ? "npc" : character?.NPC순위 != null ? "maybe" : "player");
-  const [rank, setRank] = useState(character?.NPC순위?.toString() ?? "");
+  // 인물 종류(플레이/NPC 가 될 수 있는 인물/항상 NPC) 입력칸은 지금 두지 않는다(사용자 2026-10-18). 새 인물은 플레이하는 인물이고, 이미 정해진 값은 고쳐도 그대로 둔다.
+  const npc = character?.NPC ?? false;
+  const npcRank = character?.NPC순위 ?? null;
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -94,8 +94,8 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
       비밀: orNull(texts.비밀),
       목표: orNull(texts.목표),
       범인: culprit,
-      NPC: kind === "npc",
-      NPC순위: kind === "maybe" ? (rank.trim() === "" ? null : Number(rank)) : null,
+      NPC: npc,
+      NPC순위: npcRank,
     };
     const params = { params: { path: { work_id: workId } } };
     const res = character
@@ -176,30 +176,6 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
           범인
         </label>
       </div>
-      <fieldset className="npc-kind">
-        <legend>인물 종류</legend>
-        <label className="check">
-          <input type="radio" name="npc-kind" checked={kind === "player"} onChange={() => setKind("player")} />
-          플레이하는 인물
-        </label>
-        <label className="check">
-          <input type="radio" name="npc-kind" checked={kind === "maybe"} onChange={() => setKind("maybe")} />
-          NPC가 될 수 있는 인물
-        </label>
-        {kind === "maybe" && (
-          <label className="inline">
-            NPC 순위
-            <input type="number" min={1} max={100} value={rank} onChange={(e) => setRank(e.target.value)} required />
-            <span className="muted">
-              인원이 모자랄 때 숫자가 작은 인물부터 NPC가 됩니다(예: 8인 게임을 7인으로 하면 순위 1, 6인으로 하면 순위 1과 2). 순위는 인물마다 달라야 합니다
-            </span>
-          </label>
-        )}
-        <label className="check">
-          <input type="radio" name="npc-kind" checked={kind === "npc"} onChange={() => setKind("npc")} />
-          항상 NPC (플레이할 수 없는 인물, 예: 시작부터 죽은 피해자)
-        </label>
-      </fieldset>
       {error && <p role="alert" className="error">{error}</p>}
       <div className="row start">
         <button type="submit" disabled={busy}>저장</button>
