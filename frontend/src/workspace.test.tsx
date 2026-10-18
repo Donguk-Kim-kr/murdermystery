@@ -236,21 +236,102 @@ describe("작업공간 탭", () => {
     expect(await sent("POST /api/works/7/content/clues")[0].req.json()).toEqual({ 이름: "편지", 공개이름: null, 인물_순서: 1 });
   });
 
-  it("JSON 칸이 잘못되면 보내지 않고 안내한다, 서버 오류는 그대로 보여 준다", async () => {
+  it("서버 오류는 그대로 보여 준다", async () => {
     routes["POST /api/works/7/content/endings"] = () => json({ detail: "내용: 비울 수 없는 항목입니다" }, 422);
     renderApp("/works/7?tab=endings");
     await userEvent.click(await screen.findByRole("button", { name: "엔딩 분기 추가" }));
     const form = screen.getByRole("form", { name: "엔딩 분기 추가" });
-    const cond = within(form).getByLabelText("조건");
-    await userEvent.clear(cond);
-    await userEvent.type(cond, "not json");
-    await userEvent.click(within(form).getByRole("button", { name: "저장" }));
-    expect(await within(form).findByRole("alert")).toHaveTextContent("JSON 형식");
-    expect(sent("POST /api/works/7/content/endings")).toHaveLength(0);
-    await userEvent.clear(cond);
-    await userEvent.type(cond, "{{}");
     await userEvent.click(within(form).getByRole("button", { name: "저장" }));
     expect(await within(form).findByRole("alert")).toHaveTextContent("내용: 비울 수 없는 항목입니다");
+    expect(within(form).queryByLabelText("조건", { selector: "textarea" })).not.toBeInTheDocument();      // 식을 직접 쓰는 칸은 없다
+  });
+
+  describe("엔딩 조건 고르기", () => {
+    const voteDef = {
+      번호: 5, 이름: "최종 투표", 버전: 1, 설명: "d", 삭제됨: false, 사용설정: ["후보"],
+      설정정의: [{ 키: "후보", 이름: "투표 후보", 종류: "후보" }],
+      조건정의: [
+        { 이름: "범인을 검거했다", 식: "결과_인물('최종 투표').범인", 인자: [] },
+        { 이름: "이 인물이 가장 많은 표를 받았다", 식: "결과_인물('최종 투표').순서 == {인물}", 인자: [{ 키: "인물", 이름: "인물", 종류: "인물" }] },
+        { 이름: "인물이 아닌 후보가 가장 많은 표를 받았다", 식: "결과_기타('최종 투표') == {후보}", 인자: [{ 키: "후보", 이름: "후보", 종류: "기타후보", 설정: "후보" }] },
+      ],
+    };
+    const questionDef = {
+      번호: 6, 이름: "개인 질문", 버전: 1, 설명: "d", 삭제됨: false, 사용설정: ["질문", "이름"],
+      설정정의: [{ 키: "질문", 이름: "개인 질문", 종류: "질문" }, { 키: "이름", 이름: "이 카드의 이름", 종류: "글", 기본: "개인 질문" }],
+      조건정의: [{
+        이름: "이 인물이 이렇게 답했다", 식: "변수('{@이름}:{인물}') == {답}",
+        인자: [{ 키: "인물", 이름: "인물", 종류: "질문인물", 설정: "질문" }, { 키: "답", 이름: "답", 종류: "질문답", 인물: "인물", 설정: "질문" }],
+      }],
+    };
+    const setup = () => {
+      bundle.characters = [
+        { 순서: 1, 이름: "의사", 직업: null, NPC: false, 범인: true, 서사_부분수: 1 },
+        { 순서: 2, 이름: "집사", 직업: null, NPC: false, 범인: false, 서사_부분수: 1 },
+      ];
+      bundle.phases = [{ 순서: 1, 이름: "투표", 표시이름: "투표", 진행시간: 10 }, { 순서: 2, 이름: "질문", 표시이름: "질문", 진행시간: 10 }];
+      bundle["phase-steps"] = [
+        { 번호: 9, 진행순서_순서: 1, 진행단계_번호: 5, 설정: { 후보: [1, 2, "사고사"] }, 표시이름: "최종 투표" },
+        { 번호: 10, 진행순서_순서: 2, 진행단계_번호: 6, 설정: { 질문: { 2: { 질문: "알았습니까?", 선택: ["예", "아니오"] } } }, 표시이름: "개인 질문" },
+      ];
+      bundle.library = { phases: { 5: voteDef, 6: questionDef }, gimmicks: {} };
+      routes["POST /api/works/7/content/endings"] = () => json({ 순서: 1 }, 201);
+    };
+
+    it("조건 항목을 고르고 빈칸을 채우면 식이 만들어져 저장된다", async () => {
+      setup();
+      renderApp("/works/7?tab=endings");
+      await userEvent.click(await screen.findByRole("button", { name: "엔딩 분기 추가" }));
+      const form = within(screen.getByRole("form", { name: "엔딩 분기 추가" }));
+      await userEvent.type(form.getByLabelText("이름"), "검거");
+      await userEvent.type(form.getByLabelText("내용"), "범인을 잡았다");
+      expect(form.getByText("조건이 없으면 항상 나옵니다.")).toBeInTheDocument();
+      await userEvent.click(form.getByRole("button", { name: "조건 더하기" }));
+      await userEvent.selectOptions(form.getByLabelText("조건 1"), "범인을 검거했다");
+      await userEvent.click(form.getByRole("button", { name: "조건 더하기" }));
+      await userEvent.selectOptions(form.getByLabelText("조건 2 카드"), "10");
+      await userEvent.selectOptions(form.getByLabelText("조건 2"), "이 인물이 이렇게 답했다");
+      await userEvent.selectOptions(form.getByLabelText("조건 2 인물"), "2");
+      await userEvent.selectOptions(form.getByLabelText("조건 2 답"), "예");
+      await userEvent.click(form.getByRole("button", { name: "저장" }));
+      await waitFor(() => expect(sent("POST /api/works/7/content/endings")).toHaveLength(1));
+      const body = await sent("POST /api/works/7/content/endings")[0].req.json();
+      expect(body.조건.식).toBe("(결과_인물('최종 투표').범인) and (변수('개인 질문:2') == \"예\")");
+      expect(body.조건.구성).toEqual([
+        { 카드: 9, 조건: "범인을 검거했다", 인자: {} },
+        { 카드: 10, 조건: "이 인물이 이렇게 답했다", 인자: { 인물: 2, 답: "예" } },
+      ]);
+    });
+
+    it("빈칸이 남았으면 저장하지 않고, 인물이 아닌 후보는 카드 설정에서 가져온다", async () => {
+      setup();
+      renderApp("/works/7?tab=endings");
+      await userEvent.click(await screen.findByRole("button", { name: "엔딩 분기 추가" }));
+      const form = within(screen.getByRole("form", { name: "엔딩 분기 추가" }));
+      await userEvent.type(form.getByLabelText("이름"), "사고사");
+      await userEvent.type(form.getByLabelText("내용"), "사고였다");
+      await userEvent.click(form.getByRole("button", { name: "조건 더하기" }));
+      await userEvent.selectOptions(form.getByLabelText("조건 1"), "인물이 아닌 후보가 가장 많은 표를 받았다");
+      expect(form.getByRole("option", { name: "사고사" })).toBeInTheDocument();
+      await userEvent.click(form.getByRole("button", { name: "저장" }));
+      expect(await form.findByRole("alert")).toHaveTextContent("조건 고르기를 끝내 주세요");
+      expect(sent("POST /api/works/7/content/endings")).toHaveLength(0);
+      await userEvent.selectOptions(form.getByLabelText("조건 1 후보"), "사고사");
+      await userEvent.click(form.getByRole("button", { name: "저장" }));
+      await waitFor(() => expect(sent("POST /api/works/7/content/endings")).toHaveLength(1));
+      expect((await sent("POST /api/works/7/content/endings")[0].req.json()).조건.식).toBe("(결과_기타('최종 투표') == \"사고사\")");
+    });
+
+    it("식으로 저장된 옛 조건은 코드로 쓴 조건이라고만 보이고, 지우면 고르는 방식이 된다", async () => {
+      setup();
+      bundle.endings = [{ 순서: 1, 이름: "옛 엔딩", 내용: "x", 조건: { 식: "변수('a') == 1" } }];
+      renderApp("/works/7?tab=endings");
+      await userEvent.click(await screen.findByRole("button", { name: "편집" }));
+      const form = within(screen.getByRole("form", { name: "엔딩 분기 수정" }));
+      expect(form.getByText("변수('a') == 1")).toBeInTheDocument();
+      await userEvent.click(form.getByRole("button", { name: /고르는 방식으로 바꾸기/ }));
+      expect(form.getByText("조건이 없으면 항상 나옵니다.")).toBeInTheDocument();
+    });
   });
 
   it("항목을 삭제하면 확인 후 서버에 알린다", async () => {
@@ -770,6 +851,12 @@ describe("진행 탭", () => {
       twoPhases();
       (bundle.library as { phases: Record<string, object> }).phases[5] = {
         번호: 5, 이름: "최종 투표", 버전: 1, 설명: "d", 삭제됨: false, 사용설정: ["동률", "재투표한도", "대상", "횟수"],
+        설정정의: [
+          { 키: "동률", 이름: "투표가 동률일 때", 종류: "선택", 기본: "구속없음", 선택: [["구속없음", "결과 없음"], ["재투표", "재투표"]] },
+          { 키: "재투표한도", 이름: "재투표 한도(0은 한도 없음)", 종류: "숫자", 기본: 1, 최소: 0 },
+          { 키: "대상", 이름: "능력의 지목 대상", 종류: "여러선택", 기본: ["인물"], 선택: [["인물", "인물"], ["장소", "장소"], ["단서", "단서"]] },
+          { 키: "횟수", 이름: "조사 횟수(1인당)", 종류: "숫자", 기본: 3, 최소: 1 },
+        ],
       };
       renderApp("/works/7?tab=phases");
       await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));

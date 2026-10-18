@@ -458,6 +458,21 @@ def phase_display_names(phases: list[dict], cards: list[dict]) -> dict[int, str 
     return out
 
 
+def declared(rule: Any) -> dict | None:
+    """진행단계 스크립트가 정한 제작 화면(설정 칸과 조건 항목). 정하지 않았거나 읽을 수 없으면 None."""
+    from .cards import known_names
+    from .declare import declarations
+    from .script import ScriptError
+
+    source = rule.get("스크립트") if isinstance(rule, dict) else None
+    if not isinstance(source, str):
+        return None
+    try:
+        return declarations(source, known_names())
+    except ScriptError:
+        return None
+
+
 KNOWN_SETTINGS = ("개인서사공개", "내용유지", "후보", "질문", "횟수", "보여주기허용", "양도허용", "동률", "재투표후보", "재투표한도", "대상", "안내")
 
 
@@ -497,8 +512,12 @@ def content_bundle(work_id: int, conn: Conn, me: CurrentUser) -> dict:
         },
     }
     for row in out["library"]["phases"].values():
-        # 스크립트가 읽는 카드 설정의 이름. 설정 화면이 어떤 입력을 보여 줄지 정하는 데 쓴다.
-        row["사용설정"] = used_settings(row.pop("규칙"))
+        # 제작 화면: 스크립트가 설정정의·조건정의로 정한 입력칸과 조건. 없으면 스크립트가 글자로 가리키는 설정 이름만 쓴다.
+        rule = row.pop("규칙")
+        decl = declared(rule)
+        row["설정정의"] = decl["설정"] if decl else None
+        row["조건정의"] = decl["조건"] if decl else []
+        row["사용설정"] = [s["키"] for s in decl["설정"]] if decl else used_settings(rule)
     names = {n: row["이름"] for n, row in out["library"]["phases"].items()}
     shown = card_display_names(out["phase-steps"], names)
     for card in out["phase-steps"]:

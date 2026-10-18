@@ -58,6 +58,25 @@ def _invalid(message: str) -> HTTPException:
     return HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, message)
 
 
+def _check_declarations(rule: dict) -> None:
+    """스크립트가 설정정의·조건정의를 두었다면 그것이 올바른지 본다(스크립트 문법 오류는 여기서 막지 않는다. 확정 때 검사한다)."""
+    from .cards import known_names
+    from .declare import declarations
+    from .script import ScriptError, compile_source
+
+    source = rule.get("스크립트")
+    if not isinstance(source, str) or not source.strip():
+        return
+    try:
+        compile_source(source, known_names())
+    except ScriptError:
+        return
+    try:
+        declarations(source, known_names())
+    except ScriptError as err:
+        raise _invalid(f"설정정의·조건정의: {err.message}") from err
+
+
 def _text(body: dict, name: str, *, required: bool, max_len: int) -> str | None:
     value = body.get(name)
     if value is None or (isinstance(value, str) and value.strip() == ""):
@@ -119,6 +138,8 @@ def create_item(kind: str, conn: Conn, me: CurrentUser, body: dict[str, Any] = B
         if not isinstance(value, dict):
             raise _invalid(f"{col}: JSON 객체({{...}})로 입력해 주세요")
         contents[col] = Jsonb(value)
+    if kind == "phases":
+        _check_declarations(contents["규칙"].obj)
     common = body.get("공통", False)
     if not isinstance(common, bool):
         raise _invalid("공통: 켜짐/꺼짐으로 입력해 주세요")

@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { errorMessage, http } from "../api/client";
 import type { Hit } from "./flowDrag";
 import { useFlowDrag, type Payload } from "./useFlowDrag";
-import { rowsOf, useWorkspace, type LibraryRef, type Row, type Workspace } from "./workspace";
+import { rowsOf, useWorkspace, type LibraryRef, type Row, type SettingDef, type Workspace } from "./workspace";
 
 export interface LibraryItem {
   번호: number;
@@ -25,23 +25,8 @@ const STORY_PICKS = "개인서사공개";
 const CANDIDATES = "후보";
 const QUESTIONS = "질문";
 
-/** 입력칸·선택지로 정하는 단순 설정. 스크립트가 읽는 것만 보이고, 기본값과 같으면 저장하지 않는다(비우면 정의의 기본값). */
-type SimpleSetting =
-  | { key: string; label: string; kind: "number"; def: number; min: number; help?: string }
-  | { key: string; label: string; kind: "select"; def: string; options: [string, string][]; help?: string }
-  | { key: string; label: string; kind: "bool"; def: boolean; help?: string }
-  | { key: string; label: string; kind: "multi"; def: string[]; options: string[]; help?: string }
-  | { key: string; label: string; kind: "text"; help?: string };
-const SIMPLE_SETTINGS: SimpleSetting[] = [
-  { key: "횟수", label: "조사 횟수(1인당)", kind: "number", def: 3, min: 1, help: "모두 같은 횟수만큼 한 번에 하나씩 조사합니다" },
-  { key: "보여주기허용", label: "단서 보여 주기 허용", kind: "bool", def: true },
-  { key: "양도허용", label: "단서 양도 허용", kind: "bool", def: true },
-  { key: "동률", label: "투표가 동률일 때", kind: "select", def: "구속없음", options: [["구속없음", "결과 없음(구속 없음)"], ["재투표", "재투표"]] },
-  { key: "재투표후보", label: "재투표 후보", kind: "select", def: "동률자만", options: [["동률자만", "동률인 후보만"], ["전체", "처음 후보 전체"]], help: "투표가 동률일 때의 처리가 재투표일 때만 쓰입니다" },
-  { key: "재투표한도", label: "재투표 한도(0은 한도 없음)", kind: "number", def: 1, min: 0 },
-  { key: "대상", label: "능력의 지목 대상", kind: "multi", def: ["인물"], options: ["인물", "장소", "단서"], help: "고른 종류의 것들이 후보로 나옵니다. 쓰지 않음은 항상 있습니다" },
-  { key: "안내", label: "안내 문구", kind: "text", help: "비우면 기본 문구를 보여 줍니다" },
-];
+/** 스크립트가 설정정의로 정한 입력칸 중 이 화면이 직접 그리는 것들(서사·후보·질문은 따로 전용 입력이 있다). */
+const GENERIC_KINDS = ["숫자", "선택", "켜짐", "글", "여러선택"];
 
 /**
  * 게임 흐름 화면: 맨 위에 페이즈 카드가 왼쪽에서 오른쪽으로 놓이고, 아래에 진행카드(불러온 진행단계·기믹)가 있다.
@@ -584,7 +569,7 @@ function AttachedCards({ title, empty, rows, lib, libCol, resource, call, charac
             </button>
           </div>
           <SettingsEditor key={`${selected}:${JSON.stringify(current.설정 ?? null)}`} resource={resource} id={current[idCol] as number}
-            value={current.설정} showTab={isCard} call={call} characters={characters} settingKeys={ref?.사용설정 ?? []} />
+            value={current.설정} showTab={isCard} call={call} characters={characters} settingKeys={ref?.사용설정 ?? []} defs={ref?.설정정의 ?? []} />
         </div>
       )}
     </div>
@@ -598,20 +583,20 @@ const asObject = (v: unknown): Record<string, unknown> =>
  * 카드·기믹을 이 페이즈에 놓을 때만 적용하는 세부 설정. 비우면 정의의 기본값을 쓴다.
  * 카드에는 "내용 유지"(이 페이즈가 끝나도 내용을 남겨 계속 볼 수 있게 함)를 따로 보여 준다(기본: 남김). 상세 설명 글은 아직 두지 않는다. 나머지는 JSON 으로 직접 쓴다(내부 구조는 엔진 설계에서 정함).
  */
-function SettingsEditor({ resource, id, value, showTab, call, characters, settingKeys }: {
-  resource: string; id: number; value: unknown; showTab: boolean; call: Call; characters: Row[]; settingKeys: string[];
+function SettingsEditor({ resource, id, value, showTab, call, characters, settingKeys, defs }: {
+  resource: string; id: number; value: unknown; showTab: boolean; call: Call; characters: Row[]; settingKeys: string[]; defs: SettingDef[];
 }) {
   const current = asObject(value);
   const showPicks = settingKeys.includes(STORY_PICKS);
   const showCandidates = settingKeys.includes(CANDIDATES);
   const showQuestions = settingKeys.includes(QUESTIONS);
   const { [KEEP_TAB]: keepRaw, [STORY_PICKS]: picksRaw, [CANDIDATES]: candidatesRaw, [QUESTIONS]: questionsRaw, ...restAll } = current;
-  const simpleShown = SIMPLE_SETTINGS.filter((d) => settingKeys.includes(d.key));
+  const simpleShown = defs.filter((d) => GENERIC_KINDS.includes(d.종류));
   // 전용 입력으로 다루는 설정만 JSON 칸에서 뺀다(스크립트가 쓰지 않는 카드에서는 값을 그대로 둔다).
   const rest: Record<string, unknown> = { ...restAll };
-  for (const d of simpleShown) delete rest[d.key];
+  for (const d of simpleShown) delete rest[d.키];
   const [simple, setSimple] = useState<Record<string, unknown>>(() =>
-    Object.fromEntries(simpleShown.map((d) => [d.key, current[d.key] ?? ("def" in d ? d.def : "")])));
+    Object.fromEntries(simpleShown.map((d) => [d.키, current[d.키] ?? d.기본 ?? (d.종류 === "글" ? "" : null)])));
   if (!showPicks && picksRaw !== undefined) rest[STORY_PICKS] = picksRaw;
   if (!showCandidates && candidatesRaw !== undefined) rest[CANDIDATES] = candidatesRaw;
   if (!showQuestions && questionsRaw !== undefined) rest[QUESTIONS] = questionsRaw;
@@ -653,24 +638,25 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
     if (showCandidates && !isDefault) next = { ...next, [CANDIDATES]: [...[...candidates].sort((a, b) => a - b), ...extras] };
     if (showTab && !keepTab) next = { ...next, [KEEP_TAB]: false };
     for (const d of simpleShown) {
-      const v = simple[d.key];
-      if (d.kind === "text") {
-        if (typeof v === "string" && v.trim() !== "") next = { ...next, [d.key]: v.trim() };
-      } else if (d.kind === "number") {
+      const v = simple[d.키];
+      if (d.종류 === "글") {
+        if (typeof v === "string" && v.trim() !== "" && v.trim() !== String(d.기본 ?? "")) next = { ...next, [d.키]: v.trim() };
+      } else if (d.종류 === "숫자") {
         const n = Number(v);
-        if (!Number.isInteger(n) || n < d.min) {
-          setError(`${d.label}: ${d.min} 이상의 정수로 입력해 주세요`);
+        if (!Number.isInteger(n) || n < (d.최소 ?? 0)) {
+          setError(`${d.이름}: ${d.최소 ?? 0} 이상의 정수로 입력해 주세요`);
           return;
         }
-        if (n !== d.def) next = { ...next, [d.key]: n };
-      } else if (d.kind === "multi") {
-        const list = (v as string[]).filter((o) => d.options.includes(o));
+        if (n !== d.기본) next = { ...next, [d.키]: n };
+      } else if (d.종류 === "여러선택") {
+        const allowed = (d.선택 ?? []).map(([val]) => val);
+        const list = (v as unknown[]).filter((o) => allowed.includes(o as string));
         if (list.length === 0) {
-          setError(`${d.label}: 하나 이상 골라 주세요`);
+          setError(`${d.이름}: 하나 이상 골라 주세요`);
           return;
         }
-        if (JSON.stringify(list) !== JSON.stringify(d.def)) next = { ...next, [d.key]: list };
-      } else if (v !== d.def) next = { ...next, [d.key]: v };
+        if (JSON.stringify(list) !== JSON.stringify(d.기본)) next = { ...next, [d.키]: list };
+      } else if (v !== d.기본) next = { ...next, [d.키]: v };
     }
     setError(null);
     await call("PATCH", `${resource}/${id}`, { 설정: Object.keys(next).length ? next : null });
@@ -685,7 +671,7 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
         </label>
       )}
       {simpleShown.map((d) => (
-        <SimpleSettingInput key={d.key} d={d} value={simple[d.key]} onChange={(v) => setSimple({ ...simple, [d.key]: v })} />
+        <SimpleSettingInput key={d.키} d={d} value={simple[d.키]} onChange={(v) => setSimple({ ...simple, [d.키]: v })} />
       ))}
       {showPicks && <StoryPicks characters={characters} picked={picked} onChange={setPicked} />}
       {showQuestions && <QuestionPicks characters={characters} value={questions} onChange={setQuestions} />}
@@ -704,44 +690,47 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
   );
 }
 
-function SimpleSettingInput({ d, value, onChange }: { d: SimpleSetting; value: unknown; onChange: (v: unknown) => void }) {
-  const hint = d.help ? <span className="hint">{d.help}</span> : null;
-  if (d.kind === "bool")
+function SimpleSettingInput({ d, value, onChange }: { d: SettingDef; value: unknown; onChange: (v: unknown) => void }) {
+  const hint = d.설명 ? <span className="hint">{d.설명}</span> : null;
+  const options = d.선택 ?? [];
+  if (d.종류 === "켜짐")
     return (
       <div className="field">
         <label className="check">
           <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />
-          {d.label}
+          {d.이름}
         </label>
         {hint}
       </div>
     );
-  if (d.kind === "multi")
+  if (d.종류 === "여러선택") {
+    const chosen = (value as unknown[]) ?? [];
     return (
       <fieldset className="story-picks">
-        <legend>{d.label}</legend>
+        <legend>{d.이름}</legend>
         <div className="row start">
-          {d.options.map((o) => (
-            <label key={o} className="check">
-              <input type="checkbox" checked={(value as string[]).includes(o)}
-                onChange={(e) => onChange(d.options.filter((x) => (x === o ? e.target.checked : (value as string[]).includes(x))))} />
-              {o}
+          {options.map(([val, label]) => (
+            <label key={String(val)} className="check">
+              <input type="checkbox" checked={chosen.includes(val)}
+                onChange={(e) => onChange(options.map(([v]) => v).filter((x) => (x === val ? e.target.checked : chosen.includes(x))))} />
+              {label}
             </label>
           ))}
         </div>
         {hint}
       </fieldset>
     );
+  }
   return (
     <div className="field">
       <label>
-        {d.label}
-        {d.kind === "select" ? (
-          <select value={String(value)} onChange={(e) => onChange(e.target.value)}>
-            {d.options.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
+        {d.이름}
+        {d.종류 === "선택" ? (
+          <select value={String(value)} onChange={(e) => onChange(options.find(([v]) => String(v) === e.target.value)?.[0] ?? e.target.value)}>
+            {options.map(([v, t]) => <option key={String(v)} value={String(v)}>{t}</option>)}
           </select>
-        ) : d.kind === "number" ? (
-          <input type="number" min={d.min} value={String(value)} onChange={(e) => onChange(e.target.value)} />
+        ) : d.종류 === "숫자" ? (
+          <input type="number" min={d.최소 ?? 0} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />
         ) : (
           <input value={String(value ?? "")} maxLength={500} onChange={(e) => onChange(e.target.value)} />
         )}

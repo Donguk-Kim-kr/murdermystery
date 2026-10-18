@@ -255,3 +255,39 @@ def test_tie_is_its_own_ending_and_not_a_failed_arrest(client, make_scripted_gam
         go_to_endings(client, host, 1)
         shown = [b["내용"] for b in state(client, people[0]).json()["화면"] if b["이름"].startswith("엔딩")]
         assert shown == [expected], (expected, shown)
+
+
+def test_conditions_declared_by_the_final_vote_phase_work_as_written(client, make_scripted_game):
+    """최종 투표 진행단계가 스스로 내놓은 조건(조건정의)의 식을 그대로 엔딩 조건으로 써서 동작을 확인한다."""
+    import re
+    from app.cards import known_names
+    from app.declare import declarations
+    from app.default_phases import FINAL_VOTE
+
+    declared = {c["이름"]: c for c in declarations(FINAL_VOTE, known_names())["조건"]}
+    plain = ["범인을 검거했다", "범인이 아닌 쪽으로 결과가 났다(검거 실패)", "동률이다", "아무도 투표하지 않았다"]
+    endings = [(name, {"식": declared[name]["식"]}, name) for name in plain]
+    # 인자가 있는 조건은 자리표시자를 채워서 쓴다: 인물 1(범인)이 가장 많은 표
+    endings.append(("인물 지목", {"식": re.sub(r"\{인물\}", "1", declared["이 인물이 가장 많은 표를 받았다"]["식"])}, "인물 지목"))
+
+    def mark_culprit(client_, host, wid):
+        assert client_.patch(f"/api/works/{wid}/characters/1", headers=host.headers, json={"범인": True}).status_code == 200
+
+    def votes(picks):
+        def run(people, slots):
+            by_name = {p["이름"]: p["순서"] for p in state(client, people[0]).json()["인물"]}
+            for who, choice in zip(people, picks):
+                if choice is not None:
+                    cast(client, who, by_name.get(choice, choice))
+        return run
+
+    for picks, expected in (
+        ((None, "인물0", "인물0"), ["범인을 검거했다", "인물 지목"]),
+        ((None, "인물1", "인물1"), ["범인이 아닌 쪽으로 결과가 났다(검거 실패)"]),
+        (("인물1", "인물0", "사고사"), ["동률이다"]),
+        ((None, None, None), ["아무도 투표하지 않았다"]),
+    ):
+        host, people, _ = play(client, make_scripted_game, endings, votes=votes(picks), setup_extra=mark_culprit)
+        go_to_endings(client, host, 1)
+        shown = [b["내용"] for b in state(client, people[0]).json()["화면"] if b["이름"].startswith("엔딩")]
+        assert shown == expected, (picks, shown)

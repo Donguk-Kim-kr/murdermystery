@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from . import clues, narrative
+from .declare import BUILDER_NAMES, DECL_FUNCTIONS
 from .script import VM, Program, Ref, ScriptError, Suspend, builtin_names, compile_expression, compile_source
 
 MAX_ANSWER_BYTES = 2000
@@ -56,6 +57,7 @@ FUNCTION_NAMES = {
     "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "모든_장소", "단서들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
     "단계_끝내기", "게임_종료",
 }
+FUNCTION_NAMES |= BUILDER_NAMES          # 제작 화면을 정하는 함수들(app/declare.py). 게임 중에 불러도 값만 만들 뿐이다
 CONSTANT_NAMES = {"통과", ALL}
 MAX_INPUT_CHARS = 2000
 MAX_CARDS = 200
@@ -82,7 +84,7 @@ class CardHost:
         self.constants = {"통과": True, ALL: Ref(ALL)}
         self.functions: dict[str, Callable[..., Any]] = {}
         for name in FUNCTION_NAMES:
-            self.functions[name] = self._guard(name, getattr(self, "fn_" + name))
+            self.functions[name] = DECL_FUNCTIONS[name] if name in DECL_FUNCTIONS else self._guard(name, getattr(self, "fn_" + name))
 
     def _guard(self, name: str, fn: Callable[..., Any]) -> Callable[..., Any]:
         if name not in MUTATING:

@@ -48,6 +48,36 @@ export interface LibraryRef {
   삭제됨: boolean;
   /** 스크립트가 읽는 카드 설정 이름(설정 화면이 보여 줄 입력을 정한다). 기믹에는 없다. */
   사용설정?: string[];
+  /** 진행단계 스크립트가 설정정의로 정한 입력칸(없으면 null: 옛 방식) */
+  설정정의?: SettingDef[] | null;
+  /** 진행단계 스크립트가 조건정의로 정한, 엔딩·후일담 조건으로 고를 수 있는 항목 */
+  조건정의?: ConditionDef[];
+}
+
+export interface SettingDef {
+  키: string;
+  이름: string;
+  종류: "숫자" | "선택" | "켜짐" | "글" | "여러선택" | "서사" | "후보" | "질문";
+  기본?: unknown;
+  최소?: number;
+  선택?: [string | number, string][];
+  설명?: string;
+}
+
+export interface ArgDef {
+  키: string;
+  이름: string;
+  종류: "인물" | "선택" | "기타후보" | "질문인물" | "질문답" | "대상";
+  선택?: [string | number, string][];
+  /** 질문답: 같은 조건에서 앞서 고르는 인물 인자의 키. 그 밖의 종류: 읽을 카드 설정의 키 */
+  인물?: string;
+  설정?: string;
+}
+
+export interface ConditionDef {
+  이름: string;
+  식: string;
+  인자: ArgDef[];
 }
 
 export interface Bundle {

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from .auth import CurrentUser
 from .cards import CONSTANT_NAMES, FUNCTION_NAMES, known_names
+from .declare import declarations
 from .script import ScriptError, builtin_names, compile_source
 
 router = APIRouter(prefix="/api/scripts", tags=["scripts"])
@@ -32,6 +33,10 @@ def check_script(body: ScriptCheckIn, me: CurrentUser) -> ScriptCheckOut:
         return ScriptCheckOut(정상=True, 오류=None, 줄=None, 함수=[])
     try:
         program = compile_source(body.스크립트, known_names())
+    except ScriptError as err:
+        return ScriptCheckOut(정상=False, 오류=err.message, 줄=err.line, 함수=[])
+    try:
+        declarations(body.스크립트, known_names())              # 설정정의·조건정의도 돌려서 검사한다
     except ScriptError as err:
         return ScriptCheckOut(정상=False, 오류=err.message, 줄=err.line, 함수=[])
     return ScriptCheckOut(정상=True, 오류=None, 줄=None, 함수=sorted(program.funcs))

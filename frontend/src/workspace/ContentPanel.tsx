@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 
 import { errorMessage, http } from "../api/client";
+import { ConditionPicker } from "./ConditionPicker";
 import {
   metaOf, refLabel, rowsOf, titleOf, useWorkspace,
   type FieldMeta, type Part, type ResourceMeta, type Row, type Workspace,
@@ -147,11 +148,17 @@ export function RowForm(props: {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fields = meta.fields.filter((f) => f.kind !== "libref"); // 진행단계·기믹 선택은 흐름 탭 전용 화면에서 한다
+  const picksCondition = meta.key === "endings" || meta.key === "epilogues";       // 조건은 식을 쓰지 않고 진행단계가 내놓은 항목에서 고른다
+  const [unfinished, setUnfinished] = useState(false);       // 조건 고르기가 덜 끝났다
   const [parts, setParts] = useState<Part[]>(((row?.재료 as Part[] | undefined) ?? []).map((p) => ({ 종류: p.종류, 순서: p.순서 })));
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (unfinished) {
+      setError("조건 고르기를 끝내 주세요(빈칸이 있습니다). 필요 없는 조건은 지워 주세요");
+      return;
+    }
     let body: Record<string, unknown>;
     try {
       body = toBody(fields, draft);
@@ -173,9 +180,17 @@ export function RowForm(props: {
   return (
     <form onSubmit={onSubmit} className="subform" aria-label={`${meta.label} ${row ? "수정" : "추가"}`}>
       <div className="field-grid two">
-        {fields.map((f) => (
-          <FieldInput key={f.name} f={f} ws={ws} value={draft[f.name]} onChange={(v) => set(f.name, v)} />
-        ))}
+        {fields.map((f) =>
+          picksCondition && f.name === "조건" ? (
+            <ConditionPicker key={f.name} ws={ws} label={f.label} value={row ? row[f.name] : null}
+              onChange={(value, complete) => {
+                setUnfinished(!complete);
+                set(f.name, value ? JSON.stringify(value) : f.required ? "{}" : "");
+              }} />
+          ) : (
+            <FieldInput key={f.name} f={f} ws={ws} value={draft[f.name]} onChange={(v) => set(f.name, v)} />
+          ),
+        )}
       </div>
       {meta.has_parts && <PartsPicker ws={ws} parts={parts} onChange={setParts} selfOrder={row ? (row.순서 as number) : null} />}
       {error && <p role="alert" className="error">{error}</p>}
