@@ -810,6 +810,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/game/me/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Chat */
+        get: operations["read_chat_api_game_me_chat_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/game/me/chat/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move Place */
+        post: operations["move_place_api_game_me_chat_move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/game/me/chat/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Message */
+        post: operations["send_message_api_game_me_chat_send_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -963,6 +1014,60 @@ export interface components {
             "\uCE90\uB9AD\uD130\uC124\uBA85"?: string | null;
             /** Npc순위 */
             "NPC\uC21C\uC704"?: number | null;
+        };
+        /** ChatMemberOut */
+        ChatMemberOut: {
+            /** 계정 번호 */
+            "\uACC4\uC815_\uBC88\uD638": number;
+            /** 닉네임 */
+            "\uB2C9\uB124\uC784": string;
+            /** 인물 이름 */
+            "\uC778\uBB3C_\uC774\uB984": string | null;
+        };
+        /** ChatMessageOut */
+        ChatMessageOut: {
+            /** 번호 */
+            "\uBC88\uD638": number;
+            /** 장소 */
+            "\uC7A5\uC18C": string;
+            "\uBCF4\uB0B8\uC774": components["schemas"]["ChatMemberOut"];
+            /** 내용 */
+            "\uB0B4\uC6A9": string;
+            /**
+             * 보낸일시
+             * Format: date-time
+             */
+            "\uBCF4\uB0B8\uC77C\uC2DC": string;
+        };
+        /** ChatMoveIn */
+        ChatMoveIn: {
+            /** 장소 */
+            "\uC7A5\uC18C": string;
+        };
+        /** ChatOut */
+        ChatOut: {
+            /** 내 위치 */
+            "\uB0B4_\uC704\uCE58": string | null;
+            /** 역할 */
+            "\uC5ED\uD560": string;
+            /** 장소들 */
+            "\uC7A5\uC18C\uB4E4": components["schemas"]["ChatRoomOut"][];
+            /** 메시지 */
+            "\uBA54\uC2DC\uC9C0": components["schemas"]["ChatMessageOut"][];
+        };
+        /** ChatRoomOut */
+        ChatRoomOut: {
+            /** 이름 */
+            "\uC774\uB984": string;
+            /** 최대인원 */
+            "\uCD5C\uB300\uC778\uC6D0": number | null;
+            /** 사람들 */
+            "\uC0AC\uB78C\uB4E4": components["schemas"]["ChatMemberOut"][];
+        };
+        /** ChatSendIn */
+        ChatSendIn: {
+            /** 내용 */
+            "\uB0B4\uC6A9": string;
         };
         /** ConfirmIn */
         ConfirmIn: {
@@ -3382,6 +3487,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GameStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_chat_api_game_me_chat_get: {
+        parameters: {
+            query?: {
+                after?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_place_api_game_me_chat_move_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatMoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_api_game_me_chat_send_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatSendIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOut"];
                 };
             };
             /** @description Validation Error */

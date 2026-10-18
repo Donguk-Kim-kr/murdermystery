@@ -58,6 +58,7 @@ class Game:
     snapshot: dict[str, Any]
     players: dict[int, Player]       # 계정 번호 → 플레이어. 입장한 순서를 지킨다(dict 는 넣은 순서를 기억한다)
     observers: dict[int, Observer] = field(default_factory=dict)
+    chat_at: dict[int, str] = field(default_factory=dict)   # 플레이어 → 지금 있는 채팅 장소(전체, 밀담 A …). 서버 메모리에만 있다
     npc_slots: set[int] = field(default_factory=set)   # 이 게임에서 NPC 가 된, 플레이어 인원보다 많은 인물(순서). 선택 목록에 나오지 않는다
     designated_id: int = 0           # 방장이 진행 권한을 맡긴 계정. 처음에는 방장이다
     away_seconds: float = 600.0
@@ -112,6 +113,8 @@ class Game:
         self.running_since = self.clock()
         now = self.clock()
         self.last_seen = {a: now for a in [*self.players, *self.observers]}
+        for account in self.players:
+            self.chat_at.setdefault(account, "전체")
 
     @property
     def characters(self) -> list[dict[str, Any]]:

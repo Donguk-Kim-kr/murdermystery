@@ -8,6 +8,7 @@ from psycopg import Error
 from .auth import router as auth_router
 from .characters import router as characters_router
 from .config import get_settings
+from .chat import router as chat_router
 from .confirm import router as confirm_router
 from .content import router as content_router, schema_router as content_schema_router
 from .db import Conn, create_pool
@@ -117,6 +118,7 @@ app.include_router(testers_router)
 app.include_router(rooms_router)
 app.include_router(game_router)
 app.include_router(game_state_router)
+app.include_router(chat_router)
 
 
 @app.get("/api/health")

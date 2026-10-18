@@ -681,7 +681,8 @@ ul.versions { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4re
    ========================================================================== */
 .game { max-width: 64rem; display: grid; gap: var(--gap); }
 .game-head h1 { font-size: 1.15rem; }
-.game-body { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; gap: var(--gap); align-items: start; }
+.game-body { display: grid; grid-template-columns: minmax(0, 1fr) 19rem; gap: var(--gap); align-items: start; }
+.game-side-col { display: grid; gap: var(--gap); min-width: 0; }
 @media (max-width: 760px) { .game-body { grid-template-columns: minmax(0, 1fr); } }
 .game-main { gap: 1rem; }
 .tabs { display: flex; flex-wrap: wrap; gap: 0.35rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
@@ -759,3 +760,19 @@ button.clue-head:hover { background: transparent; }
 
 /* 아이콘만 있는 작은 버튼(링크 복사 등) */
 .icon-btn { padding: 0.4rem 0.55rem; line-height: 0; display: inline-flex; align-items: center; justify-content: center; }
+
+/* 게임 채팅 */
+.chat { gap: 0.6rem; }
+.chat-places { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.chat-place { width: 100%; display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem; text-align: left; font-weight: 400; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+.chat-place:hover:not(:disabled) { background: var(--surface); border-color: var(--border-strong); }
+.chat-place.on { background: var(--accent-soft); color: var(--accent-soft-text); border-color: transparent; }
+.chat-place:disabled { opacity: 0.55; }
+.chat-place-name { font-weight: 600; flex: none; }
+.chat-place-people { font-size: 0.8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-place.on .chat-place-people { color: inherit; }
+.chat-log { list-style: none; margin: 0; padding: 0.5rem 0.6rem; display: grid; gap: 0.35rem; align-content: start; height: 14rem; overflow-y: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.9rem; }
+.chat-log li { overflow-wrap: anywhere; }
+.chat-log strong { font-weight: 600; margin-right: 0.25rem; }
+.chat-form { display: flex; gap: 0.4rem; }
+.chat-form input { flex: 1; min-width: 0; }

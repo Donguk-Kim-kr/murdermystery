@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { BlockView, type Block } from "./Blocks";
+import { ChatPanel } from "./ChatPanel";
 import { useGame, type GameApi, type GameState } from "./useGame";
 
 const NOW = "현재 화면";
@@ -118,6 +119,8 @@ function Play({ game, state }: { game: GameApi; state: GameState }) {
           ))}
         </section>
 
+        <div className="game-side-col">
+        <ChatPanel />
         <aside className="card game-side" aria-label="참가자">
           <h2>플레이어</h2>
           <ul className="person-list">
@@ -135,6 +138,7 @@ function Play({ game, state }: { game: GameApi; state: GameState }) {
             ))}
           </ul>
         </aside>
+        </div>
       </div>
     </main>
   );

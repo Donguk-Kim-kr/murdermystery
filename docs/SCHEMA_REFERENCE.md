@@ -2,7 +2,7 @@
 
 > `db/scripts/dump_schema_md.py` 가 마이그레이션이 적용된 실제 DB 에서 추출한 문서입니다. 직접 수정하지 마세요.
 
-테이블 33개 (생성 순서)
+테이블 35개 (생성 순서)
 
 | 번호 | 테이블 |
 |---|---|
@@ -39,6 +39,8 @@
 | 31 | 진행순서 |
 | 32 | 공개 |
 | 33 | 투표결과 |
+| 34 | 대화 |
+| 35 | 대화수신 |
 
 ## 계정
 
@@ -925,4 +927,50 @@
 **추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
 
 - `ix_투표결과_참여`: `CREATE INDEX "ix_투표결과_참여" ON public."투표결과" USING btree ("참여_번호")`
+
+## 대화
+
+| 순번 | 컬럼 | 타입 | NULL | 기본값 / 특성 |
+|---|---|---|---|---|
+| 1 | 번호 | integer | 불가 | IDENTITY (GENERATED ALWAYS) |
+| 2 | 진행_번호 | integer | 불가 |  |
+| 3 | 계정_번호 | integer | 불가 |  |
+| 4 | 장소 | text | 불가 |  |
+| 5 | 내용 | text | 불가 |  |
+| 6 | 보낸일시 | timestamp with time zone | 불가 | CURRENT_TIMESTAMP |
+
+**제약조건**
+
+| 종류 | 이름 | 정의 |
+|---|---|---|
+| PK | `pk_대화` | `PRIMARY KEY ("번호")` |
+| FK | `fk_대화_계정` | `FOREIGN KEY ("계정_번호") REFERENCES "계정"("번호") ON DELETE RESTRICT` |
+| FK | `fk_대화_진행` | `FOREIGN KEY ("진행_번호") REFERENCES "진행"("번호") ON DELETE CASCADE` |
+| CHECK | `ck_대화_내용` | `CHECK (((char_length("내용") >= 1) AND (char_length("내용") <= 500)))` |
+
+**추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
+
+- `ix_대화_계정`: `CREATE INDEX "ix_대화_계정" ON public."대화" USING btree ("계정_번호")`
+- `ix_대화_진행`: `CREATE INDEX "ix_대화_진행" ON public."대화" USING btree ("진행_번호", "번호")`
+
+## 대화수신
+
+| 순번 | 컬럼 | 타입 | NULL | 기본값 / 특성 |
+|---|---|---|---|---|
+| 1 | 번호 | integer | 불가 | IDENTITY (GENERATED ALWAYS) |
+| 2 | 대화_번호 | integer | 불가 |  |
+| 3 | 계정_번호 | integer | 불가 |  |
+
+**제약조건**
+
+| 종류 | 이름 | 정의 |
+|---|---|---|
+| PK | `pk_대화수신` | `PRIMARY KEY ("번호")` |
+| UNIQUE | `uq_대화수신_대화_계정` | `UNIQUE ("대화_번호", "계정_번호")` |
+| FK | `fk_대화수신_계정` | `FOREIGN KEY ("계정_번호") REFERENCES "계정"("번호") ON DELETE RESTRICT` |
+| FK | `fk_대화수신_대화` | `FOREIGN KEY ("대화_번호") REFERENCES "대화"("번호") ON DELETE CASCADE` |
+
+**추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
+
+- `ix_대화수신_계정`: `CREATE INDEX "ix_대화수신_계정" ON public."대화수신" USING btree ("계정_번호", "대화_번호")`
 

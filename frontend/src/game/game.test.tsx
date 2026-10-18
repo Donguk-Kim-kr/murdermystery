@@ -49,6 +49,7 @@ let posts: { path: string; body: unknown }[];
 let handlers: Record<string, (body: unknown) => Response>;
 let events: ReadableStreamDefaultController<Uint8Array> | null;
 let stateReads: number;
+let chatView: unknown;
 const enc = new TextEncoder();
 
 beforeEach(() => {
@@ -57,6 +58,7 @@ beforeEach(() => {
   handlers = {};
   events = null;
   stateReads = 0;
+  chatView = { 내_위치: "전체", 역할: "플레이어", 장소들: [{ 이름: "전체", 최대인원: null, 사람들: [] }], 메시지: [] };
   localStorage.clear();
   vi.stubGlobal("fetch", async (input: Request) => {
     const path = new URL(input.url).pathname;
@@ -73,6 +75,7 @@ beforeEach(() => {
       stateReads += 1;
       return json(state);
     }
+    if (input.method === "GET" && path === "/api/game/me/chat") return json(chatView);
     if (input.method === "POST") {
       const text = await input.clone().text();
       const body = text ? JSON.parse(text) : undefined;

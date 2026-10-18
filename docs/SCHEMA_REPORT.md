@@ -139,7 +139,7 @@ python3 db/scripts/dump_schema_md.py --dbname murder_mystery > docs/SCHEMA_REFER
 
 ## 7. 향후 백엔드에서 구현해야 할 항목
 
-전체 목록(B1~B33)은 `DB_RULES.md` 2장. 핵심만 요약한다.
+전체 목록(B1~B40)은 `DB_RULES.md` 2장. 핵심만 요약한다.
 
 - **스냅샷 참조 검증**: JSONB 를 가리키는 모든 `*_순서` 컬럼 (진행, 참여, 획득, 기믹실행, 엔딩)
 - **확정 흐름**: 스냅샷 직렬화(라이브러리 사본 포함), 버전 문자열 규칙, `최신버전`·`수정일시` 갱신
