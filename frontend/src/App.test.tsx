@@ -726,6 +726,17 @@ describe("방", () => {
     expect(await calls.find((c) => c.key === "POST /api/rooms")!.req.json()).toEqual({ 작품_번호: 7, 방장_참여: true, 입장코드: null });
   });
 
+  it("방 만들기 화면의 제목 자리에는 작품 제목이 들어간다(목록에서 눌러 오면 그대로, 주소로 오면 불러와서)", async () => {
+    routes["GET /api/play-works"] = () => json([{ 번호: 7, 제목: "저택의 비밀", 시놉시스: "", 장르: "추리", 예상시간: "3시간", 최소인원: 3, 최대인원: 4, 제작자: "탐정", 비공개플레이: false }]);
+    renderApp("/");
+    await userEvent.click(await screen.findByRole("link", { name: "방 만들기" }));
+    expect(await screen.findByRole("heading", { name: "저택의 비밀", level: 1 })).toBeInTheDocument();
+    cleanup();
+    routes["GET /api/private-play-works"] = () => json([{ 번호: 7, 제목: "주소로 열린 작품" }]);
+    renderApp("/rooms/new/7");
+    expect(await screen.findByRole("heading", { name: "주소로 열린 작품", level: 1 })).toBeInTheDocument();
+  });
+
   it("방장이 입장코드를 정하면 대문자로 바꿔 보내고, 이미 쓰는 코드면 이유를 보여 준다", async () => {
     routes["POST /api/rooms"] = () => json({ detail: "이미 사용 중인 입장코드입니다. 다른 코드를 정해 주세요" }, 409);
     renderApp("/rooms/new/7");

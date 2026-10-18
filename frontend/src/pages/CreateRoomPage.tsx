@@ -1,17 +1,31 @@
-import { useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { api, errorMessage } from "../api/client";
 import { useRoom } from "../rooms/RoomContext";
 
-/** 방 만들기. 방장은 플레이어로 참여하는 것으로 시작하고, 관전으로 바꾸는 것은 방을 만든 뒤 대기실에서 한다. */
+/** 방 만들기. 제목 자리에는 작품 제목이 들어간다(방에는 이름이 없고 작품 이름을 쓴다). 방장은 플레이어로 참여하는 것으로 시작하고, 관전으로 바꾸는 것은 방을 만든 뒤 대기실에서 한다. */
 export function CreateRoomPage() {
   const workId = Number(useParams().workId);
   const navigate = useNavigate();
   const { refresh } = useRoom();
+  const location = useLocation();
+  const [title, setTitle] = useState<string | null>((location.state as { title?: string } | null)?.title ?? null);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // 주소로 바로 들어왔으면 내가 비공개 플레이할 수 있는 작품 목록에서 제목을 찾는다. 찾지 못하면 "방 만들기"로 둔다.
+  useEffect(() => {
+    if (title !== null) return;
+    let cancelled = false;
+    api.GET("/api/private-play-works").then(({ data }) => {
+      if (!cancelled) setTitle(data?.find((w) => w.번호 === workId)?.제목 ?? "");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [title, workId]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -32,7 +46,7 @@ export function CreateRoomPage() {
     <main className="page narrow">
       <Link to="/" className="back">← 플레이공간</Link>
       <form onSubmit={onSubmit} className="card">
-        <h1>방 만들기</h1>
+        <h1>{title || "방 만들기"}</h1>
         <label>
           입장코드
           <input
