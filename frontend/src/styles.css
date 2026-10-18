@@ -700,3 +700,4 @@ textarea.code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, mono
 .clue-actions { display: grid; gap: 0.5rem; margin-top: 0.25rem; }
 .clue-panel { display: grid; gap: 0.35rem; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; }
 .question-pick { display: grid; gap: 0.3rem; }
+.field-hint { display: block; margin-top: 0.25rem; font-size: 0.8125rem; font-weight: 400; color: var(--muted); }

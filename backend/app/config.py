@@ -1,6 +1,7 @@
 """환경 설정. 접속 정보는 libpq 표준 환경변수(PGHOST, PGPORT, PGUSER, PGPASSWORD)를 따른다."""
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +12,8 @@ class Settings(BaseSettings):
     database_url: str = "dbname=murder_mystery"
     # 빌드된 프론트엔드 폴더. 지정하면 백엔드가 화면도 함께 서비스한다 (Docker 실행용). 비어 있으면 서비스하지 않는다.
     static_dir: str = ""
+    # 가입할 때 패스워드의 최소 글자 수(기본 8). 여러 계정을 만들어 시험할 때만 MM_PASSWORD_MIN_LENGTH 로 낮춘다(1 이상).
+    password_min_length: int = Field(default=8, ge=1)
     db_pool_min: int = 1
     db_pool_max: int = 10
 

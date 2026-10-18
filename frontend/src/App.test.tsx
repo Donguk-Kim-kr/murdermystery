@@ -133,6 +133,21 @@ describe("로그인 화면 구성과 다크 모드", () => {
 });
 
 describe("회원가입", () => {
+  it("가입이 안 되면 어느 항목이 왜 문제인지 알려 준다", async () => {
+    routes["POST /api/auth/signup"] = () =>
+      json({ detail: [
+        { type: "string_pattern_mismatch", loc: ["body", "아이디"], msg: "x", ctx: { pattern: "^\\S+$" } },
+        { type: "string_too_short", loc: ["body", "패스워드"], msg: "x", ctx: { min_length: 8 } },
+      ] }, 422);
+    renderApp();
+    await userEvent.click(await screen.findByRole("button", { name: "회원가입" }));
+    await userEvent.type(screen.getByLabelText("아이디"), "a b");
+    await userEvent.type(screen.getByLabelText("패스워드"), "x");
+    await userEvent.type(screen.getByLabelText("닉네임"), "A");
+    await userEvent.click(screen.getByRole("button", { name: "가입하기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("아이디은(는) 공백 없이 입력해 주세요 · 패스워드은(는) 8자 이상이어야 합니다");
+  });
+
   it("가입 후 같은 정보로 로그인한다", async () => {
     routes["POST /api/auth/signup"] = () => json(account, 201);
     routes["POST /api/auth/login"] = () => json({ 토큰: "tok-2", 만료일시: "2030-01-01T00:00:00Z", 계정: account });

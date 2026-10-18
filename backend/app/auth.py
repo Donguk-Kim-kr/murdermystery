@@ -7,8 +7,10 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from psycopg.errors import UniqueViolation
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from pydantic_core import PydanticCustomError
 
+from .config import get_settings
 from .db import Conn
 from .security import DUMMY_HASH, hash_password, hash_token, new_token, verify_password
 
@@ -21,8 +23,17 @@ SESSION_LONG = timedelta(days=30)
 
 class SignupIn(BaseModel):
     아이디: str = Field(min_length=1, max_length=50, pattern=r"^\S+$")
-    패스워드: str = Field(min_length=8, max_length=128)
+    패스워드: str = Field(min_length=1, max_length=128)
     닉네임: str = Field(min_length=1, max_length=30)
+
+    @field_validator("패스워드")
+    @classmethod
+    def long_enough(cls, value: str) -> str:
+        """최소 글자 수는 설정(MM_PASSWORD_MIN_LENGTH, 기본 8)에서 읽는다. 화면이 항목별로 안내할 수 있게 같은 오류 종류를 쓴다."""
+        minimum = get_settings().password_min_length
+        if len(value) < minimum:
+            raise PydanticCustomError("string_too_short", "String should have at least {min_length} characters", {"min_length": minimum})
+        return value
 
 
 class LoginIn(BaseModel):

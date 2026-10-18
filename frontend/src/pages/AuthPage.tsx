@@ -51,6 +51,9 @@ export function AuthPage() {
               <input value={nickname} onChange={(e) => setNickname(e.target.value)} required />
             </label>
           )}
+          {mode === "signup" && (
+            <p className="field-hint">아이디는 공백 없이 50자 이하, 닉네임은 30자 이하이며 다른 참가자에게 보입니다.</p>
+          )}
           {mode === "login" && (
             <label className="check">
               <input type="checkbox" checked={autoLogin} onChange={(e) => setAutoLogin(e.target.checked)} />

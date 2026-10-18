@@ -17,11 +17,43 @@ const authMiddleware: Middleware = {
 export const api = createClient<paths>({ baseUrl: window.location.origin, fetch: (req) => fetch(req) });
 api.use(authMiddleware);
 
-/** FastAPI 오류 응답({detail: 문자열 | 검증오류 배열})에서 사용자에게 보여 줄 문장을 꺼낸다. */
+interface ValidationItem {
+  type?: string;
+  loc?: unknown[];
+  ctx?: { min_length?: number; max_length?: number; pattern?: string; ge?: number; le?: number };
+}
+
+/** 검증 오류 한 건을 "어느 항목이 왜 안 되는지" 알려 주는 문장으로 바꾼다. 항목 이름은 서버의 필드 이름(한글)이다. */
+function validationSentence(item: ValidationItem): string {
+  const field = [...(item.loc ?? [])].reverse().find((v): v is string => typeof v === "string" && v !== "body");
+  const name = field ?? "입력값";
+  const ctx = item.ctx ?? {};
+  switch (item.type) {
+    case "missing":
+      return `${name}을(를) 입력해 주세요`;
+    case "string_too_short":
+      return ctx.min_length === 1 ? `${name}을(를) 입력해 주세요` : `${name}은(는) ${ctx.min_length}자 이상이어야 합니다`;
+    case "string_too_long":
+      return `${name}은(는) ${ctx.max_length}자 이하여야 합니다`;
+    case "string_pattern_mismatch":
+      return ctx.pattern === "^\\S+$" ? `${name}은(는) 공백 없이 입력해 주세요` : `${name}에 쓸 수 없는 글자가 있습니다`;
+    case "greater_than_equal":
+      return `${name}은(는) ${ctx.ge} 이상이어야 합니다`;
+    case "less_than_equal":
+      return `${name}은(는) ${ctx.le} 이하여야 합니다`;
+    default:
+      return `${name} 값을 확인해 주세요`;
+  }
+}
+
+/** FastAPI 오류 응답({detail: 문자열 | 검증오류 배열})에서 사용자에게 보여 줄 문장을 꺼낸다. 검증 오류는 어느 항목이 왜 안 되는지 알려 준다. */
 export function errorMessage(error: unknown, fallback = "요청에 실패했습니다"): string {
   const detail = (error as { detail?: unknown } | undefined)?.detail;
   if (typeof detail === "string") return detail;
-  if (Array.isArray(detail)) return "입력값을 확인해 주세요";
+  if (Array.isArray(detail)) {
+    const sentences = [...new Set((detail as ValidationItem[]).map(validationSentence))];
+    return sentences.length > 0 ? sentences.slice(0, 3).join(" · ") : "입력값을 확인해 주세요";
+  }
   return fallback;
 }
 

@@ -151,3 +151,22 @@ def test_role_set_in_database_is_reported_on_login_and_me(client, user, db, role
 def test_database_rejects_unknown_role(user, db):
     with pytest.raises(psycopg.errors.CheckViolation):
         db.execute('UPDATE "계정" SET "권한" = %s WHERE "번호" = %s', ("왕", user["번호"]))
+
+
+def test_password_minimum_length_can_be_lowered_by_setting_for_testing(client, monkeypatch):
+    from app.config import get_settings
+
+    body = {"아이디": "shortpw", "패스워드": "a", "닉네임": "짧은"}
+    res = client.post("/api/auth/signup", json=body)
+    assert res.status_code == 422
+    error = res.json()["detail"][0]
+    assert error["type"] == "string_too_short" and error["ctx"]["min_length"] == 8 and error["loc"][-1] == "패스워드"
+    monkeypatch.setenv("MM_PASSWORD_MIN_LENGTH", "1")
+    get_settings.cache_clear()
+    try:
+        assert client.post("/api/auth/signup", json=body).status_code == 201
+        assert client.post("/api/auth/signup", json={**body, "아이디": "emptypw", "패스워드": ""}).status_code == 422   # 0자는 낮춰도 안 된다
+    finally:
+        monkeypatch.delenv("MM_PASSWORD_MIN_LENGTH")
+        get_settings.cache_clear()
+    assert client.post("/api/auth/signup", json={**body, "아이디": "again"}).status_code == 422
