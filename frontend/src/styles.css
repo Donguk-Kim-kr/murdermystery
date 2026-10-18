@@ -553,9 +553,10 @@ a.work-card:hover {
 /* 방 */
 .room-chip { text-decoration: none; }
 .room-title h1 { margin: 0; overflow-wrap: anywhere; }
-.code-box { display: flex; align-items: center; gap: 0.75rem; padding: 0.7rem 1rem; background: var(--surface-2); border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); }
+.code-box { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0.75rem; padding: 0.7rem 1rem; background: var(--surface-2); border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); }
 /* 입장코드는 라벨·버튼과 비슷한 크기이고, 코드 길이(4~10자)가 달라도 한 줄에 들어가 배치가 흔들리지 않는다 */
-.code-box .code { font-size: 1rem; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; margin-right: auto; min-width: 0; overflow-wrap: anywhere; }
+.code-box .code { font-size: 1rem; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; min-width: 0; overflow-wrap: anywhere; text-align: center; }
+.code-box > :last-child { justify-self: end; }               /* 입장코드 글자는 왼쪽, 코드는 가운데, 링크 복사 버튼은 오른쪽 */
 .code-input { font-size: 1.3rem; letter-spacing: 0.18em; text-align: center; text-transform: uppercase; }
 
 /* 작업공간 */
