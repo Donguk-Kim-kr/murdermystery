@@ -267,3 +267,57 @@ def test_invalid_candidate_settings_do_not_break_the_card(client, make_scripted_
     host2, people2, _ = kinds(make_scripted_game, client, settings={"후보": [1, "", "  ", 99, ["x"], "사고사"]})
     box = block(state(client, people2[0]).json(), "최종 투표")
     assert [i["값"] for i in box["항목"]] == [1, "사고사"]
+
+
+def test_default_announcement_and_the_maker_can_change_it(client, make_scripted_game):
+    host, people, slots = voting(make_scripted_game, client)
+    assert block(state(client, people[0]).json(), "최종 투표")["질문"] == "가장 범인일 것 같은 사람을 골라 주세요."
+    host2, people2, _ = voting(make_scripted_game, client, settings={"안내": "범인이라고 생각하는 사람에게 투표하세요."})
+    assert block(state(client, people2[0]).json(), "최종 투표")["질문"] == "범인이라고 생각하는 사람에게 투표하세요."
+
+
+def test_abstain_button_is_off_by_default_and_refused(client, make_scripted_game):
+    host, people, slots = voting(make_scripted_game, client)
+    a = people[0]
+    box = block(state(client, a).json(), "최종 투표")
+    assert all(i["값"] != "기권" for i in box["항목"])
+    res = vote(client, a, "기권")
+    assert res.json()["알림"][-1]["글"] == "이 인물에게는 투표할 수 없습니다."
+    assert block(state(client, a).json(), "투표 완료")["완료"] == 0
+
+
+def test_abstain_counts_as_voted_but_is_nobodys_vote(client, make_scripted_game):
+    host, people, slots = voting(make_scripted_game, client, settings={"기권허용": True})
+    a, b, c = people
+    box = block(state(client, a).json(), "최종 투표")
+    assert box["항목"][-1]["값"] == "기권" and box["항목"][-1]["비활성"] is False and len(box["항목"]) == 4
+    assert vote(client, a, "기권").status_code == 200
+    assert block(state(client, b).json(), "투표 완료")["완료"] == 1                       # 기권도 투표한 것으로 센다
+    assert block(state(client, a).json(), "최종 투표")["내_선택"] == "기권"
+    vote(client, b, slots[c.number])
+    vote(client, c, slots[a.number])                                                    # 기권 1, 후보 1표씩 → 동률이면 재투표
+    assert block(state(client, a).json(), "투표 완료")["완료"] == 0
+    assert block(state(client, a).json(), "최종 투표")["질문"].startswith("동률입니다")
+    assert block(state(client, a).json(), "최종 투표")["항목"][-1]["값"] == "기권"       # 재투표에도 기권이 있다
+
+
+def test_abstain_does_not_make_ties_and_everyone_abstaining_means_no_result(client, make_scripted_game):
+    host, people, slots = voting(make_scripted_game, client, settings={"기권허용": True})
+    a, b, c = people
+    vote(client, a, slots[c.number])
+    vote(client, b, "기권")
+    vote(client, c, "기권")
+    assert block(state(client, a).json(), "투표 완료")["완료"] == 3                       # 한 후보에게 1표뿐이라 동률이 아니다
+    name = {i["값"]: i["이름"] for i in block(state(client, a).json(), "최종 투표")["항목"]}[slots[c.number]]
+    assert result(client, host) == name
+
+    host2, people2, _ = voting(make_scripted_game, client, settings={"기권허용": True})
+    for who in people2:
+        vote(client, who, "기권")
+    assert block(state(client, people2[0]).json(), "투표 완료")["완료"] == 3
+    assert result(client, host2) == "구속 없음"
+
+
+def test_a_candidate_cannot_be_named_abstain(client, make_scripted_game):
+    host, others, _, _ = make_scripted_game([("최종 투표", FINAL_VOTE, {"후보": [1, "기권"], "기권허용": True})])
+    assert any("기권" in e["메시지"] for e in state(client, host).json()["오류"])

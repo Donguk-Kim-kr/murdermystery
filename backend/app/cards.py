@@ -395,10 +395,11 @@ class CardHost:
             block.update({"동작": actions, "질문ID": f"{self.run.key}:{name}"})
         return block
 
-    def fn_투표칸(self, 이름: str, 후보: Any, 질문: Any = "") -> dict[str, Any]:
+    def fn_투표칸(self, 이름: str, 후보: Any, 질문: Any = "", 기권: bool = False) -> dict[str, Any]:
         """비공개 투표 칸. 후보는 인물이나 인물이 아닌 선택지(글, 예: "사고사")의 목록이다. 플레이어는 다음 단계로 가기 전까지
         다시 골라 바꿀 수 있고, 자기 인물은 고를 수 없다. 투표하면 `기다리기(이름)` 이 `{플레이어, 값}` 을 돌려준다
-        (값은 인물이면 순서 번호, 선택지이면 그 글)."""
+        (값은 인물이면 순서 번호, 선택지이면 그 글). `기권` 을 켜면 "기권" 선택이 더해지고, 기권은 투표한 것으로 세지만
+        어느 후보의 표도 아니다(값은 "기권")."""
         name = str(이름)
         if ":" in name or name in ("확인", ""):
             raise ScriptError("투표칸의 이름은 비워 둘 수 없고 ':' 이나 '확인' 일 수 없습니다")
@@ -409,13 +410,19 @@ class CardHost:
             if isinstance(c, Ref) and c.kind in VOTE_REF_KINDS:
                 options.append(c)
             elif isinstance(c, str) and c.strip() and len(c.strip()) <= MAX_OPTION_CHARS:
+                if c.strip() == ABSTAIN:
+                    raise ScriptError("투표칸의 후보를 '기권' 이라고 할 수 없습니다(기권은 기권 설정으로 둡니다)")
                 options.append(c.strip())
             else:
                 raise ScriptError("투표칸의 후보는 인물·장소·단서나 글이어야 합니다")
         if len({_vote_value(c) for c in options}) != len(options):
             raise ScriptError("투표칸의 후보가 겹칩니다")
         self.game.vote_options[name] = {v for v in (_vote_value(c) for c in options) if isinstance(v, str)}
-        return {"종류": "투표", "이름": name, "질문": _text(질문), "항목": options, "질문ID": f"{self.run.key}:{name}"}
+        if 기권:
+            self.game.vote_abstain.add(name)
+        else:
+            self.game.vote_abstain.discard(name)
+        return {"종류": "투표", "이름": name, "질문": _text(질문), "항목": options, "질문ID": f"{self.run.key}:{name}", "기권": bool(기권)}
 
     def fn_현황(self, 이름: str, 완료: int, 전체: int) -> dict[str, Any]:
         return {"종류": "현황", "이름": str(이름), "완료": int(완료), "전체": int(전체)}
@@ -469,6 +476,8 @@ class CardHost:
                 return False
             if self.game.players[account].character == value:
                 return False
+        elif value == ABSTAIN and name in self.game.vote_abstain:
+            pass
         elif not (isinstance(value, str) and value in self.game.vote_options.get(name, set())):
             return False
         self.game.votes.setdefault(name, {})[account] = value
@@ -655,11 +664,13 @@ def _ordinal_prefix(title: str, library_name: Any) -> str:
 def _tally(game, name: str) -> dict[int | str, int]:
     counts: dict[int | str, int] = {}
     for slot in game.votes.get(name, {}).values():
-        counts[slot] = counts.get(slot, 0) + 1
+        if slot != ABSTAIN:                                  # 기권은 어느 후보의 표도 아니다
+            counts[slot] = counts.get(slot, 0) + 1
     return counts
 
 
 VOTE_REF_KINDS = ("인물", "장소", "단서")
+ABSTAIN = "기권"
 
 
 def _vote_value(option: Any) -> Any:
@@ -917,6 +928,8 @@ def _block(game, viewer: int, block: dict[str, Any]) -> dict[str, Any]:
                 for extra in ("유형", "특징"):
                     item.pop(extra, None)
             item["비활성"] = player is None or (mine is not None and item["값"] == mine)   # 관전자는 고르지 못하고 자기 인물에게는 투표할 수 없다
+        if block.get("기권"):
+            items.append({"이름": ABSTAIN, "값": ABSTAIN, "종류": ABSTAIN, "기타": True, "비활성": player is None})
         out["항목"] = items
         out["내_선택"] = game.votes.get(block["이름"], {}).get(viewer)
         out["투표수"] = len(game.votes.get(block["이름"], {}))

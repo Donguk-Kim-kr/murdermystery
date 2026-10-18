@@ -118,7 +118,7 @@ function VoteBlock({ block, state, onAnswer }: { block: Block; state: GameState;
               {!item.기타 && item.종류 !== "장소" && item.종류 !== "단서" && (
                 <span className="muted">{[item.직업, item.나이 != null ? `${item.나이}세` : null, item.성별].filter(Boolean).join(" · ")}</span>
               )}
-              {mine === item.값 && <span className="chip accent">내 투표</span>}
+              {mine === item.값 && <span className="chip accent">{item.종류 === "기권" ? "내 선택" : "내 투표"}</span>}
             </button>
           </li>
         ))}
@@ -138,7 +138,11 @@ function VoteBlock({ block, state, onAnswer }: { block: Block; state: GameState;
             {mine === null ? "투표" : "투표 바꾸기"}
           </button>
           <span className="muted">
-            {mine === null ? "아직 투표하지 않았습니다." : `${nameOf(mine)}에게 투표했습니다. 다음 단계로 넘어가기 전에는 바꿀 수 있습니다.`}
+            {mine === null
+              ? "아직 투표하지 않았습니다."
+              : mine === "기권" && items.some((i) => i.종류 === "기권")
+                ? "기권했습니다. 다음 단계로 넘어가기 전에는 바꿀 수 있습니다."
+                : `${nameOf(mine)}에게 투표했습니다. 다음 단계로 넘어가기 전에는 바꿀 수 있습니다.`}
           </span>
         </div>
       ) : (
