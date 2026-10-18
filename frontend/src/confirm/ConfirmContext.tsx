@@ -2,10 +2,14 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 
 type Ask = (message: string) => Promise<boolean>;
 
+type Notify = (message: string) => Promise<void>;
+
 const ConfirmContext = createContext<Ask | null>(null);
+const NoticeContext = createContext<Notify | null>(null);
 
 interface Pending {
   message: string;
+  notice?: boolean;   // 알림: 확인 버튼 하나만 있다
   resolve: (ok: boolean) => void;
 }
 
@@ -17,12 +21,14 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<Pending | null>(null);
   const current = useRef<Pending | null>(null);
 
-  const ask = useCallback<Ask>((message) => new Promise<boolean>((resolve) => {
+  const open = useCallback((message: string, notice: boolean) => new Promise<boolean>((resolve) => {
     current.current?.resolve(false);                          // 앞의 물음이 아직 열려 있으면 취소로 닫는다
-    const next = { message, resolve };
+    const next = { message, notice, resolve };
     current.current = next;
     setPending(next);
   }), []);
+  const ask = useCallback<Ask>((message) => open(message, false), [open]);
+  const notify = useCallback<Notify>(async (message) => { await open(message, true); }, [open]);
 
   const answer = useCallback((ok: boolean) => {
     const open = current.current;
@@ -41,20 +47,22 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 
   return (
     <ConfirmContext.Provider value={ask}>
-      {children}
-      {pending && (
-        <div className="overlay" onClick={() => answer(false)}>
-          <div className="dialog confirm-dialog" role="alertdialog" aria-modal="true" aria-label="확인" onClick={(e) => e.stopPropagation()}>
-            <div className="confirm-message">
-              {pending.message.split("\n").map((line, i) => <p key={i}>{line}</p>)}
-            </div>
-            <div className="row end">
-              <button type="button" className="secondary" onClick={() => answer(false)}>취소</button>
-              <button type="button" autoFocus onClick={() => answer(true)}>확인</button>
+      <NoticeContext.Provider value={notify}>
+        {children}
+        {pending && (
+          <div className="overlay" onClick={() => answer(false)}>
+            <div className="dialog confirm-dialog" role="alertdialog" aria-modal="true" aria-label={pending.notice ? "알림" : "확인"} onClick={(e) => e.stopPropagation()}>
+              <div className="confirm-message">
+                {pending.message.split("\n").map((line, i) => <p key={i}>{line}</p>)}
+              </div>
+              <div className="row end">
+                {!pending.notice && <button type="button" className="secondary" onClick={() => answer(false)}>취소</button>}
+                <button type="button" autoFocus onClick={() => answer(true)}>확인</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </NoticeContext.Provider>
     </ConfirmContext.Provider>
   );
 }
@@ -64,4 +72,11 @@ export function useConfirm(): Ask {
   const ask = useContext(ConfirmContext);
   if (!ask) throw new Error("ConfirmProvider 안에서만 쓸 수 있습니다");
   return ask;
+}
+
+/** `const notify = useNotice(); await notify("…");` — 확인 버튼 하나뿐인 알림 팝업. */
+export function useNotice(): Notify {
+  const notify = useContext(NoticeContext);
+  if (!notify) throw new Error("ConfirmProvider 안에서만 쓸 수 있습니다");
+  return notify;
 }

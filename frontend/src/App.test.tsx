@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 import { AuthProvider } from "./auth/AuthContext";
-import { answerConfirm } from "./confirmTest";
+import { answerConfirm, answerNotice } from "./confirmTest";
 
 type Handler = (req: Request) => Response | Promise<Response>;
 const json = (body: unknown, status = 200) =>
@@ -721,7 +721,7 @@ describe("방", () => {
     renderApp("/room");
     await userEvent.click(await screen.findByRole("button", { name: "링크 복사" }));
     expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/join/K7M2QX`);
-    expect(await screen.findByRole("button", { name: "링크 복사됨" })).toBeInTheDocument();      // 복사하면 잠깐 완료 표시가 된다
+    expect(await answerNotice()).toBe("링크가 복사되었습니다.");                                     // 복사하면 알림 팝업이 뜬다
   });
 
   it("입장코드를 대문자로 바꿔 입장하고 대기실을 보여 준다", async () => {
