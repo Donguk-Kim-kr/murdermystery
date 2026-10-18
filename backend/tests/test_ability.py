@@ -34,7 +34,7 @@ def test_only_the_character_with_an_ability_picks_a_target(client, make_scripted
     assert [i["이름"] for i in box["항목"] if not i.get("기타")] == ["인물0", "인물1", "인물2"]          # 기본 대상은 플레이어의 인물
     assert [i["이름"] for i in box["항목"] if i.get("기타")] == ["사용 안 함"]
     other = state(client, who[2]).json()
-    assert block(other, "능력 사용")["종류"] == "글" and "능력이 없습니다" in block(other, "능력 사용")["내용"]
+    assert block(other, "능력 사용")["종류"] == "글" and block(other, "능력 사용")["내용"] == "능력이 없습니다."
     assert block(mine, "능력 사용 완료")["전체"] == 1 and block(other, "능력 사용 완료")["완료"] == 0
 
 
