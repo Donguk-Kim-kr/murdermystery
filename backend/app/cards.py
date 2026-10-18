@@ -126,7 +126,7 @@ class CardHost:
         return [Ref("장소", p["순서"]) for p in clues.leaf_places(self.game)]
 
     def fn_보유목록(self, 플레이어: Any) -> list[dict[str, Any]]:
-        """이 플레이어가 지금 가진 단서·증언(얻은 순서). 각 항목은 {종류, 이름, 내용, 장소}."""
+        """이 플레이어가 지금 가진 단서·증언(얻은 순서). 각 항목은 {종류, 이름, 공개이름, 내용, 장소}."""
         return clues.holdings_of(self.game, self._player_account(플레이어))
 
     def fn_인물찾기(self, 순서: Any) -> Ref | None:
@@ -177,7 +177,7 @@ class CardHost:
         return None
 
     def fn_모든_단서(self) -> list[dict[str, Any]]:
-        """작품의 모든 단서와 증언(누가 가졌는지와 상관없이). 전체 공개 단계가 보여 준다. 각 항목은 {종류, 이름, 내용, 장소}."""
+        """작품의 모든 단서와 증언(누가 가졌는지와 상관없이). 전체 공개 단계가 보여 준다. 각 항목은 {종류, 이름, 공개이름, 내용, 장소}."""
         out = []
         for kind in ("단서", "증언"):
             for row in sorted(self.game.snapshot.get(kind) or [], key=lambda r: r["순서"]):
@@ -340,7 +340,7 @@ class CardHost:
         for item in list(항목)[:MAX_CARDS]:
             if not isinstance(item, dict):
                 raise ScriptError("카드목록의 항목은 보유목록() 이 돌려준 카드여야 합니다")
-            card = {k: _text(item.get(k)) for k in ("종류", "이름", "내용", "장소", "주인")}
+            card = {k: _text(item.get(k)) for k in ("종류", "이름", "공개이름", "내용", "장소", "주인")}
             if isinstance(item.get("순서"), int):
                 card["순서"] = item["순서"]
             if isinstance(item.get("양도가능"), bool):

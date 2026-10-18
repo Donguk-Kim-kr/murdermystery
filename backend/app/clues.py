@@ -67,10 +67,13 @@ def investigate(game, account: int, place_slot: int, io) -> dict[str, Any] | Non
 
 
 def describe(game, kind: str, row: dict[str, Any]) -> dict[str, Any]:
+    """카드 하나. `공개이름` 은 남들에게 보이는 이름(비워 두었으면 진짜 이름), `이름` 은 진짜 이름이다."""
     place = place_path(game, row["장소_순서"]) if row.get("장소_순서") is not None else ""
-    if kind == "단서":
-        return {"종류": "단서", "순서": row["순서"], "이름": row.get("이름") or "", "내용": row.get("내용") or "", "장소": place}
-    return {"종류": "증언", "순서": row["순서"], "이름": f"{row.get('화자') or ''}의 증언", "내용": row.get("내용") or "", "장소": place}
+    name = row.get("이름") or ""
+    return {
+        "종류": kind, "순서": row["순서"], "이름": name, "공개이름": row.get("공개이름") or name,
+        "내용": row.get("내용") or "", "장소": place,
+    }
 
 
 def holdings_of(game, account: int) -> list[dict[str, Any]]:

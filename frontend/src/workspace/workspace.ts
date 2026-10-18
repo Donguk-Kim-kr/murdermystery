@@ -21,7 +21,16 @@ export interface ResourceMeta {
   title_fields: string[];
   group_by: string | null;
   help: string | null;
+  /** 화면에 따로 보이지 않는 항목(다른 항목의 입력 화면에 합쳐져 있다) */
+  hidden?: boolean;
+  /** 조합처럼 재료 목록을 함께 입력받는 항목 */
+  has_parts?: boolean;
   fields: FieldMeta[];
+}
+
+export interface Part {
+  종류: "단서" | "증언" | "조합";
+  순서: number;
 }
 
 export interface Schema {

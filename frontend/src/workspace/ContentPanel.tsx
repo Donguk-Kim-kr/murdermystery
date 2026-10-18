@@ -3,7 +3,7 @@ import { useState, type FormEvent } from "react";
 import { errorMessage, http } from "../api/client";
 import {
   metaOf, refLabel, rowsOf, titleOf, useWorkspace,
-  type FieldMeta, type ResourceMeta, type Row, type Workspace,
+  type FieldMeta, type Part, type ResourceMeta, type Row, type Workspace,
 } from "./workspace";
 
 /** 작업공간의 한 탭: 주어진 종류의 항목들을 목록과 입력 양식으로 보여 준다. 순서와 무관하게 아무거나 먼저 채울 수 있다. */
@@ -14,7 +14,7 @@ export function ContentPanel({ workId, keys }: { workId: number; keys: string[] 
   return (
     <div className="stack">
       {ws.schema.resources
-        .filter((r) => keys.includes(r.key))
+        .filter((r) => keys.includes(r.key) && !r.hidden)
         .sort((a, b) => keys.indexOf(a.key) - keys.indexOf(b.key))
         .map((meta) => (
           <ResourceSection key={meta.key} workId={workId} ws={ws} meta={meta} />
@@ -98,8 +98,17 @@ function summary(ws: Workspace, meta: ResourceMeta, row: Row): string {
     else if (f.kind === "text" || f.kind === "long") parts.push(`${f.label}: ${String(v).slice(0, 40)}`);
     else parts.push(`${f.label}: ${String(v)}`);
   }
+  if (meta.has_parts) {
+    const used = (row.재료 as Part[] | undefined) ?? [];
+    parts.push(used.length === 0 ? "재료 없음" : `재료: ${used.map((p) => partLabel(ws, p)).join(", ")}`);
+  }
   return parts.join(" · ");
 }
+
+const PART_KEYS: Record<Part["종류"], string> = { 단서: "clues", 증언: "testimonies", 조합: "combos" };
+const PART_KINDS = Object.keys(PART_KEYS) as Part["종류"][];
+
+const partLabel = (ws: Workspace, p: Part) => `${p.종류} ${refLabel(ws, PART_KEYS[p.종류], p.순서)}`;
 
 type Draft = Record<string, string | boolean>;
 
@@ -138,6 +147,7 @@ export function RowForm(props: {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fields = meta.fields.filter((f) => f.kind !== "libref"); // 진행단계·기믹 선택은 흐름 탭 전용 화면에서 한다
+  const [parts, setParts] = useState<Part[]>(((row?.재료 as Part[] | undefined) ?? []).map((p) => ({ 종류: p.종류, 순서: p.순서 })));
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -149,6 +159,7 @@ export function RowForm(props: {
       setError("JSON 형식이 올바르지 않습니다. 예: {}");
       return;
     }
+    if (meta.has_parts) body.재료 = parts;
     setBusy(true);
     const base = `/api/works/${workId}/content/${meta.key}`;
     const res = row ? await http("PATCH", `${base}/${row[meta.key_col]}`, body) : await http("POST", base, body);
@@ -166,6 +177,7 @@ export function RowForm(props: {
           <FieldInput key={f.name} f={f} ws={ws} value={draft[f.name]} onChange={(v) => set(f.name, v)} />
         ))}
       </div>
+      {meta.has_parts && <PartsPicker ws={ws} parts={parts} onChange={setParts} selfOrder={row ? (row.순서 as number) : null} />}
       {error && <p role="alert" className="error">{error}</p>}
       <div className="row start">
         <button type="submit" disabled={busy}>저장</button>
@@ -219,5 +231,55 @@ function FieldInput({ f, ws, value, onChange }: {
       </label>
       {hint}
     </div>
+  );
+}
+
+/** 조합의 재료 고르기: 단서·증언·조합 버튼을 누르면 그 종류의 항목 목록이 나오고, 하나를 고르면 재료에 더해진다. 같은 재료는 한 번만 들어간다. */
+function PartsPicker({ ws, parts, onChange, selfOrder }: {
+  ws: Workspace; parts: Part[]; onChange: (parts: Part[]) => void; selfOrder: number | null;
+}) {
+  const [kind, setKind] = useState<Part["종류"] | null>(null);
+  const has = (k: Part["종류"], order: number) => parts.some((p) => p.종류 === k && p.순서 === order);
+  const choices = kind === null ? [] : rowsOf(ws, PART_KEYS[kind]).filter(
+    (r) => !has(kind, r.순서 as number) && !(kind === "조합" && r.순서 === selfOrder),   // 자기 자신은 재료가 될 수 없다
+  );
+
+  function add(order: number) {
+    if (kind !== null && !has(kind, order)) onChange([...parts, { 종류: kind, 순서: order }]);
+  }
+
+  return (
+    <fieldset className="parts">
+      <legend>재료</legend>
+      {parts.length === 0 && <p className="muted">재료가 없습니다. 아래 버튼으로 단서·증언·조합을 골라 넣으세요.</p>}
+      <ul className="item-list">
+        {parts.map((p) => (
+          <li key={`${p.종류}-${p.순서}`} className="item">
+            <span className="body"><span className="name">{partLabel(ws, p)}</span></span>
+            <button type="button" className="small secondary" aria-label={`재료에서 빼기: ${partLabel(ws, p)}`}
+              onClick={() => onChange(parts.filter((q) => q !== p))}>빼기</button>
+          </li>
+        ))}
+      </ul>
+      <div className="row start" role="group" aria-label="재료 종류">
+        {PART_KINDS.map((k) => (
+          <button key={k} type="button" className={kind === k ? "small" : "small secondary"} aria-pressed={kind === k}
+            onClick={() => setKind(kind === k ? null : k)}>
+            {`${k} 넣기`}
+          </button>
+        ))}
+      </div>
+      {kind !== null && (
+        <label>
+          {`넣을 ${kind}`}
+          <select value="" onChange={(e) => { if (e.target.value !== "") add(Number(e.target.value)); }}>
+            <option value="">{choices.length === 0 ? `넣을 수 있는 ${kind}이(가) 없습니다` : "선택…"}</option>
+            {choices.map((r) => (
+              <option key={String(r.순서)} value={String(r.순서)}>{refLabel(ws, PART_KEYS[kind], r.순서 as number)}</option>
+            ))}
+          </select>
+        </label>
+      )}
+    </fieldset>
   );
 }

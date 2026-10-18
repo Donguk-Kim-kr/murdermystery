@@ -30,13 +30,13 @@ const schema = {
       field("상위_장소_순서", "ref", { ref: "places", label: "상위 장소" }),
     ] },
     { key: "clues", label: "단서", key_col: "순서", title_fields: ["이름"], group_by: null, help: null, fields: [
-      field("이름", "text", { required: true }), field("인물_순서", "ref", { ref: "characters", label: "관련 인물" }),
+      field("이름", "text", { required: true }), field("공개이름", "text"), field("인물_순서", "ref", { ref: "characters", label: "관련 인물" }),
     ] },
-    { key: "testimonies", label: "증언", key_col: "순서", title_fields: ["화자"], group_by: null, help: null, fields: [
-      field("화자", "text", { required: true }), field("내용", "long", { required: true }),
+    { key: "testimonies", label: "증언", key_col: "순서", title_fields: ["이름"], group_by: null, help: null, fields: [
+      field("이름", "text", { required: true }), field("공개이름", "text"), field("내용", "long", { required: true }),
     ] },
-    { key: "combos", label: "조합", key_col: "순서", title_fields: ["이름"], group_by: null, help: null, fields: [field("이름", "text", { required: true })] },
-    { key: "combo-parts", label: "조합 재료", key_col: "번호", title_fields: [], group_by: "결과_조합_순서", help: null, fields: [
+    { key: "combos", label: "조합", key_col: "순서", title_fields: ["이름"], group_by: null, help: null, has_parts: true, fields: [field("이름", "text", { required: true })] },
+    { key: "combo-parts", label: "조합 재료", key_col: "번호", title_fields: [], group_by: "결과_조합_순서", help: null, hidden: true, fields: [
       field("결과_조합_순서", "ref", { ref: "combos", required: true }),
     ] },
     { key: "relations", label: "관계", key_col: "번호", title_fields: [], group_by: "인물_순서", help: null, fields: [
@@ -158,6 +158,46 @@ describe("작업공간 탭", () => {
     await userEvent.click(screen.getByRole("tab", { name: "조사" }));
     for (const name of ["단서", "증언", "조합"]) expect(await screen.findByRole("region", { name })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "장소" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "조합 재료" })).not.toBeInTheDocument();        // 재료는 조합 입력 화면에 합쳐져 있다
+  });
+
+  it("조합은 재료를 단서·증언·조합 버튼으로 골라 한 번에 저장하고, 같은 재료는 한 번만 들어간다", async () => {
+    bundle.clues = [{ 순서: 1, 이름: "커터칼", 공개이름: "A의 서랍" }];
+    bundle.testimonies = [{ 순서: 1, 이름: "A의 마약소문", 공개이름: "지나가던 사람", 내용: "들었습니다" }];
+    bundle.combos = [{ 순서: 1, 이름: "안쪽", 재료: [] }];
+    routes["POST /api/works/7/content/combos"] = () => json({ 순서: 2 }, 201);
+    renderApp("/works/7?tab=clues");
+    const section = within(await screen.findByRole("region", { name: "조합" }));
+    await userEvent.click(section.getByRole("button", { name: "조합 추가" }));
+    const form = within(section.getByRole("form", { name: "조합 추가" }));
+    await userEvent.type(form.getByLabelText("이름"), "완성");
+    await userEvent.click(form.getByRole("button", { name: "단서 넣기" }));
+    await userEvent.selectOptions(form.getByLabelText("넣을 단서"), "1");
+    expect(form.queryByRole("option", { name: /커터칼/ })).not.toBeInTheDocument();             // 이미 넣은 재료는 다시 고를 수 없다
+    await userEvent.click(form.getByRole("button", { name: "증언 넣기" }));
+    await userEvent.selectOptions(form.getByLabelText("넣을 증언"), "1");
+    await userEvent.click(form.getByRole("button", { name: "조합 넣기" }));
+    await userEvent.selectOptions(form.getByLabelText("넣을 조합"), "1");
+    expect(form.getAllByRole("button", { name: /^재료에서 빼기/ })).toHaveLength(3);
+    await userEvent.click(form.getByRole("button", { name: /재료에서 빼기: 조합/ }));
+    expect(form.getAllByRole("button", { name: /^재료에서 빼기/ })).toHaveLength(2);
+    await userEvent.click(form.getByRole("button", { name: "저장" }));
+    await waitFor(() => expect(sent("POST /api/works/7/content/combos")).toHaveLength(1));
+    expect(await sent("POST /api/works/7/content/combos")[0].req.json()).toEqual({
+      이름: "완성", 재료: [{ 종류: "단서", 순서: 1 }, { 종류: "증언", 순서: 1 }],
+    });
+  });
+
+  it("조합 편집에서 자기 자신은 재료로 고를 수 없다", async () => {
+    bundle.combos = [{ 순서: 1, 이름: "안쪽", 재료: [] }, { 순서: 2, 이름: "바깥", 재료: [{ 종류: "조합", 순서: 1 }] }];
+    renderApp("/works/7?tab=clues");
+    const section = within(await screen.findByRole("region", { name: "조합" }));
+    expect(section.getByText(/재료: 조합 1\. 안쪽/)).toBeInTheDocument();
+    await userEvent.click(section.getAllByRole("button", { name: "편집" })[0]);
+    const form = within(section.getByRole("form", { name: "조합 수정" }));
+    await userEvent.click(form.getByRole("button", { name: "조합 넣기" }));
+    expect(form.queryByRole("option", { name: /안쪽/ })).not.toBeInTheDocument();
+    expect(form.getByRole("option", { name: /바깥/ })).toBeInTheDocument();
   });
 
   it("확인 탭은 게임 흐름을 세로로 보여 주고 확정 검사를 함께 한다", async () => {
@@ -193,7 +233,7 @@ describe("작업공간 탭", () => {
     await userEvent.selectOptions(within(form).getByLabelText("관련 인물"), "1");
     await userEvent.click(within(form).getByRole("button", { name: "저장" }));
     await waitFor(() => expect(sent("POST /api/works/7/content/clues")).toHaveLength(1));
-    expect(await sent("POST /api/works/7/content/clues")[0].req.json()).toEqual({ 이름: "편지", 인물_순서: 1 });
+    expect(await sent("POST /api/works/7/content/clues")[0].req.json()).toEqual({ 이름: "편지", 공개이름: null, 인물_순서: 1 });
   });
 
   it("JSON 칸이 잘못되면 보내지 않고 안내한다, 서버 오류는 그대로 보여 준다", async () => {

@@ -68,7 +68,8 @@ class Builders(PgTestCase):
         return self.ins("단서", 작품_번호=w, 순서=n, **kw)
 
     def witness(self, w, n=1, **kw):
-        kw.setdefault("화자", "화자")
+        kw.setdefault("이름", "증언")
+        kw.setdefault("공개이름", "지나가던 사람")
         kw.setdefault("내용", "내용")
         return self.ins("증언", 작품_번호=w, 순서=n, **kw)
 

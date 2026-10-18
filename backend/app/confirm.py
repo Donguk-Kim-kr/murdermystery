@@ -117,6 +117,11 @@ def check_work(conn: Connection, work_id: int) -> dict:
             warnings.append(
                 f"페이즈 {row['phase']}에 연결된 {word} '{row['이름']}' v{row['버전']}은(는) 삭제되어 확정 내용에서 빠집니다."
             )
+    for combo in conn.execute(
+        'SELECT c."이름" FROM "조합" c WHERE c."작품_번호" = %s AND NOT EXISTS '
+        '(SELECT 1 FROM "조합재료" m WHERE m."작품_번호" = c."작품_번호" AND m."결과_조합_순서" = c."순서") ORDER BY c."순서"', (work_id,)
+    ).fetchall():
+        warnings.append(f"조합 '{combo['이름']}'에 재료가 없습니다.")
     errors.extend(script_errors(conn, work_id))
     errors.extend(condition_errors(conn, work_id))
     warnings.extend(story_selection_warnings(conn, work_id))

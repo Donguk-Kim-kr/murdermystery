@@ -20,11 +20,11 @@ def build(client, host, wid):
     kitchen = add("places", 이름="주방", 상위_장소_순서=mansion)
     garden = add("places", 이름="정원", 유형="야외")
     add("places", 이름="연못")
-    add("clues", 이름="찢어진 편지", 내용="편지 내용 XYZ1", 장소_순서=study)
+    add("clues", 이름="찢어진 편지", 공개이름="서랍 속 종이", 내용="편지 내용 XYZ1", 장소_순서=study)
     add("clues", 이름="깨진 안경", 내용="안경 내용 XYZ2", 장소_순서=study)
     add("clues", 이름="독이 든 컵", 내용="컵 내용 XYZ3", 장소_순서=kitchen)
-    add("testimonies", 화자="집사", 내용="증언 내용 XYZ4", 장소_순서=kitchen)
-    add("testimonies", 화자="정원사", 내용="증언 내용 XYZ5", 장소_순서=garden)
+    add("testimonies", 이름="집사의 증언", 공개이름="집사", 내용="증언 내용 XYZ4", 장소_순서=kitchen)
+    add("testimonies", 이름="정원사의 증언", 공개이름="정원사", 내용="증언 내용 XYZ5", 장소_순서=garden)
 
 
 @pytest.fixture
@@ -39,6 +39,11 @@ def game(client, make_scripted_game):
 
 def pick(client, who, qid, place):
     return answer(client, who, qid, place)
+
+
+def newest(view):
+    """방금 얻은 카드: 조사 결과 칸은 따로 없고, 얻은 것은 내 단서 탭의 맨 끝에 쌓인다."""
+    return tab(view, "내 단서")["항목"][-1]
 
 
 def places_of(client, who):
@@ -60,10 +65,11 @@ def test_picking_a_place_gives_the_next_clue_and_uses_a_count(client, game, db):
     res = pick(client, people[0], qid, names["저택 › 서재"])
     assert res.status_code == 200
     view = res.json()
-    assert block(view, "조사 결과")["내용"] == "찢어진 편지: 편지 내용 XYZ1"
+    assert block(view, "조사 결과") is None                                              # 조사 결과를 따로 보여 주지 않는다
     assert block(view, "조사 횟수")["완료"] == 1 and block(view, "조사 횟수")["전체"] == 2
     mine = tab(view, "내 단서")
     assert [c["이름"] for c in mine["항목"]] == ["찢어진 편지"] and mine["항목"][0]["장소"] == "저택 › 서재"
+    assert mine["항목"][0]["공개이름"] == "서랍 속 종이" and mine["항목"][0]["내용"] == "편지 내용 XYZ1"
     rows = db.execute('SELECT 단서_순서, 증언_순서, 획득방법, 보유여부 FROM "획득" WHERE 진행_번호 = (SELECT 번호 FROM "진행" WHERE 방_번호 = %s)', (room["번호"],)).fetchall()
     assert rows == [(1, None, "조사", True)]
 
@@ -71,10 +77,10 @@ def test_picking_a_place_gives_the_next_clue_and_uses_a_count(client, game, db):
 def test_a_clue_goes_to_one_player_only_and_the_next_picker_gets_the_next_one(client, game):
     people, names, qid, _ = game
     study = names["저택 › 서재"]
-    assert block(pick(client, people[0], qid, study).json(), "조사 결과")["내용"].startswith("찢어진 편지")
-    assert block(pick(client, people[1], qid, study).json(), "조사 결과")["내용"].startswith("깨진 안경")
+    assert newest(pick(client, people[0], qid, study).json())["이름"] == "찢어진 편지"
+    assert newest(pick(client, people[1], qid, study).json())["이름"] == "깨진 안경"
     third = pick(client, people[2], qid, study).json()                                  # 단서가 모두 나갔다
-    assert block(third, "조사 결과") is None
+    assert tab(third, "내 단서")["항목"] == []
     assert [n["글"] for n in third["알림"]] == ["이 장소에서는 더 얻을 것이 없습니다."]
     assert block(third, "조사 횟수")["완료"] == 0                                         # 얻지 못하면 횟수를 쓰지 않는다
     for who in people:
@@ -85,7 +91,8 @@ def test_testimonies_are_gotten_once_by_each_player(client, game):
     people, names, qid, _ = game
     garden = names["정원"]
     for who in people:
-        assert block(pick(client, who, qid, garden).json(), "조사 결과")["내용"] == "정원사의 증언: 증언 내용 XYZ5"
+        got = newest(pick(client, who, qid, garden).json())
+        assert (got["이름"], got["공개이름"], got["내용"]) == ("정원사의 증언", "정원사", "증언 내용 XYZ5")
     again = pick(client, people[0], qid, garden).json()                  # 이미 얻은 증언은 다시 얻을 수 없고, 횟수도 쓰지 않는다
     assert [n["글"] for n in again["알림"]] == ["이 장소에서는 더 얻을 것이 없습니다."]
     assert block(again, "조사 횟수")["완료"] == 1
@@ -95,9 +102,9 @@ def test_testimonies_are_gotten_once_by_each_player(client, game):
 def test_kitchen_gives_the_clue_before_the_testimony(client, game):
     people, names, qid, _ = game
     kitchen = names["저택 › 주방"]
-    first = block(pick(client, people[0], qid, kitchen).json(), "조사 결과")["내용"]
-    second = block(pick(client, people[1], qid, kitchen).json(), "조사 결과")["내용"]
-    assert first.startswith("독이 든 컵") and second.startswith("집사의 증언")
+    first = newest(pick(client, people[0], qid, kitchen).json())["이름"]
+    second = newest(pick(client, people[1], qid, kitchen).json())["이름"]
+    assert first == "독이 든 컵" and second == "집사의 증언"
     assert places_of(client, people[0])["저택 › 주방"]["비활성"] is False       # 이 사람은 아직 증언을 얻지 않았다
     assert places_of(client, people[1])["저택 › 주방"]["비활성"] is True
 
@@ -116,16 +123,16 @@ def test_count_limit_per_player(client, game):
 def test_bad_place_values_do_not_break_the_card_or_use_a_count(client, game, value):
     people, names, qid, _ = game
     res = pick(client, people[0], qid, value)
-    assert res.status_code == 200 and block(res.json(), "조사 결과") is None
+    assert res.status_code == 200 and tab(res.json(), "내 단서")["항목"] == []
     assert state(client, people[0]).json()["오류"] == [] and state(client, people[1]).json()["오류"] == []
-    assert block(pick(client, people[0], qid, names["정원"]).json(), "조사 결과") is not None   # 카드가 계속 동작한다
+    assert newest(pick(client, people[0], qid, names["정원"]).json())["이름"] == "정원사의 증언"   # 카드가 계속 동작한다
     assert block(state(client, people[0]).json(), "조사 횟수")["완료"] == 1
 
 
 def test_places_that_are_not_innermost_cannot_be_investigated(client, game):
     people, _, qid, _ = game
     res = pick(client, people[0], qid, 1)                                                  # 저택(바깥 장소)
-    assert block(res.json(), "조사 결과") is None
+    assert tab(res.json(), "내 단서")["항목"] == []
 
 
 def test_simultaneous_picks_give_each_clue_to_exactly_one_player(client, game, db):

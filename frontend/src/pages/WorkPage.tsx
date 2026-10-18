@@ -113,7 +113,7 @@ export function WorkPage() {
         )}
       </nav>
       {tab === "places" && <ContentPanel workId={workId} keys={["places"]} />}
-      {tab === "clues" && <ContentPanel workId={workId} keys={["clues", "testimonies", "combos", "combo-parts"]} />}
+      {tab === "clues" && <ContentPanel workId={workId} keys={["clues", "testimonies", "combos"]} />}
       {tab === "incidents" && <ContentPanel workId={workId} keys={["incidents", "incident-details", "timelines"]} />}
       {tab === "relations" && <ContentPanel workId={workId} keys={["materials"]} />}
       {tab === "phases" && (

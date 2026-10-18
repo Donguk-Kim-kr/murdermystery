@@ -114,7 +114,7 @@ class TestOrderChecksAndUniqueness(Builders):
             if table == "단서":
                 return dict(작품_번호=w, 순서=n, 이름="a")
             if table == "증언":
-                return dict(작품_번호=w, 순서=n, 화자="a", 내용="b")
+                return dict(작품_번호=w, 순서=n, 이름="a", 내용="b")
             if table == "조합":
                 return dict(작품_번호=w, 순서=n, 이름="a")
             if table == "사건":
@@ -186,8 +186,8 @@ class TestCompositeForeignKeys(Builders):
         return [
             ("단서", "인물_순서", dict(작품_번호=w, 순서=50, 이름="x")),
             ("단서", "장소_순서", dict(작품_번호=w, 순서=51, 이름="x")),
-            ("증언", "인물_순서", dict(작품_번호=w, 순서=50, 화자="x", 내용="y")),
-            ("증언", "장소_순서", dict(작품_번호=w, 순서=51, 화자="x", 내용="y")),
+            ("증언", "인물_순서", dict(작품_번호=w, 순서=50, 이름="x", 내용="y")),
+            ("증언", "장소_순서", dict(작품_번호=w, 순서=51, 이름="x", 내용="y")),
             ("장소", "상위_장소_순서", dict(작품_번호=w, 순서=50, 이름="x")),
             ("사건설명", "인물_순서", dict(작품_번호=w, 사건_순서=1)),
             ("후일담", "인물_순서", dict(작품_번호=w, 순서=50, 내용="x")),

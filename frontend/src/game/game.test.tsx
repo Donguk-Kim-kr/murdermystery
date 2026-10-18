@@ -361,17 +361,28 @@ describe("조사 블록", () => {
       탭: [{
         종류: "카드목록", 이름: "내 단서", 카드: "조사",
         항목: [
-          { 종류: "단서", 이름: "찢어진 편지", 내용: "편지 내용", 장소: "저택 › 서재" },
-          { 종류: "증언", 이름: "집사의 증언", 내용: "저는 보았습니다", 장소: "저택 › 주방" },
+          { 종류: "단서", 이름: "찢어진 편지", 공개이름: "서랍 속 종이", 내용: "편지 내용", 장소: "저택 › 서재" },
+          { 종류: "증언", 이름: "집사의 증언", 공개이름: "집사", 내용: "저는 보았습니다", 장소: "저택 › 주방" },
         ],
       }],
     });
     render(<GamePage />);
     await userEvent.setup().click(await screen.findByRole("tab", { name: "내 단서" }));
     const list = screen.getByRole("region", { name: "내 단서" });
-    expect(within(list).getByText("찢어진 편지")).toBeInTheDocument();
+    expect(within(list).getByText("서랍 속 종이")).toBeInTheDocument();                       // 남들에게 보이는 이름
+    expect(within(list).getByText("찢어진 편지")).toBeInTheDocument();                       // 진짜 이름이 그 아래에 있다
     expect(within(list).getByText("저택 › 주방")).toBeInTheDocument();
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(list).queryByText("편지 내용")).not.toBeInTheDocument();                   // 내용은 눌러야 펼쳐진다
+    await userEvent.setup().click(within(list).getByRole("button", { name: /서랍 속 종이/ }));
+    expect(within(list).getByText("편지 내용")).toBeInTheDocument();
+  });
+
+  it("공개이름이 없으면 이름 하나만 보인다", async () => {
+    state = makeState({ 탭: [{ 종류: "카드목록", 이름: "내 단서", 카드: "조사", 항목: [{ 종류: "단서", 이름: "찢어진 편지", 내용: "편지 내용", 장소: "서재" }] }] });
+    render(<GamePage />);
+    await userEvent.setup().click(await screen.findByRole("tab", { name: "내 단서" }));
+    expect(screen.getAllByText("찢어진 편지")).toHaveLength(1);
   });
 
   it("얻은 것이 없으면 안내한다", async () => {
@@ -411,7 +422,8 @@ describe("단서 보여 주기·양도", () => {
     const cards = screen.getAllByRole("listitem");
     expect(within(cards[0]).getByRole("button", { name: "보여 주기" })).toBeInTheDocument();
     expect(within(cards[0]).getByRole("button", { name: "양도" })).toBeInTheDocument();
-    expect(within(cards[1]).queryByRole("button")).toBeNull();
+    expect(within(cards[1]).queryByRole("button", { name: "보여 주기" })).toBeNull();
+    expect(within(cards[1]).queryByRole("button", { name: "양도" })).toBeNull();
     expect(within(cards[0]).getByText("공개하지 않음")).toBeInTheDocument();
   });
 

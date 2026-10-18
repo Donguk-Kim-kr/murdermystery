@@ -2,7 +2,7 @@
 
 > `db/scripts/dump_schema_md.py` 가 마이그레이션이 적용된 실제 DB 에서 추출한 문서입니다. 직접 수정하지 마세요.
 
-테이블 32개 (생성 순서)
+테이블 33개 (생성 순서)
 
 | 번호 | 테이블 |
 |---|---|
@@ -38,6 +38,7 @@
 | 30 | 참여 |
 | 31 | 엔딩분기 |
 | 32 | 진행순서 |
+| 33 | 공개 |
 
 ## 계정
 
@@ -349,6 +350,7 @@
 | 6 | 기능 | text | 가능 |  |
 | 7 | 인물_순서 | integer | 가능 |  |
 | 8 | 장소_순서 | integer | 가능 |  |
+| 9 | 공개이름 | text | 가능 |  |
 
 **제약조건**
 
@@ -373,10 +375,11 @@
 | 1 | 번호 | integer | 불가 | IDENTITY (GENERATED ALWAYS) |
 | 2 | 작품_번호 | integer | 불가 |  |
 | 3 | 순서 | integer | 불가 |  |
-| 4 | 화자 | text | 불가 |  |
+| 4 | 공개이름 | text | 가능 |  |
 | 5 | 내용 | text | 불가 |  |
 | 6 | 인물_순서 | integer | 가능 |  |
 | 7 | 장소_순서 | integer | 가능 |  |
+| 8 | 이름 | text | 불가 |  |
 
 **제약조건**
 
@@ -404,6 +407,7 @@
 | 4 | 이름 | text | 불가 |  |
 | 5 | 내용 | text | 가능 |  |
 | 6 | 기능 | text | 가능 |  |
+| 7 | 공개이름 | text | 가능 |  |
 
 **제약조건**
 
@@ -623,9 +627,9 @@
 
 **추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
 
-- `uq_방_입장코드_사용중`: `CREATE UNIQUE INDEX "uq_방_입장코드_사용중" ON public."방" USING btree ("입장코드") WHERE ("상태" <> '종료'::text)` — 종료되지 않은 방끼리만 코드가 유일하다(0022)
 - `ix_방_계정`: `CREATE INDEX "ix_방_계정" ON public."방" USING btree ("계정_번호")`
 - `ix_방_버전`: `CREATE INDEX "ix_방_버전" ON public."방" USING btree ("작품_번호", "버전_버전")`
+- `uq_방_입장코드_사용중`: `CREATE UNIQUE INDEX "uq_방_입장코드_사용중" ON public."방" USING btree ("입장코드") WHERE ("상태" <> '종료'::text)`
 
 **트리거**
 
@@ -770,31 +774,6 @@
 - `ix_획득_진행`: `CREATE INDEX "ix_획득_진행" ON public."획득" USING btree ("진행_번호")`
 - `ix_획득_참여`: `CREATE INDEX "ix_획득_참여" ON public."획득" USING btree ("참여_번호")`
 
-
-## 공개
-
-게임 중 단서를 다른 참가자에게 보여 준 기록. 대상이 비어 있으면 전체 공개이고, 취소일시가 비어 있으면 유효하다(0021).
-
-| 순번 | 컬럼 | 타입 | NULL | 기본값 / 특성 |
-|---|---|---|---|---|
-| 1 | 번호 | integer | 불가 | IDENTITY (GENERATED ALWAYS) |
-| 2 | 작품_번호 | integer | 불가 |  |
-| 3 | 진행_번호 | integer | 불가 |  |
-| 4 | 획득_번호 | integer | 불가 |  |
-| 5 | 대상_참여_번호 | integer | 가능 |  |
-| 6 | 공개일시 | timestamp with time zone | 불가 | CURRENT_TIMESTAMP |
-| 7 | 취소일시 | timestamp with time zone | 가능 |  |
-
-**제약조건**
-
-| 종류 | 이름 | 정의 |
-|---|---|---|
-| PK | `pk_공개` | `PRIMARY KEY ("번호")` |
-| FK | `fk_공개_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE RESTRICT` |
-| FK | `fk_공개_진행` | `FOREIGN KEY ("진행_번호") REFERENCES "진행"("번호") ON DELETE CASCADE` |
-| FK | `fk_공개_획득` | `FOREIGN KEY ("획득_번호") REFERENCES "획득"("번호") ON DELETE CASCADE` |
-| FK | `fk_공개_참여` | `FOREIGN KEY ("대상_참여_번호") REFERENCES "참여"("번호") ON DELETE CASCADE` |
-
 ## 테스터
 
 | 순번 | 컬럼 | 타입 | NULL | 기본값 / 특성 |
@@ -908,4 +887,33 @@
 | FK | `fk_진행순서_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE CASCADE` |
 | CHECK | `ck_진행순서_순서` | `CHECK (("순서" >= 1))` |
 | CHECK | `ck_진행순서_진행시간` | `CHECK (("진행시간" >= 0))` |
+
+## 공개
+
+| 순번 | 컬럼 | 타입 | NULL | 기본값 / 특성 |
+|---|---|---|---|---|
+| 1 | 번호 | integer | 불가 | IDENTITY (GENERATED ALWAYS) |
+| 2 | 작품_번호 | integer | 불가 |  |
+| 3 | 진행_번호 | integer | 불가 |  |
+| 4 | 획득_번호 | integer | 불가 |  |
+| 5 | 대상_참여_번호 | integer | 가능 |  |
+| 6 | 공개일시 | timestamp with time zone | 불가 | CURRENT_TIMESTAMP |
+| 7 | 취소일시 | timestamp with time zone | 가능 |  |
+
+**제약조건**
+
+| 종류 | 이름 | 정의 |
+|---|---|---|
+| PK | `pk_공개` | `PRIMARY KEY ("번호")` |
+| FK | `fk_공개_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE RESTRICT` |
+| FK | `fk_공개_진행` | `FOREIGN KEY ("진행_번호") REFERENCES "진행"("번호") ON DELETE CASCADE` |
+| FK | `fk_공개_참여` | `FOREIGN KEY ("대상_참여_번호") REFERENCES "참여"("번호") ON DELETE CASCADE` |
+| FK | `fk_공개_획득` | `FOREIGN KEY ("획득_번호") REFERENCES "획득"("번호") ON DELETE CASCADE` |
+
+**추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
+
+- `ix_공개_작품`: `CREATE INDEX "ix_공개_작품" ON public."공개" USING btree ("작품_번호")`
+- `ix_공개_진행`: `CREATE INDEX "ix_공개_진행" ON public."공개" USING btree ("진행_번호")`
+- `ix_공개_참여`: `CREATE INDEX "ix_공개_참여" ON public."공개" USING btree ("대상_참여_번호")`
+- `ix_공개_획득`: `CREATE INDEX "ix_공개_획득" ON public."공개" USING btree ("획득_번호")`
 

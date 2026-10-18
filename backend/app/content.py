@@ -50,6 +50,8 @@ class Resource:
     title: tuple[str, ...] = ()  # 목록에서 제목처럼 보여 줄 칸 (앞에서부터 처음 값이 있는 것)
     group_by: str | None = None  # 이 칸이 같은 항목끼리 묶어 보여 준다
     help: str | None = None
+    hidden: bool = False  # True: 화면에 따로 보이지 않는다(다른 항목의 입력 화면에 합쳐져 있다). API·스냅샷에는 그대로 있다
+    has_parts: bool = False  # True: 조합처럼 재료 목록(`재료`)을 함께 입력받는다
 
 
 def _ref(name: str, ref: str, label: str | None = None, required: bool = False) -> F:
@@ -65,28 +67,32 @@ RESOURCES: tuple[Resource, ...] = (
     ), title=("이름",)),
     Resource("clues", "단서", "단서", (
         F("이름", "text", True, 100, help=NAME_HELP),
+        F("공개이름", "text", max=100, help="남들에게 보여 주는 이름입니다(예: A의 서랍). 이름은 진짜 이름입니다. 비워 두어도 됩니다"),
         F("내용", "long", max=5000),
         F("기능", "long", max=2000),
         _ref("인물_순서", "characters", "관련 인물"),
         _ref("장소_순서", "places", "관련 장소"),
     ), title=("이름",)),
     Resource("testimonies", "증언", "증언", (
-        F("화자", "text", True, 100),
+        F("이름", "text", True, 100, help="진짜 이름입니다(예: A의 마약소문). "+NAME_HELP),
+        F("공개이름", "text", max=100, help="남들에게 보여 주는 이름입니다(예: 지나가던 사람). 비워 두어도 됩니다"),
         F("내용", "long", True, 5000),
         _ref("인물_순서", "characters", "관련 인물"),
         _ref("장소_순서", "places", "관련 장소"),
-    ), title=("화자", "내용")),
+    ), title=("이름", "내용")),
     Resource("combos", "조합", "조합", (
         F("이름", "text", True, 100, help=NAME_HELP),
+        F("공개이름", "text", max=100, help="남들에게 보여 주는 이름입니다(예: A의 서랍). 이름은 진짜 이름입니다. 비워 두어도 됩니다"),
         F("내용", "long", max=5000),
         F("기능", "long", max=2000),
-    ), title=("이름",)),
+    ), title=("이름",), has_parts=True,
+        help="재료는 단서·증언·조합에서 골라 넣습니다. 같은 재료를 두 번 넣어도 한 번만 쓰입니다."),
     Resource("combo-parts", "조합재료", "조합 재료", (
         _ref("결과_조합_순서", "combos", "만들어지는 조합", required=True),
         _ref("단서_순서", "clues", "재료: 단서"),
         _ref("증언_순서", "testimonies", "재료: 증언"),
         _ref("조합_순서", "combos", "재료: 조합"),
-    ), ordered=False, group_by="결과_조합_순서",
+    ), ordered=False, group_by="결과_조합_순서", hidden=True,
         help="재료는 단서·증언·조합 중 정확히 하나를 고릅니다."),
     Resource("incidents", "사건", "사건", (
         F("설명", "long", max=5000),
@@ -178,7 +184,7 @@ def content_schema(me: CurrentUser) -> dict:
         "resources": [
             {
                 "key": r.key, "label": r.label, "key_col": key_col(r), "title_fields": list(r.title),
-                "group_by": r.group_by, "help": r.help, "fields": [field_meta(f) for f in r.fields],
+                "group_by": r.group_by, "help": r.help, "hidden": r.hidden, "has_parts": r.has_parts, "fields": [field_meta(f) for f in r.fields],
             }
             for r in RESOURCES
         ],
@@ -264,12 +270,13 @@ def ensure_mine(conn: Connection, work_id: int, account_id: int) -> None:
 
 def select_rows(conn: Connection, res: Resource, work_id: int) -> list[dict]:
     cols = sql.SQL(", ").join(sql.Identifier(c) for c in columns(res))
-    return conn.execute(
+    rows = conn.execute(
         sql.SQL('SELECT {cols} FROM {t} WHERE "작품_번호" = %s ORDER BY {k}').format(
             cols=cols, t=sql.Identifier(res.table), k=sql.Identifier(key_col(res))
         ),
         (work_id,),
     ).fetchall()
+    return with_materials(conn, res, work_id, rows)
 
 
 def fetch_one(conn: Connection, res: Resource, work_id: int, item_id: int) -> dict:
@@ -282,7 +289,96 @@ def fetch_one(conn: Connection, res: Resource, work_id: int, item_id: int) -> di
     ).fetchone()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"{res.label}을(를) 찾을 수 없습니다")
-    return row
+    return with_materials(conn, res, work_id, [row])[0]
+
+
+MATERIAL_COLUMNS = {"단서": "단서_순서", "증언": "증언_순서", "조합": "조합_순서"}
+MAX_MATERIALS = 50
+
+
+def combo_materials(conn: Connection, work_id: int) -> dict[int, list[dict]]:
+    """조합 순서 → 재료 목록([{종류, 순서}], 넣은 순서대로). 화면은 조합 하나를 만들 때 재료를 함께 고르므로 조합에 붙여서 내려 준다."""
+    out: dict[int, list[dict]] = {}
+    for row in conn.execute(
+        'SELECT "결과_조합_순서", "단서_순서", "증언_순서", "조합_순서" FROM "조합재료" WHERE "작품_번호" = %s ORDER BY "번호"', (work_id,)
+    ).fetchall():
+        kind = next(k for k, col in MATERIAL_COLUMNS.items() if row[col] is not None)
+        out.setdefault(row["결과_조합_순서"], []).append({"종류": kind, "순서": row[MATERIAL_COLUMNS[kind]]})
+    return out
+
+
+def with_materials(conn: Connection, res: Resource, work_id: int, rows: list[dict]) -> list[dict]:
+    if res.key != "combos":
+        return rows
+    by_combo = combo_materials(conn, work_id)
+    return [{**r, "재료": by_combo.get(r["순서"], [])} for r in rows]
+
+
+def clean_materials(conn: Connection, work_id: int, raw: Any, combo_order: int | None) -> list[dict]:
+    """조합의 재료 목록을 검사한다. 같은 재료를 여러 번 넣어도 한 번만 남고, 없는 재료나 순환(자기 자신 포함)은 거부한다."""
+    if not isinstance(raw, list):
+        raise _invalid("재료: 목록으로 입력해 주세요")
+    if len(raw) > MAX_MATERIALS * 4:
+        raise _invalid(f"재료는 {MAX_MATERIALS}개까지 넣을 수 있습니다")
+    seen: set[tuple[str, int]] = set()
+    parts: list[dict] = []
+    for item in raw:
+        if not isinstance(item, dict) or item.get("종류") not in MATERIAL_COLUMNS:
+            raise _invalid("재료: 단서·증언·조합 중 하나여야 합니다")
+        order = item.get("순서")
+        if isinstance(order, bool) or not isinstance(order, int) or order < 1:
+            raise _invalid("재료: 번호를 읽을 수 없습니다")
+        key = (item["종류"], order)
+        if key in seen:
+            continue                                                  # 같은 재료는 한 번만 참조한다
+        seen.add(key)
+        parts.append({"종류": item["종류"], "순서": order})
+    if len(parts) > MAX_MATERIALS:
+        raise _invalid(f"재료는 {MAX_MATERIALS}개까지 넣을 수 있습니다")
+    for kind, table in (("단서", "단서"), ("증언", "증언"), ("조합", "조합")):
+        wanted = [p["순서"] for p in parts if p["종류"] == kind]
+        if wanted:
+            found = {
+                r["순서"] for r in conn.execute(
+                    sql.SQL('SELECT "순서" FROM {t} WHERE "작품_번호" = %s AND "순서" = ANY(%s)').format(t=sql.Identifier(table)),
+                    (work_id, wanted),
+                ).fetchall()
+            }
+            if found != set(wanted):
+                raise _invalid(f"재료: 이 작품에 없는 {kind}입니다")
+    combos = [p["순서"] for p in parts if p["종류"] == "조합"]
+    if combo_order is not None and combo_order in combos:
+        raise _invalid("재료: 조합이 자기 자신을 재료로 쓸 수 없습니다")
+    if combos and combo_order is not None:
+        # 다른 조합들의 재료 관계에서, 재료로 고른 조합들이 거슬러 올라가다 이 조합에 닿으면 순환이다.
+        uses: dict[int, list[int]] = {}
+        for row in conn.execute(
+            'SELECT "결과_조합_순서", "조합_순서" FROM "조합재료" WHERE "작품_번호" = %s AND "조합_순서" IS NOT NULL AND "결과_조합_순서" <> %s',
+            (work_id, combo_order),
+        ).fetchall():
+            uses.setdefault(row["결과_조합_순서"], []).append(row["조합_순서"])
+        stack, visited = list(combos), set()
+        while stack:
+            cur = stack.pop()
+            if cur == combo_order:
+                raise _invalid("재료: 조합이 서로를 재료로 쓰는 순환이 됩니다")
+            if cur in visited:
+                continue
+            visited.add(cur)
+            stack.extend(uses.get(cur, []))
+    return parts
+
+
+def save_materials(conn: Connection, work_id: int, combo_order: int, parts: list[dict]) -> None:
+    """조합의 재료를 통째로 바꾼다(DB 에는 조합재료 행으로 나눠 저장한다)."""
+    conn.execute('DELETE FROM "조합재료" WHERE "작품_번호" = %s AND "결과_조합_순서" = %s', (work_id, combo_order))
+    for part in parts:
+        conn.execute(
+            sql.SQL('INSERT INTO "조합재료" ("작품_번호", "결과_조합_순서", {c}) VALUES (%s, %s, %s)').format(
+                c=sql.Identifier(MATERIAL_COLUMNS[part["종류"]])
+            ),
+            (work_id, combo_order, part["순서"]),
+        )
 
 
 def check_library_access(conn: Connection, res: Resource, values: dict, account_id: int) -> None:
@@ -424,8 +520,10 @@ def list_items(work_id: int, key: str, conn: Conn, me: CurrentUser) -> list[dict
 def create_item(work_id: int, key: str, conn: Conn, me: CurrentUser, body: dict[str, Any] = Body(...)) -> dict:
     res = get_resource(key)
     lock_work(conn, work_id, me.계정.번호)
+    parts_raw = body.pop("재료", None) if res.has_parts else None
     values = clean_body(res, body, creating=True)
     check_library_access(conn, res, values, me.계정.번호)
+    parts = clean_materials(conn, work_id, parts_raw, None) if parts_raw is not None else None
     cols = ["작품_번호"]
     params: list[Any] = [work_id]
     if res.ordered:
@@ -445,8 +543,13 @@ def create_item(work_id: int, key: str, conn: Conn, me: CurrentUser, body: dict[
         ).fetchone()
     except errors.Error as exc:
         raise translate_db_error(exc) from exc
+    if parts is not None:
+        try:
+            save_materials(conn, work_id, row["순서"], parts)
+        except errors.Error as exc:
+            raise translate_db_error(exc) from exc
     touch_work(conn, work_id)
-    return row
+    return with_materials(conn, res, work_id, [row])[0]
 
 
 @router.patch("/{key}/{item_id}")
@@ -454,10 +557,18 @@ def update_item(work_id: int, key: str, item_id: int, conn: Conn, me: CurrentUse
     res = get_resource(key)
     lock_work(conn, work_id, me.계정.번호)
     current = fetch_one(conn, res, work_id, item_id)
+    parts_raw = body.pop("재료", None) if res.has_parts else None
     changes = clean_body(res, body, creating=False)
     check_library_access(conn, res, changes, me.계정.번호)
+    parts = clean_materials(conn, work_id, parts_raw, item_id) if parts_raw is not None else None
+    if parts is not None:
+        try:
+            save_materials(conn, work_id, item_id, parts)
+        except errors.Error as exc:
+            raise translate_db_error(exc) from exc
     if not changes:
-        return current
+        touch_work(conn, work_id)
+        return fetch_one(conn, res, work_id, item_id)
     try:
         row = conn.execute(
             sql.SQL('UPDATE {t} SET {sets} WHERE "작품_번호" = %s AND {k} = %s RETURNING {ret}').format(
@@ -471,7 +582,7 @@ def update_item(work_id: int, key: str, item_id: int, conn: Conn, me: CurrentUse
     except errors.Error as exc:
         raise translate_db_error(exc) from exc
     touch_work(conn, work_id)
-    return row
+    return with_materials(conn, res, work_id, [row])[0]
 
 
 @router.delete("/{key}/{item_id}", status_code=status.HTTP_204_NO_CONTENT)

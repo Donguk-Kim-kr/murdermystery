@@ -57,7 +57,7 @@ def test_required_fields_and_types_are_validated(client, headers):
         ("places", {}),                                  # 이름 필수
         ("places", {"이름": "  "}),                      # 공백만
         ("places", {"이름": "서재", "유형": 3}),         # 글자가 아님
-        ("testimonies", {"화자": "집사"}),               # 내용 필수
+        ("testimonies", {"이름": "집사의 증언"}),         # 내용 필수
         ("phases", {"진행시간": -5}),
         ("phases", {"진행시간": "많이"}),
         ("endings", {"이름": "엔딩", "조건": [1], "내용": "x"}),  # JSON 객체여야 함
@@ -126,7 +126,7 @@ def test_combo_part_needs_exactly_one_ingredient(client, headers):
     w = work(client, headers)
     combo = add(client, headers, w, "combos", 이름="완성된 편지")
     clue = add(client, headers, w, "clues", 이름="조각 1")
-    testimony = add(client, headers, w, "testimonies", 화자="집사", 내용="봤습니다")
+    testimony = add(client, headers, w, "testimonies", 이름="집사의 증언", 공개이름="집사", 내용="봤습니다")
     base = {"결과_조합_순서": combo["순서"]}
     assert client.post(url(w, "combo-parts"), headers=headers, json=base).status_code == 422
     assert client.post(url(w, "combo-parts"), headers=headers,
@@ -198,3 +198,63 @@ def test_writes_touch_the_modified_time(client, headers):
     assert client.get(f"/api/works/{w}", headers=headers).json()["수정일시"] is None
     add(client, headers, w, "places", 이름="서재")
     assert client.get(f"/api/works/{w}", headers=headers).json()["수정일시"] is not None
+
+
+def test_combo_is_made_with_its_ingredients_in_one_request(client, headers):
+    w = work(client, headers)
+    clue = add(client, headers, w, "clues", 이름="커터칼", 공개이름="A의 서랍")
+    testimony = add(client, headers, w, "testimonies", 이름="A의 마약소문", 공개이름="지나가던 사람", 내용="들었습니다")
+    assert (clue["공개이름"], testimony["공개이름"]) == ("A의 서랍", "지나가던 사람")
+    inner = add(client, headers, w, "combos", 이름="안쪽", 재료=[{"종류": "단서", "순서": clue["순서"]}])
+    # 같은 재료를 여러 번 넣어도 한 번만 참조된다. 순서는 넣은 순서 그대로이다
+    combo = add(client, headers, w, "combos", 이름="완성", 공개이름="수상한 물건", 재료=[
+        {"종류": "증언", "순서": testimony["순서"]}, {"종류": "단서", "순서": clue["순서"]},
+        {"종류": "증언", "순서": testimony["순서"]}, {"종류": "조합", "순서": inner["순서"]},
+    ])
+    assert combo["재료"] == [
+        {"종류": "증언", "순서": testimony["순서"]}, {"종류": "단서", "순서": clue["순서"]}, {"종류": "조합", "순서": inner["순서"]},
+    ]
+    assert client.get(url(w, "combos"), headers=headers).json()[1]["재료"] == combo["재료"]
+    rows = client.get(url(w, "combo-parts"), headers=headers).json()                       # DB 에는 재료마다 한 줄로 나뉜다
+    assert len([r for r in rows if r["결과_조합_순서"] == combo["순서"]]) == 3
+    assert client.get(f"/api/works/{w}/content", headers=headers).json()["combos"][1]["재료"] == combo["재료"]
+    # 재료만 바꾸어 고치면 통째로 바뀐다. 재료를 보내지 않으면 그대로이다
+    res = client.patch(url(w, "combos", combo["순서"]), headers=headers, json={"재료": [{"종류": "단서", "순서": clue["순서"]}]})
+    assert res.status_code == 200 and res.json()["재료"] == [{"종류": "단서", "순서": clue["순서"]}]
+    res = client.patch(url(w, "combos", combo["순서"]), headers=headers, json={"내용": "바뀐 내용"})
+    assert res.json()["재료"] == [{"종류": "단서", "순서": clue["순서"]}] and res.json()["내용"] == "바뀐 내용"
+    res = client.patch(url(w, "combos", combo["순서"]), headers=headers, json={"재료": []})
+    assert res.status_code == 200 and res.json()["재료"] == []
+
+
+def test_combo_ingredients_are_validated(client, headers):
+    w = work(client, headers)
+    clue = add(client, headers, w, "clues", 이름="커터칼")
+    a = add(client, headers, w, "combos", 이름="A")
+    b = add(client, headers, w, "combos", 이름="B", 재료=[{"종류": "조합", "순서": a["순서"]}])
+    patch = lambda order, parts: client.patch(url(w, "combos", order), headers=headers, json={"재료": parts})
+    assert patch(a["순서"], [{"종류": "조합", "순서": a["순서"]}]).status_code == 422                    # 자기 자신
+    assert patch(a["순서"], [{"종류": "조합", "순서": b["순서"]}]).status_code == 422                    # A→B→A 순환
+    assert patch(a["순서"], [{"종류": "단서", "순서": 99}]).status_code == 422                           # 없는 단서
+    for bad in ("단서", [1], [{"종류": "물건", "순서": 1}], [{"종류": "단서", "순서": "1"}], [{"종류": "단서", "순서": True}]):
+        assert patch(a["순서"], bad).status_code == 422, bad
+    assert client.get(url(w, "combos"), headers=headers).json()[0]["재료"] == []                       # 실패하면 바뀌지 않는다
+    assert patch(a["순서"], [{"종류": "단서", "순서": clue["순서"]}]).status_code == 200
+    res = client.post(url(w, "combos"), headers=headers, json={"이름": "C", "재료": [{"종류": "단서", "순서": 99}]})
+    assert res.status_code == 422
+    assert len(client.get(url(w, "combos"), headers=headers).json()) == 2                              # 만들다 실패한 조합은 남지 않는다
+
+
+def test_combo_parts_are_hidden_from_the_screen_but_stay_in_the_schema(client, headers):
+    resources = {r["key"]: r for r in client.get("/api/content/schema", headers=headers).json()["resources"]}
+    assert resources["combo-parts"]["hidden"] is True and resources["combos"]["has_parts"] is True
+    assert resources["combos"]["hidden"] is False
+
+
+def test_confirm_warns_about_a_combo_without_ingredients(client, headers):
+    w = work(client, headers)
+    clue = add(client, headers, w, "clues", 이름="커터칼")
+    add(client, headers, w, "combos", 이름="빈 조합")
+    add(client, headers, w, "combos", 이름="찬 조합", 재료=[{"종류": "단서", "순서": clue["순서"]}])
+    warnings = client.get(f"/api/works/{w}/confirm/check", headers=headers).json()["warnings"]
+    assert "조합 '빈 조합'에 재료가 없습니다." in warnings and not any("찬 조합" in x for x in warnings)

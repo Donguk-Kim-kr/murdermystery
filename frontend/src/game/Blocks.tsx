@@ -22,7 +22,10 @@ interface Item {
 
 interface Card {
   종류: string;
+  /** 진짜 이름 */
   이름: string;
+  /** 남들에게 보이는 이름. 비어 있으면 진짜 이름만 보인다 */
+  공개이름?: string;
   내용: string;
   장소: string;
   /** 단서만: 단서 번호, 지금 누구에게 공개했는지("전체" 또는 계정 번호 목록), 양도할 수 있는지 */
@@ -146,22 +149,50 @@ function CardsBlock({ block, state, onAnswer }: { block: Block; state: GameState
       {cards.length === 0 && <p className="muted">아직 얻은 것이 없습니다.</p>}
       <ul className="clue-cards">
         {cards.map((c, i) => (
-          <li key={`${c.종류}-${c.순서 ?? i}`} className="clue-card">
-            <span className="clue-meta">
-              <span className="chip">{c.종류}</span>
-              {c.장소 && <span className="muted">{c.장소}</span>}
-              {c.주인 && <span className="chip accent">{c.주인}</span>}
-            </span>
-            <strong>{c.이름}</strong>
-            <p className="prose">{c.내용}</p>
-            {c.공개 !== undefined && <SharedWith card={c} state={state} />}
-            {canAct && c.순서 !== undefined && c.공개 !== undefined && (
-              <CardActions card={c} actions={actions} state={state} onSend={(value) => onAnswer(text(block.질문ID), value)} />
-            )}
-          </li>
+          <ClueCard
+            key={`${c.종류}-${c.순서 ?? i}`}
+            card={c}
+            state={state}
+            actions={canAct && c.순서 !== undefined && c.공개 !== undefined ? actions : []}
+            onSend={(value) => onAnswer(text(block.질문ID), value)}
+          />
         ))}
       </ul>
     </section>
+  );
+}
+
+/** 카드 한 장. 남들에게 보이는 이름 아래에 진짜 이름이 있고, 누르면 내용이 펼쳐진다(내용이 길 수 있어서 처음에는 접혀 있다). */
+function ClueCard({ card: c, state, actions, onSend }: {
+  card: Card; state: GameState; actions: string[]; onSend: (value: unknown) => Promise<boolean>;
+}) {
+  const [open, setOpen] = useState(false);
+  const shown = c.공개이름 || c.이름;
+  const title = (
+    <>
+      <strong>{shown}</strong>
+      {shown !== c.이름 && <span className="muted real-name">{c.이름}</span>}
+    </>
+  );
+  return (
+    <li className="clue-card">
+      <span className="clue-meta">
+        <span className="chip">{c.종류}</span>
+        {c.장소 && <span className="muted">{c.장소}</span>}
+        {c.주인 && <span className="chip accent">{c.주인}</span>}
+      </span>
+      {c.내용 ? (
+        <button type="button" className="clue-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {title}
+          <span className="muted">{open ? "접기" : "눌러서 내용 보기"}</span>
+        </button>
+      ) : (
+        <div className="clue-head">{title}</div>
+      )}
+      {open && <p className="prose">{c.내용}</p>}
+      {c.공개 !== undefined && <SharedWith card={c} state={state} />}
+      {actions.length > 0 && <CardActions card={c} actions={actions} state={state} onSend={onSend} />}
+    </li>
   );
 }
 
