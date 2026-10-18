@@ -55,6 +55,7 @@ const [host, p1, p2] = pages;
 const mshot = (name) => p1.screenshot({ path: `${OUT}/m-${name}.png`, fullPage: true });        // 모바일(390px) 화면을 눈으로 확인하려고 남긴다
 await mshot("home");
 await host.getByRole("link", { name: "방 만들기" }).first().click();
+await host.screenshot({ path: `${OUT}/create-room.png` });
 await host.getByRole("button", { name: "방 만들기" }).click();
 const code = (await host.getByLabel("입장코드", { exact: false }).locator("xpath=self::strong").textContent()).trim();
 // 둘째(모바일)는 입장코드로, 셋째는 방장이 준 링크로 들어간다
@@ -62,6 +63,7 @@ await p1.goto(BASE + "/rooms/join"); await p1.getByLabel("입장코드").fill(co
 await p2.goto(BASE + "/join/" + encodeURIComponent(code)); await p2.getByRole("region", { name: "참가자" }).waitFor({ timeout: 8000 });
 check(true, "입장: 링크를 열면 바로 방에 입장한다");
 await host.getByText("플레이어 3/3명").waitFor({ timeout: 8000 });
+await host.screenshot({ path: `${OUT}/lobby-host.png` });
 await mshot("lobby");
 await host.getByRole("button", { name: "게임 시작" }).click();
 
