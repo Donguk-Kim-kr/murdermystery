@@ -66,22 +66,31 @@ def test_pick_intro_is_shown_only_when_the_card_setting_asks(client, make_script
     assert "자기소개 멘트" not in str(state(client, host).json())
 
 
-def test_character_description_tab_lists_everyone_and_who_plays_whom(client, make_scripted_game):
+def test_character_description_tab_is_made_when_moving_on_and_lists_everyone_and_who_plays_whom(client, make_scripted_game):
     def setup(client_, host, wid):
         assert client_.patch(f"/api/works/{wid}/characters/1", headers=host.headers, json={"나이": 34, "성별": "남", "선택소개": "다정한 의사"}).status_code == 200
         assert client_.patch(f"/api/works/{wid}/characters/4", headers=host.headers, json={"NPC": True, "직업": "정원사"}).status_code == 200
     host, people = selecting(client, make_scripted_game, setup=setup, characters=4)
-    shown = tab(state(client, host).json(), "캐릭터 설명")["내용"]
-    assert "인물0 (의사, 34세, 남)" in shown and "인물1 (의사)" in shown and "인물3 (정원사) [NPC]" in shown
-    assert "다정한 의사" not in shown                                         # 소개는 카드 설정이 켜졌을 때만
+    assert tab(state(client, host).json(), "캐릭터 설명") is None                    # 선택하는 동안에는 아직 없다
     assert pick(client, people[0], 1).status_code == 200
-    mine = tab(state(client, people[1]).json(), "캐릭터 설명")["내용"]         # 다른 사람의 화면에도 누가 맡았는지가 보인다
-    assert "인물0 (의사, 34세, 남) - " in mine
-    answer(client, people[0], qid(client, people[0]), "취소")
-    assert "인물0 (의사, 34세, 남) - " not in tab(state(client, people[1]).json(), "캐릭터 설명")["내용"]
-    host2, people2 = selecting(client, make_scripted_game, {"소개보이기": True}, setup, characters=4)
-    assert "다정한 의사" in tab(state(client, host2).json(), "캐릭터 설명")["내용"]
-    host3, people3 = selecting(client, make_scripted_game, {"설명탭": False}, setup, characters=4)
-    assert tab(state(client, host3).json(), "캐릭터 설명") is None
-    host4, people4 = selecting(client, make_scripted_game, {"설명탭이름": "등장인물"}, setup, characters=4)
-    assert tab(state(client, host4).json(), "등장인물") is not None
+    answer(client, people[0], qid(client, people[0]), "취소")                         # 취소해도 탭은 만들어지지 않고, 마지막 선택만 반영된다
+    assert pick(client, people[0], 2).status_code == 200
+    assert pick(client, people[1], 1).status_code == 200 and pick(client, people[2], 3).status_code == 200
+    assert advance(client, host).status_code == 200
+    shown = tab(state(client, people[1]).json(), "캐릭터 설명")["내용"]
+    assert "인물0 (의사, 34세, 남) - " in shown and "인물1 (의사) - " in shown and "인물2 (의사) - " in shown   # 맡은 사람이 있는 인물에는 이름이 붙는다
+    assert "인물3 (정원사) [NPC]" in shown and "- " not in shown.split("인물3")[1]                              # NPC 는 [NPC] 표시
+    assert "다정한 의사" not in shown                                                                         # 소개는 카드 설정이 켜졌을 때만
+
+
+def test_description_tab_options(client, make_scripted_game):
+    def setup(client_, host, wid):
+        assert client_.patch(f"/api/works/{wid}/characters/1", headers=host.headers, json={"선택소개": "다정한 의사"}).status_code == 200
+    def after(settings):
+        host, people = selecting(client, make_scripted_game, settings, setup)
+        all_pick(client, people)
+        assert advance(client, host).status_code == 200
+        return state(client, host).json()
+    assert "다정한 의사" in tab(after({"소개보이기": True}), "캐릭터 설명")["내용"]
+    assert tab(after({"설명탭": False}), "캐릭터 설명") is None
+    assert tab(after({"설명탭이름": "등장인물"}), "등장인물") is not None

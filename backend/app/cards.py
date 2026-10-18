@@ -691,7 +691,18 @@ def _program_for(game, library: dict[str, Any]) -> tuple[Program | None, str | N
 
 
 def start_phase(game, io) -> None:
-    """지금 페이즈의 카드를 만들어 실행을 시작한다(게임 시작과 페이즈 전환 때). 이전 페이즈의 카드와 대기는 모두 끝난다."""
+    """지금 페이즈의 카드를 만들어 실행을 시작한다(게임 시작과 페이즈 전환 때). 이전 페이즈의 카드와 대기는 모두 끝난다.
+
+    이전 페이즈의 카드에 `종료(카드)` 함수가 있으면 먼저 실행한다(페이즈 번호는 이미 새 페이즈로 넘어간 뒤이므로, 이때 만든 탭은 새 페이즈부터 보인다).
+    """
+    for old in list(game.runs.values()):
+        if old.program and "종료" in old.program.funcs and not old.error:
+            vm = VM(old.program, CardHost(game, old, io))
+            try:
+                vm.start("종료", [Ref("카드", old.key)])
+                vm.run()
+            except Exception:           # 끝맺는 함수의 문제가 페이즈 전환을 막지 않는다
+                pass
     game.runs = {}
     game.card_conditions = []
     game.end_requested = False
