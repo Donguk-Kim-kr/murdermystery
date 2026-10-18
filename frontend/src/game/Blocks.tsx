@@ -155,7 +155,7 @@ function CardsBlock({ block, state, onAnswer }: { block: Block; state: GameState
   return (
     <section className="block" aria-label={text(block.이름)}>
       <Title block={block} />
-      {cards.length === 0 && <p className="muted">아직 얻은 것이 없습니다.</p>}
+      {cards.length === 0 && <p className="muted">아직 획득한 것이 없습니다.</p>}
       <ul className="clue-cards">
         {cards.map((c, i) => (
           <ClueCard
@@ -407,7 +407,7 @@ function ChoiceBlock({ block, state, onAnswer }: { block: Block; state: GameStat
             <ul className="choice-list">
               {items.filter((i) => (i.장소 ?? "") === place).map((item) => {
                 const others = item.가진_사람 ?? [];
-                const note = item.상태 === "얻음" ? "내가 얻음" : item.상태 === "가져감" ? (others.length > 0 ? `${others.join(", ")} 가져감` : "다른 사람이 가져감") : null;
+                const note = item.상태 === "얻음" ? "내가 획득" : item.상태 === "가져감" ? (others.length > 0 ? `${others.join(", ")} 획득` : "다른 사람이 획득") : null;
                 return (
                   <li key={String(item.값)}>
                     <button
@@ -419,7 +419,7 @@ function ChoiceBlock({ block, state, onAnswer }: { block: Block; state: GameStat
                       <strong>{text(item.이름) || "이름 없음"}</strong>
                       <span className="chip">{item.종류}</span>
                       {note && <span className="chip accent">{note}</span>}
-                      {item.상태 === "가능" && item.종류 === "증언" && others.length > 0 && <span className="muted">{others.join(", ")} 들음</span>}
+                      {item.상태 === "가능" && item.종류 === "증언" && others.length > 0 && <span className="muted">{others.join(", ")} 획득</span>}
                     </button>
                   </li>
                 );

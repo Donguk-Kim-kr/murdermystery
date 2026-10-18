@@ -362,17 +362,17 @@ describe("조사 목록(단서·증언을 직접 고른다)", () => {
     expect(study.getByRole("button", { name: /서랍 속 종이/ })).toBeEnabled();
     const taken = study.getByRole("button", { name: /깨진 안경/ });
     expect(taken).toBeDisabled();
-    expect(within(taken).getByText("다른 사람이 가져감")).toBeInTheDocument();
+    expect(within(taken).getByText("다른 사람이 획득")).toBeInTheDocument();
     const garden = within(screen.getByRole("group", { name: "정원" }));
     expect(garden.getByRole("button", { name: /정원사/ })).toBeDisabled();
-    expect(garden.getByText("내가 얻음")).toBeInTheDocument();
+    expect(garden.getByText("내가 획득")).toBeInTheDocument();
     expect(garden.getByRole("button", { name: /독이 든 컵/ })).toBeEnabled();
   });
 
-  it("조사 공개를 켠 게임에서는 가져간 사람의 닉네임이 보인다", async () => {
+  it("조사 공개가 켜진 게임에서는 획득한 사람의 닉네임이 보인다", async () => {
     state = makeState({ 화면: [list({ 가진_사람: ["조수"] })] });
     render(<GamePage />);
-    expect(await screen.findByText("조수 가져감")).toBeInTheDocument();
+    expect(await screen.findByText("조수 획득")).toBeInTheDocument();
   });
 
   it("고르면 확인 없이 그 항목의 값을 바로 보낸다", async () => {
@@ -449,7 +449,7 @@ describe("조사 블록", () => {
     state = makeState({ 탭: [{ 종류: "카드목록", 이름: "내 단서", 카드: "조사", 항목: [] }] });
     render(<GamePage />);
     await userEvent.setup().click(await screen.findByRole("tab", { name: "내 단서" }));
-    expect(screen.getByText("아직 얻은 것이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("아직 획득한 것이 없습니다.")).toBeInTheDocument();
   });
 });
 

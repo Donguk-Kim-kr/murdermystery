@@ -345,7 +345,7 @@ class CardHost:
 
     def fn_선택지(self, 이름: str, 항목: Any, 한사람당: int = 1, 확인필요: bool = False, 설명보임: bool = False, 공개: bool = False) -> dict[str, Any]:
         """고르는 칸. 인물을 고르는 칸이면 `설명보임` 으로 인물의 캐릭터 설명(`캐릭터설명`)을 함께 보여 줄 수 있다.
-        조사 항목(단서·증언)을 고르는 칸이면 `공개` 로 누가 그것을 가졌는지도 모두에게 보여 줄 수 있다(기본은 보이지 않는다)."""
+        조사 항목(단서·증언)을 고르는 칸이면 `공개` 로 누가 그것을 획득했는지도 모두에게 보여 줄 수 있다."""
         if not isinstance(항목, (list, tuple)):
             raise ScriptError("선택지의 항목은 목록이어야 합니다")
         return {
