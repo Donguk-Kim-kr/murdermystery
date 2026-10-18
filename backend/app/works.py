@@ -120,7 +120,7 @@ def not_found() -> HTTPException:
 def lock_work(conn: Connection, work_id: int, account_id: int) -> dict:
     """내 작품을 잠그고 돌려준다. 같은 작품에 대한 쓰기 요청은 이 잠금으로 직렬화된다."""
     row = conn.execute(
-        f'SELECT {WORK_COLUMNS} FROM "작품" WHERE "번호" = %s AND "계정_번호" = %s FOR UPDATE',
+        f'SELECT {WORK_COLUMNS} FROM "작품" WHERE "번호" = %s AND "계정_번호" = %s AND "상태" <> \'삭제\' FOR UPDATE',
         (work_id, account_id),
     ).fetchone()
     if row is None:
@@ -133,7 +133,7 @@ def load_work_for_actor(
 ) -> tuple[dict, Level, bool]:
     """작품과 요청자의 단계를 돌려준다. 소유자도 관리자·운영자도 아니면 존재를 숨기려고 404 를 낸다."""
     row = conn.execute(
-        f'SELECT {WORK_COLUMNS}, "계정_번호" FROM "작품" WHERE "번호" = %s' + (" FOR UPDATE" if lock else ""),
+        f'SELECT {WORK_COLUMNS}, "계정_번호" FROM "작품" WHERE "번호" = %s AND "상태" <> \'삭제\'' + (" FOR UPDATE" if lock else ""),
         (work_id,),
     ).fetchone()
     if row is None:
@@ -159,7 +159,7 @@ def create_work(body: WorkIn, conn: Conn, me: CurrentUser) -> dict:
 @router.get("", response_model=list[WorkOut])
 def list_works(conn: Conn, me: CurrentUser) -> list[dict]:
     return conn.execute(
-        f'SELECT {WORK_COLUMNS} FROM "작품" WHERE "계정_번호" = %s ORDER BY "번호" DESC',
+        f'SELECT {WORK_COLUMNS} FROM "작품" WHERE "계정_번호" = %s AND "상태" <> \'삭제\' ORDER BY "번호" DESC',
         (me.계정.번호,),
     ).fetchall()
 
@@ -167,7 +167,7 @@ def list_works(conn: Conn, me: CurrentUser) -> list[dict]:
 @router.get("/{work_id}", response_model=WorkOut)
 def get_work(work_id: int, conn: Conn, me: CurrentUser) -> dict:
     row = conn.execute(
-        f'SELECT {WORK_COLUMNS} FROM "작품" WHERE "번호" = %s AND "계정_번호" = %s',
+        f'SELECT {WORK_COLUMNS} FROM "작품" WHERE "번호" = %s AND "계정_번호" = %s AND "상태" <> \'삭제\'',
         (work_id, me.계정.번호),
     ).fetchone()
     if row is None:
@@ -196,19 +196,24 @@ def update_work(work_id: int, body: WorkPatch, conn: Conn, me: CurrentUser) -> d
 
 @router.delete("/{work_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_work(work_id: int, conn: Conn, me: CurrentUser, request: Request) -> None:
-    """내 작품을 지운다. 제작용 콘텐츠·확정 버전·테스터는 물론 이 작품으로 만든 방과 플레이 기록도 함께 지워진다(되돌릴 수 없다).
+    """내 작품을 지운다(되돌릴 수 없다).
 
-    시험 삼아 플레이해 본 작품도 지울 수 있어야 해서(사용자 결정 2026-10-18) 방·진행·참여 기록을 먼저 지운 뒤 작품을 지운다.
-    열려 있는 방(대기·진행 중)이 있으면 그 방도 닫힌다. DB 의 외래키는 여전히 직접 지우는 것을 막는다(docs/DB_RULES.md B11).
+    * 이 작품으로 만든 방이 하나도 없으면 제작용 콘텐츠·확정 버전·테스터와 함께 실제로 지운다.
+    * 방이나 플레이 기록이 있으면 작품 행은 남기고 상태만 '삭제'로 바꿔 숨긴다(사용자 결정 2026-10-18). 플레이 기록은 그대로 남고,
+      제작자 목록·플레이 목록·제작 화면에서는 없는 작품이 된다. 열려 있는 방(대기·진행 중)은 닫힌다.
     """
     lock_work(conn, work_id, me.계정.번호)
     room_ids = [r["번호"] for r in conn.execute('SELECT "번호" FROM "방" WHERE "작품_번호" = %s', (work_id,)).fetchall()]
-    try:
-        conn.execute('DELETE FROM "진행" WHERE "작품_번호" = %s', (work_id,))     # 참여·획득·공개·기믹실행·엔딩·투표결과가 함께 지워진다
-        conn.execute('DELETE FROM "방" WHERE "작품_번호" = %s', (work_id,))
-        conn.execute('DELETE FROM "작품" WHERE "번호" = %s', (work_id,))
-    except errors.ForeignKeyViolation as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, "이 작품을 쓰는 기록이 남아 있어 삭제할 수 없습니다") from exc
+    if room_ids:
+        conn.execute(
+            'UPDATE "작품" SET "상태" = \'삭제\', "공개여부" = FALSE, "수정일시" = CURRENT_TIMESTAMP WHERE "번호" = %s', (work_id,)
+        )
+        conn.execute('UPDATE "방" SET "상태" = \'종료\' WHERE "작품_번호" = %s AND "상태" <> \'종료\'', (work_id,))
+    else:
+        try:
+            conn.execute('DELETE FROM "작품" WHERE "번호" = %s', (work_id,))
+        except errors.ForeignKeyViolation as exc:
+            raise HTTPException(status.HTTP_409_CONFLICT, "이 작품을 쓰는 기록이 남아 있어 삭제할 수 없습니다") from exc
     for room_id in room_ids:                                                      # 열려 있던 방은 서버 메모리에서도 닫는다
         request.app.state.rooms.remove_room(room_id)
         request.app.state.games.remove(room_id)

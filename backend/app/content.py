@@ -264,7 +264,7 @@ def get_resource(key: str) -> Resource:
 
 def ensure_mine(conn: Connection, work_id: int, account_id: int) -> None:
     if conn.execute(
-        'SELECT 1 FROM "작품" WHERE "번호" = %s AND "계정_번호" = %s', (work_id, account_id)
+        'SELECT 1 FROM "작품" WHERE "번호" = %s AND "계정_번호" = %s AND "상태" <> \'삭제\'', (work_id, account_id)
     ).fetchone() is None:
         raise not_found()
 

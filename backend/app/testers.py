@@ -22,7 +22,7 @@ from .works import load_work_for_actor
 router = APIRouter(tags=["testers"])
 
 # 비공개 플레이 가능 조건 (작품 별칭 w, 테스터 부여 행 별칭 t). 제작자 본인은 테스터 행 없이도 해당한다.
-_TESTABLE = 'NOT w."공개여부" AND w."공개권한" = \'제작자\' AND (w."계정_번호" = %(me)s OR t."계정_번호" IS NOT NULL)'
+_TESTABLE = 'NOT w."공개여부" AND w."상태" <> \'삭제\' AND w."공개권한" = \'제작자\' AND (w."계정_번호" = %(me)s OR t."계정_번호" IS NOT NULL)'
 _FROM = 'FROM "작품" w LEFT JOIN "테스터" t ON t."작품_번호" = w."번호" AND t."계정_번호" = %(me)s'
 
 

@@ -1,3 +1,13 @@
+import psycopg
+import pytest
+
+
+@pytest.fixture
+def db(test_dbname):
+    with psycopg.connect(f"dbname={test_dbname}", autocommit=True) as conn:
+        yield conn
+
+
 def create(client, headers, **kw):
     res = client.post("/api/works", headers=headers, json={"제목": "저택의 비밀", **kw})
     assert res.status_code == 201, res.text
@@ -131,14 +141,32 @@ def test_only_the_owner_can_delete(client, new_user):
     assert client.get(f"/api/works/{w}", headers=owner).status_code == 200          # 그대로 남아 있다
 
 
-def test_work_with_a_room_can_be_deleted_and_the_room_closes(client, headers, confirm):
+def test_work_with_a_room_is_hidden_as_deleted_but_keeps_its_records_and_the_room_closes(client, headers, confirm, db):
     w = create(client, headers)["번호"]
     client.post(f"/api/works/{w}/characters", headers=headers, json={"이름": "A"})
     confirm(w)
     assert client.post("/api/rooms", headers=headers, json={"작품_번호": w}).status_code == 201
     assert client.delete(f"/api/works/{w}", headers=headers).status_code == 204
-    assert client.get(f"/api/works/{w}", headers=headers).status_code == 404
-    assert client.get("/api/rooms/me", headers=headers).json() is None                # 열려 있던 방도 닫혔다
+    assert client.get(f"/api/works/{w}", headers=headers).status_code == 404            # 제작자에게는 없는 작품이다
+    assert all(x["번호"] != w for x in client.get("/api/works", headers=headers).json())
+    assert client.patch(f"/api/works/{w}", headers=headers, json={"제목": "되살리기"}).status_code == 404
+    assert client.get(f"/api/works/{w}/content", headers=headers).status_code == 404
+    assert client.post("/api/rooms", headers=headers, json={"작품_번호": w}).status_code == 404     # 새 방은 만들 수 없다
+    assert client.get("/api/rooms/me", headers=headers).json() is None                  # 열려 있던 방은 닫혔다
+    assert db.execute('SELECT "상태", "공개여부" FROM "작품" WHERE "번호" = %s', (w,)).fetchone() == ("삭제", False)
+    assert [r[0] for r in db.execute('SELECT "상태" FROM "방" WHERE "작품_번호" = %s', (w,)).fetchall()] == ["종료"]   # 방 기록은 남는다
+    assert client.delete(f"/api/works/{w}", headers=headers).status_code == 404        # 두 번 지울 수 없다
+
+
+def test_deleted_work_is_not_offered_for_play_or_private_play(client, headers, confirm, make_account):
+    w = create(client, headers)["번호"]
+    client.post(f"/api/works/{w}/characters", headers=headers, json={"이름": "A"})
+    confirm(w)
+    assert client.post("/api/rooms", headers=headers, json={"작품_번호": w}).status_code == 201
+    assert any(x["번호"] == w for x in client.get("/api/private-play-works", headers=headers).json())
+    client.delete(f"/api/works/{w}", headers=headers)
+    assert all(x["번호"] != w for x in client.get("/api/private-play-works", headers=headers).json())
+    assert all(x["번호"] != w for x in client.get("/api/play-works", headers=headers).json())
 
 
 def test_time_format_defaults_to_time_only_and_can_be_changed_to_the_allowed_values(client, headers):

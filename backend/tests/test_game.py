@@ -974,17 +974,18 @@ def test_auto_advance_ignores_unlimited_phase_and_ended_game(client, make_accoun
     assert state(client, host).json()["페이즈"]["위치"] == 1            # 끝난 게임은 넘기지 않는다
 
 
-def test_a_work_with_a_game_and_play_records_can_be_deleted(client, make_account, make_game_work, db):
-    """시험 삼아 플레이해 본 작품도 지울 수 있다: 방·진행·참여 기록이 함께 지워지고, 진행 중이던 게임은 닫힌다."""
+def test_a_work_with_a_game_is_hidden_when_deleted_and_its_play_records_stay(client, make_account, make_game_work, db):
+    """시험 삼아 플레이해 본 작품도 지울 수 있다: 작품은 숨기고(상태 삭제) 방·진행·참여 기록은 남으며, 진행 중이던 게임은 닫힌다."""
     host, others, room, wid = full_room(client, make_account, make_game_work)
     assert start(client, host).status_code == 200
     assert state(client, others[0]).status_code == 200
     game_id = client.app.state.games.of_account(host.number).id
-    assert db.execute('SELECT count(*) FROM "참여" WHERE "진행_번호" = %s', (game_id,)).fetchone()[0] == 3
     res = client.delete(f"/api/works/{wid}", headers=host.headers)
     assert res.status_code == 204, res.text
-    for table in ("방", "진행", "참여"):
-        assert db.execute(f'SELECT count(*) FROM "{table}" WHERE "작품_번호" = %s', (wid,)).fetchone()[0] == 0, table
+    assert db.execute('SELECT "상태" FROM "작품" WHERE "번호" = %s', (wid,)).fetchone()[0] == "삭제"
+    assert db.execute('SELECT count(*) FROM "참여" WHERE "진행_번호" = %s', (game_id,)).fetchone()[0] == 3    # 플레이 기록은 그대로
+    assert db.execute('SELECT count(*) FROM "진행" WHERE "작품_번호" = %s', (wid,)).fetchone()[0] == 1
+    assert db.execute('SELECT "상태" FROM "방" WHERE "번호" = %s', (room["번호"],)).fetchone()[0] == "종료"
     assert state(client, others[0]).status_code == 404                                  # 진행 중이던 게임은 닫혔다
     assert client.get("/api/rooms/me", headers=others[0].headers).json() is None
     assert client.get(f"/api/works/{wid}", headers=host.headers).status_code == 404

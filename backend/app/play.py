@@ -33,7 +33,7 @@ def play_works(conn: Conn, me: CurrentUser) -> list[dict]:
         'a."닉네임" AS "제작자", NOT w."공개여부" AS "비공개플레이" '
         'FROM "작품" w JOIN "계정" a ON a."번호" = w."계정_번호" '
         'LEFT JOIN "테스터" t ON t."작품_번호" = w."번호" AND t."계정_번호" = %(me)s '
-        f'WHERE EXISTS (SELECT 1 FROM "버전" v WHERE v."작품_번호" = w."번호") AND (w."공개여부" OR ({_TESTABLE})) '
+        f'WHERE w."상태" <> \'삭제\' AND EXISTS (SELECT 1 FROM "버전" v WHERE v."작품_번호" = w."번호") AND (w."공개여부" OR ({_TESTABLE})) '
         'ORDER BY w."번호" DESC',
         {"me": me.계정.번호},
     ).fetchall()

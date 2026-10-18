@@ -115,7 +115,7 @@
 | PK | `pk_작품` | `PRIMARY KEY ("번호")` |
 | FK | `fk_작품_계정` | `FOREIGN KEY ("계정_번호") REFERENCES "계정"("번호") ON DELETE RESTRICT` |
 | CHECK | `ck_작품_공개권한` | `CHECK (("공개권한" = ANY (ARRAY['제작자'::text, '관리자'::text, '운영자'::text])))` |
-| CHECK | `ck_작품_상태` | `CHECK (("상태" = ANY (ARRAY['수정'::text, '개발'::text, '완료'::text])))` |
+| CHECK | `ck_작품_상태` | `CHECK (("상태" = ANY (ARRAY['수정'::text, '개발'::text, '완료'::text, '삭제'::text])))` |
 | CHECK | `ck_작품_시간형식` | `CHECK (("시간형식" = ANY (ARRAY['시간만'::text, '일까지'::text, '월까지'::text, '연도까지'::text])))` |
 | CHECK | `ck_작품_최대인원` | `CHECK (("최대인원" >= "최소인원"))` |
 | CHECK | `ck_작품_최소인원` | `CHECK (("최소인원" >= 1))` |
