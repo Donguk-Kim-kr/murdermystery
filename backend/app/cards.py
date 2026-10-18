@@ -53,7 +53,7 @@ class CardRun:
 MUTATING = {"변수설정", "배정", "투표", "투표초기화", "조사", "양도", "공개설정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
 FUNCTION_NAMES = {
     "플레이어들", "플레이어수", "인물들", "공통스토리", "서사들", "배정된_플레이어수", "인물_없는_플레이어가_있다",
-    "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "보유목록", "받은공개", "인물찾기", "투표", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
+    "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
     "단계_끝내기", "게임_종료",
 }
 CONSTANT_NAMES = {"통과", ALL}
@@ -240,6 +240,19 @@ class CardHost:
         if row is None:
             raise ScriptError(f"없는 {ref.kind} 입니다")
         return row
+
+    def fn_질문정의(self, 정의: Any) -> dict[str, Any] | None:
+        """카드 설정에 적은 질문을 {질문, 선택, 글자수} 로 정리한다. 글자만 적으면 자유롭게 쓰는 질문이고, {"질문": …, "선택": [...]} 이면
+        고르는 질문이다. 읽을 수 없으면 None."""
+        if isinstance(정의, str) and 정의.strip():
+            return {"질문": 정의.strip(), "선택": [], "글자수": 300}
+        if not isinstance(정의, dict) or not isinstance(정의.get("질문"), str) or not 정의["질문"].strip():
+            return None
+        choices = [c.strip() for c in (정의.get("선택") or []) if isinstance(c, str) and c.strip() and len(c.strip()) <= MAX_OPTION_CHARS]
+        limit = 정의.get("글자수")
+        if not _is_int(limit) or not 1 <= limit <= MAX_INPUT_CHARS:
+            limit = 300
+        return {"질문": 정의["질문"].strip(), "선택": list(dict.fromkeys(choices))[:MAX_CANDIDATES], "글자수": limit}
 
     def fn_기타후보(self, 값: Any) -> str | None:
         """인물이 아닌 투표 선택지(예: "사고사")로 쓸 수 있는 글이면 그 글, 아니면 None. 카드 설정의 후보를 읽을 때 쓴다."""
@@ -440,8 +453,10 @@ class CardHost:
         for key in ([ALL] if target.kind == ALL else [target.key]):
             self.run.screens.setdefault(key, {})[str(name)] = block
 
-    def fn_기다리기(self, 종류: str) -> Any:
-        raise Suspend({"종류": str(종류)})
+    def fn_기다리기(self, 종류: str, *더: str) -> Any:
+        """플레이어의 입력을 기다린다. 종류를 여럿 주면 그중 아무 것이나 오면 이어서 실행하고, 돌려주는 값의 `종류` 로 무엇이 왔는지 안다."""
+        kinds = [str(종류), *[str(k) for k in 더]]
+        raise Suspend({"종류": kinds[0], "종류들": kinds})
 
     def fn_단계_끝내기(self) -> bool:
         self.game.end_requested = True
@@ -715,7 +730,7 @@ def answer(game, account_id: int, qid: str, value: Any, io) -> None:
             game.bump()
         return
     vm = run.vm
-    if vm is None or vm.waiting is None or vm.waiting.get("종류") != rest:
+    if vm is None or vm.waiting is None or rest not in (vm.waiting.get("종류들") or [vm.waiting.get("종류")]):
         raise AnswerError("stale", "지금은 받지 않는 질문입니다")
     action_block = _card_action_block(game, run, rest)
     if action_block is not None:

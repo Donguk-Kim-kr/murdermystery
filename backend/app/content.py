@@ -362,7 +362,7 @@ def phase_display_names(phases: list[dict], cards: list[dict]) -> dict[int, str 
     return out
 
 
-KNOWN_SETTINGS = ("개인서사공개", "내용유지", "후보")
+KNOWN_SETTINGS = ("개인서사공개", "내용유지", "후보", "질문")
 
 
 def used_settings(rule: Any) -> list[str]:

@@ -23,6 +23,7 @@ type Call = (method: string, path: string, body?: unknown) => Promise<boolean>;
 const KEEP_TAB = "내용유지";
 const STORY_PICKS = "개인서사공개";
 const CANDIDATES = "후보";
+const QUESTIONS = "질문";
 
 /**
  * 게임 흐름 화면: 맨 위에 페이즈 카드가 왼쪽에서 오른쪽으로 놓이고, 아래에 진행카드(불러온 진행단계·기믹)가 있다.
@@ -585,11 +586,14 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
   const current = asObject(value);
   const showPicks = settingKeys.includes(STORY_PICKS);
   const showCandidates = settingKeys.includes(CANDIDATES);
-  const { [KEEP_TAB]: keepRaw, [STORY_PICKS]: picksRaw, [CANDIDATES]: candidatesRaw, ...restAll } = current;
+  const showQuestions = settingKeys.includes(QUESTIONS);
+  const { [KEEP_TAB]: keepRaw, [STORY_PICKS]: picksRaw, [CANDIDATES]: candidatesRaw, [QUESTIONS]: questionsRaw, ...restAll } = current;
   // 전용 입력으로 다루는 설정만 JSON 칸에서 뺀다(스크립트가 쓰지 않는 카드에서는 값을 그대로 둔다).
   const rest: Record<string, unknown> = { ...restAll };
   if (!showPicks && picksRaw !== undefined) rest[STORY_PICKS] = picksRaw;
   if (!showCandidates && candidatesRaw !== undefined) rest[CANDIDATES] = candidatesRaw;
+  if (!showQuestions && questionsRaw !== undefined) rest[QUESTIONS] = questionsRaw;
+  const [questions, setQuestions] = useState<Record<string, QuestionDraft>>(() => readQuestions(questionsRaw));
   const allPlayable = characters.filter((c) => c.NPC !== true).map((c) => Number(c.순서));
   const [candidates, setCandidates] = useState<number[]>(
     Array.isArray(candidatesRaw) ? candidatesRaw.filter((n): n is number => Number.isInteger(n)) : allPlayable,
@@ -622,6 +626,8 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
     let next: Record<string, unknown> = showPicks && Object.keys(changed).length ? { ...extra, [STORY_PICKS]: changed } : extra;
     // 기본(플레이어가 맡는 인물 모두)과 같은 선택은 따로 저장하지 않는다.
     const isDefault = extras.length === 0 && candidates.length === allPlayable.length && allPlayable.every((n) => candidates.includes(n));
+    const asked = writeQuestions(questions);
+    if (showQuestions && Object.keys(asked).length) next = { ...next, [QUESTIONS]: asked };
     if (showCandidates && !isDefault) next = { ...next, [CANDIDATES]: [...[...candidates].sort((a, b) => a - b), ...extras] };
     if (showTab && !keepTab) next = { ...next, [KEEP_TAB]: false };
     setError(null);
@@ -637,6 +643,7 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
         </label>
       )}
       {showPicks && <StoryPicks characters={characters} picked={picked} onChange={setPicked} />}
+      {showQuestions && <QuestionPicks characters={characters} value={questions} onChange={setQuestions} />}
       {showCandidates && (
         <CandidatePicks characters={characters} selected={candidates} onChange={setCandidates} extras={extras} onExtras={setExtras} />
       )}
@@ -659,6 +666,66 @@ function storyPicks(raw: unknown): Record<string, number[]> {
     if (Array.isArray(nums)) out[key] = nums.filter((n): n is number => Number.isInteger(n) && n >= 1).sort((a, b) => a - b);
   }
   return out;
+}
+
+interface QuestionDraft {
+  text: string;
+  /** 쉼표로 나눈 선택지. 비우면 자유롭게 글로 답한다 */
+  choices: string;
+}
+
+/** 저장된 `질문`({"인물 순서": "질문" 또는 {질문, 선택}})을 입력용 값으로 읽는다. 모양이 다른 값은 건너뛴다. */
+function readQuestions(raw: unknown): Record<string, QuestionDraft> {
+  const out: Record<string, QuestionDraft> = {};
+  for (const [key, def] of Object.entries(asObject(raw))) {
+    if (typeof def === "string") out[key] = { text: def, choices: "" };
+    else {
+      const d = asObject(def);
+      if (typeof d.질문 === "string")
+        out[key] = { text: d.질문, choices: Array.isArray(d.선택) ? d.선택.filter((c) => typeof c === "string").join(", ") : "" };
+    }
+  }
+  return out;
+}
+
+/** 입력한 질문을 저장 모양으로 바꾼다. 질문이 비어 있는 인물은 뺀다(질문이 없는 인물은 답할 것이 없다). */
+function writeQuestions(drafts: Record<string, QuestionDraft>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, d] of Object.entries(drafts)) {
+    const text = d.text.trim();
+    if (!text) continue;
+    const choices = d.choices.split(",").map((c) => c.trim()).filter(Boolean);
+    out[key] = choices.length ? { 질문: text, 선택: choices } : text;
+  }
+  return out;
+}
+
+/** 개인 질문 카드: 인물마다 다른 질문을 정한다. 선택지를 쉼표로 적으면 고르는 질문이고, 비우면 글로 답하는 질문이다. 질문을 비운 인물은 답할 것이 없다. */
+function QuestionPicks({ characters, value, onChange }: {
+  characters: Row[]; value: Record<string, QuestionDraft>; onChange: (next: Record<string, QuestionDraft>) => void;
+}) {
+  const players = characters.filter((c) => c.NPC !== true);
+  return (
+    <fieldset className="story-picks">
+      <legend>개인 질문</legend>
+      <p className="muted">
+        인물마다 다른 질문을 정합니다. 선택지를 쉼표로 적으면 고르는 질문, 비우면 글로 답하는 질문입니다. 질문을 비워 두면 그 인물은 답할 것이 없습니다.
+        답은 게임 변수 "이름:인물 순서"에 남아 엔딩 조건이 읽습니다.
+      </p>
+      {players.map((c) => {
+        const key = String(c.순서);
+        const draft = value[key] ?? { text: "", choices: "" };
+        const set = (next: Partial<QuestionDraft>) => onChange({ ...value, [key]: { ...draft, ...next } });
+        return (
+          <div key={key} className="question-pick" role="group" aria-label={`${String(c.이름)}의 질문`}>
+            <strong>{String(c.이름)}</strong>
+            <input aria-label={`${String(c.이름)} 질문`} value={draft.text} maxLength={300} placeholder="질문" onChange={(e) => set({ text: e.target.value })} />
+            <input aria-label={`${String(c.이름)} 선택지`} value={draft.choices} placeholder="선택지(쉼표로 구분, 비우면 글로 답함)" onChange={(e) => set({ choices: e.target.value })} />
+          </div>
+        );
+      })}
+    </fieldset>
+  );
 }
 
 /** 투표 카드: 투표할 수 있는 후보를 고른다. 인물(NPC 포함)과 인물이 아닌 선택지(사고사, 자살 …)를 둘 수 있다. 기본은 플레이어가 맡는 인물 모두이다. */

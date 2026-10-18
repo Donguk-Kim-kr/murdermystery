@@ -676,6 +676,30 @@ describe("진행 탭", () => {
       expect(await sent("PATCH /api/works/7/content/phase-steps/9")[1].req.json()).toEqual({ 설정: { 후보: [1, 3] } });
     });
 
+    it("개인 질문 카드는 인물마다 질문과 선택지를 적고, 비운 인물은 저장하지 않는다", async () => {
+      routes["PATCH /api/works/7/content/phase-steps/9"] = () => json({});
+      twoPhases();
+      (bundle.library as { phases: Record<string, object> }).phases[5] = { 번호: 5, 이름: "개인 질문", 버전: 1, 설명: "d", 삭제됨: false, 사용설정: ["질문"] };
+      bundle.characters = [
+        { 순서: 1, 이름: "의사", 직업: null, NPC: false, 범인: false, 서사_부분수: 1 },
+        { 순서: 2, 이름: "집사", 직업: null, NPC: false, 범인: false, 서사_부분수: 1 },
+        { 순서: 3, 이름: "피해자", 직업: null, NPC: true, 범인: false, 서사_부분수: 1 },
+      ];
+      (bundle["phase-steps"] as { 설정: unknown }[])[0].설정 = { 질문: { 2: "기존 질문" } };
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));
+      await pickCard("1차 조사");
+      const card = within(editor().getByRole("group", { name: "1차 조사 수정" }));
+      expect(card.queryByRole("group", { name: "피해자의 질문" })).not.toBeInTheDocument();          // NPC 는 답하지 않는다
+      expect(card.getByLabelText("집사 질문")).toHaveValue("기존 질문");
+      await userEvent.type(card.getByLabelText("의사 질문"), "비밀을 알았습니까?");
+      await userEvent.type(card.getByLabelText("의사 선택지"), "예, 아니오");
+      await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({
+        설정: { 질문: { 1: { 질문: "비밀을 알았습니까?", 선택: ["예", "아니오"] }, 2: "기존 질문" } },
+      });
+    });
+
     it("투표 후보에 사고사·자살 같은 인물이 아닌 후보를 더하고 뺄 수 있다", async () => {
       routes["PATCH /api/works/7/content/phase-steps/9"] = () => json({});
       twoPhases();
