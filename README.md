@@ -2,6 +2,48 @@
 
 시나리오 제작 툴(PC)과 플레이(PC·모바일)를 제공하는 웹 플랫폼. 진행 상황은 `docs/HANDOFF_2026-10-14.md` 참고.
 
+## 빠른 시작 (시연)
+
+### 도커 명령어
+
+프로젝트 폴더(`docker-compose.yml`이 있는 곳)에서 실행한다. Docker Desktop 이 켜져 있어야 한다.
+
+| 하려는 일 | 명령 |
+|---|---|
+| 처음 켜기 (빌드 + 실행) | `docker compose up --build` |
+| 다시 켜기 | `docker compose up` |
+| 끄기 | `Ctrl+C`, 또는 다른 터미널에서 `docker compose down` |
+| 코드를 새로 받은 뒤 | `git pull` → `docker compose up --build` |
+| 데이터까지 지우고 처음부터 | `docker compose down -v` |
+
+`Uvicorn running` 이 보이면 브라우저에서 **http://localhost:8000** 을 연다. 켠 터미널은 닫지 않는다.
+처음 켜면 시연용 작품 「동짓날 마을회관」(4인)이 자동으로 만들어져 "게임 목록"에 나온다.
+
+### AI 호출 명령어
+
+1. 프로젝트 폴더에 `.env` 파일을 만들고 키를 적는다(이 파일은 저장소에 올라가지 않는다. 파일 이름이 `.env.txt` 가 되지 않게 한다).
+   ```
+   ANTHROPIC_API_KEY=발급받은키
+   ```
+2. `docker compose up --build` 로 켠다.
+3. 브라우저에서 「동짓날 마을회관」으로 방을 만든다. AI 4명이 자리를 채우도록 **"방장도 플레이어로 참여"를 끄고**, 대기실에서 관전 방식을 **GM** 으로 바꾼 뒤 입장코드를 확인한다.
+4. **다른 터미널**에서 입장코드를 넣어 AI 를 입장시킨다.
+   ```
+   docker compose exec app python backend/scripts/ai_players.py --code 입장코드 --count 4
+   ```
+5. 방장이 게임을 시작하고 단계를 넘긴다. 끝나면 `Ctrl+C`.
+
+| 옵션 | 설명 |
+|---|---|
+| `--code` | 방의 입장코드(필수) |
+| `--count 4` | 입장시킬 AI 수 |
+| `--brain simple` | 모델 없이 규칙으로 플레이(키가 없을 때 흐름만 확인, 말투는 살지 않음) |
+| `--nicknames "A,B,C,D"` | AI 닉네임(기본 `AI 1`…) |
+| `--think 8` | AI 한 명이 모델을 부르는 최소 간격(초). 늘리면 비용이 줄고 반응이 느려진다 |
+| `--verbose` | AI 에게 준 글을 출력 |
+
+모델은 `.env` 에 `MM_AI_MODEL=claude-sonnet-5-5` 처럼 적어 바꾼다(기본은 `claude-haiku-5-5`). 크레딧이 모자라면 터미널에 안내가 나온다.
+
 ## 구성
 
 | 디렉터리 | 내용 |
