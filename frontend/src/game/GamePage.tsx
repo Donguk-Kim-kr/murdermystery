@@ -43,6 +43,8 @@ export function GamePage() {
 
 function Play({ game, state }: { game: GameApi; state: GameState }) {
   const [tab, setTab] = useState(NOW);
+  // 단계가 바뀌면 새 단계의 화면으로 돌아온다(지난 단계에서 읽던 탭에 머물러 있지 않는다)
+  useEffect(() => setTab(NOW), [state.페이즈.순서]);
   const [dismissed, setDismissed] = useState(0);
   const remaining = useRemaining(state);
   const tabs = state.탭 as Block[];

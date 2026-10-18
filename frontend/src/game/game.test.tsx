@@ -527,3 +527,25 @@ describe("투표 블록", () => {
     expect(screen.getByRole("button", { name: /집사/ })).toBeDisabled();
   });
 });
+
+describe("단계가 바뀔 때", () => {
+  it("읽던 탭에서 현재 화면으로 돌아온다", async () => {
+    state = makeState({
+      화면: [{ 종류: "글", 이름: "안내", 내용: "현재 안내" }],
+      탭: [{ 종류: "글", 이름: "공통 스토리", 내용: "프롤로그 내용", 카드: "프롤로그" }],
+    });
+    render(<GamePage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "공통 스토리" }));
+    expect(screen.queryByText("현재 안내")).toBeNull();
+    await waitFor(() => expect(events).not.toBeNull());
+    state = makeState({
+      상태_버전: 4, 페이즈: { 위치: 2, 전체: 3, 순서: 2, 이름: "다음 단계", 진행시간: 0 },
+      화면: [{ 종류: "글", 이름: "안내", 내용: "다음 단계 안내" }],
+      탭: [{ 종류: "글", 이름: "공통 스토리", 내용: "프롤로그 내용", 카드: "프롤로그" }],
+    });
+    push(4);
+    expect(await screen.findByText("다음 단계 안내")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "현재 화면" })).toHaveAttribute("aria-selected", "true");
+  });
+});
