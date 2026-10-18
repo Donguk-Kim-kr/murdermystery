@@ -487,7 +487,8 @@ describe("작품", () => {
     ]);
     renderApp();
     expect(await screen.findByRole("heading", { name: "플레이" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("입장코드")).not.toBeInTheDocument();             // 입장코드 입력은 아직 두지 않는다
+    expect(screen.queryByLabelText("입장코드")).not.toBeInTheDocument();             // 입장코드 입력은 버튼을 눌러야 나온다
+    expect(screen.getByRole("button", { name: "코드로 입장" })).toBeInTheDocument();
     expect(await screen.findByText("공개 작품")).toBeInTheDocument();
     expect(screen.getByText("제작 탐정")).toBeInTheDocument();
     expect(screen.getAllByText("비공개 플레이")).toHaveLength(1);                       // 테스트 작품에만 붙는다
@@ -545,6 +546,47 @@ describe("방", () => {
   beforeEach(() => {
     localStorage.setItem("mm.token", "saved");
     routes["GET /api/auth/me"] = () => json(account);
+  });
+
+  it("플레이공간의 '코드로 입장' 버튼은 입장코드 입력 창을 열고 닫을 수 있다", async () => {
+    renderApp();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "코드로 입장" }));
+    const dialog = screen.getByRole("dialog", { name: "입장코드로 입장" });
+    expect(within(dialog).getByLabelText("입장코드")).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "코드로 입장" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "닫기" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("입장 창에서 코드를 넣으면 입장해서 대기실로 간다", async () => {
+    let inRoom = false;
+    const asGuest = { ...baseRoom, 내가_방장: false };
+    routes["GET /api/rooms/me"] = () => json(inRoom ? asGuest : null);
+    routes["POST /api/rooms/join"] = () => {
+      inRoom = true;
+      return json(asGuest);
+    };
+    renderApp();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "코드로 입장" }));
+    await user.type(screen.getByLabelText("입장코드"), "k7m2qx");
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "입장하기" }));
+    expect(await screen.findByRole("heading", { name: "저택의 비밀" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(await calls.find((c) => c.key === "POST /api/rooms/join")!.req.json()).toEqual({ 입장코드: "K7M2QX" });
+  });
+
+  it("입장 창에서 코드가 틀리면 창 안에 이유를 보여 준다", async () => {
+    routes["POST /api/rooms/join"] = () => json({ detail: "입장코드가 올바르지 않습니다" }, 404);
+    renderApp();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "코드로 입장" }));
+    await user.type(screen.getByLabelText("입장코드"), "ZZZZZZ");
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "입장하기" }));
+    expect(await within(screen.getByRole("dialog")).findByRole("alert")).toHaveTextContent("입장코드가 올바르지 않습니다");
   });
 
   it("입장코드를 대문자로 바꿔 입장하고 대기실을 보여 준다", async () => {

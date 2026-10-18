@@ -4,14 +4,16 @@ import { Link } from "react-router-dom";
 import { api, errorMessage } from "../api/client";
 import type { components } from "../api/schema";
 import { useRoom } from "../rooms/RoomContext";
+import { JoinCodeDialog } from "./JoinRoomPage";
 
 type PlayWork = components["schemas"]["PlayWorkOut"];
 
-/** 로그인하면 처음 보이는 플레이공간: 내가 방을 만들 수 있는 작품. (입장코드 입력은 아직 두지 않는다 — 사용자가 나중에 정한다) */
+/** 로그인하면 처음 보이는 플레이공간: 내가 방을 만들 수 있는 작품과, 입장코드로 들어가는 버튼(누르면 코드 입력 창이 열린다). */
 export function PlayHomePage() {
   const { room } = useRoom();
   const [works, setWorks] = useState<PlayWork[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [joining, setJoining] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,7 +40,10 @@ export function PlayHomePage() {
           </div>
         </section>
       )}
-      <h2>플레이할 작품</h2>
+      <div className="row">
+        <h2>플레이할 작품</h2>
+        <button type="button" className="secondary" onClick={() => setJoining(true)}>코드로 입장</button>
+      </div>
       {error && <p role="alert" className="error">{error}</p>}
       {works === null && !error && <p className="muted">불러오는 중…</p>}
       {works?.length === 0 && (
@@ -65,6 +70,7 @@ export function PlayHomePage() {
           ))}
         </div>
       )}
+      {joining && <JoinCodeDialog onClose={() => setJoining(false)} />}
     </main>
   );
 }
