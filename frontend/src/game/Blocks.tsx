@@ -18,6 +18,8 @@ interface Item {
   비활성?: boolean;
   /** 투표: 인물이 아닌 선택지(예: 사고사) */
   기타?: boolean;
+  /** 투표: 인물 / 장소 / 단서 / 기타 */
+  종류?: string;
 }
 
 interface Card {
@@ -105,7 +107,8 @@ function VoteBlock({ block, state, onAnswer }: { block: Block; state: GameState;
               onClick={() => setPicked(item.값 as number | string)}
             >
               <strong>{text(item.이름) || "이름 없음"}</strong>
-              {!item.기타 && (
+              {(item.종류 === "장소" || item.종류 === "단서") && <span className="chip">{item.종류}</span>}
+              {!item.기타 && item.종류 !== "장소" && item.종류 !== "단서" && (
                 <span className="muted">{[item.직업, item.나이 != null ? `${item.나이}세` : null, item.성별].filter(Boolean).join(" · ")}</span>
               )}
               {mine === item.값 && <span className="chip accent">내 투표</span>}

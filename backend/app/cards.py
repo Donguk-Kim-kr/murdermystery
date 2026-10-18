@@ -53,7 +53,7 @@ class CardRun:
 MUTATING = {"변수설정", "배정", "투표", "투표초기화", "조사", "양도", "공개설정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
 FUNCTION_NAMES = {
     "플레이어들", "플레이어수", "인물들", "공통스토리", "서사들", "배정된_플레이어수", "인물_없는_플레이어가_있다",
-    "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
+    "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "모든_장소", "단서들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
     "단계_끝내기", "게임_종료",
 }
 CONSTANT_NAMES = {"통과", ALL}
@@ -64,7 +64,7 @@ MAX_OPTION_CHARS = 50
 MAX_VARIABLES = 500
 MAX_VARIABLE_NAME = 100
 MAX_VARIABLE_BYTES = 2000
-MAX_CANDIDATES = 30
+MAX_CANDIDATES = 100
 
 
 def known_names() -> set[str]:
@@ -124,6 +124,14 @@ class CardHost:
     def fn_장소들(self) -> list[Ref]:
         """조사할 수 있는 장소들(가장 안쪽 장소)."""
         return [Ref("장소", p["순서"]) for p in clues.leaf_places(self.game)]
+
+    def fn_모든_장소(self) -> list[Ref]:
+        """작품의 모든 장소(바깥 장소 포함). 능력의 지목 대상처럼 조사 단위가 아니어도 고를 수 있는 장소에 쓴다."""
+        return [Ref("장소", p["순서"]) for p in sorted(self.game.snapshot.get("장소") or [], key=lambda p: p["순서"])]
+
+    def fn_단서들(self) -> list[Ref]:
+        """작품의 모든 단서(누가 가졌는지와 상관없이, 증언은 제외). 화면에는 공개이름이 보인다."""
+        return [Ref("단서", c["순서"]) for c in sorted(self.game.snapshot.get("단서") or [], key=lambda c: c["순서"])]
 
     def fn_보유목록(self, 플레이어: Any) -> list[dict[str, Any]]:
         """이 플레이어가 지금 가진 단서·증언(얻은 순서). 각 항목은 {종류, 이름, 공개이름, 내용, 장소}."""
@@ -365,15 +373,15 @@ class CardHost:
             raise ScriptError(f"투표칸의 후보는 1개 이상 {MAX_CANDIDATES}개 이하의 목록이어야 합니다")
         options: list[Any] = []
         for c in 후보:
-            if isinstance(c, Ref) and c.kind == "인물":
+            if isinstance(c, Ref) and c.kind in VOTE_REF_KINDS:
                 options.append(c)
             elif isinstance(c, str) and c.strip() and len(c.strip()) <= MAX_OPTION_CHARS:
                 options.append(c.strip())
             else:
-                raise ScriptError("투표칸의 후보는 인물이나 글이어야 합니다")
-        if len({c.key if isinstance(c, Ref) else c for c in options}) != len(options):
+                raise ScriptError("투표칸의 후보는 인물·장소·단서나 글이어야 합니다")
+        if len({_vote_value(c) for c in options}) != len(options):
             raise ScriptError("투표칸의 후보가 겹칩니다")
-        self.game.vote_options[name] = {c for c in options if isinstance(c, str)}
+        self.game.vote_options[name] = {v for v in (_vote_value(c) for c in options) if isinstance(v, str)}
         return {"종류": "투표", "이름": name, "질문": _text(질문), "항목": options, "질문ID": f"{self.run.key}:{name}"}
 
     def fn_현황(self, 이름: str, 완료: int, 전체: int) -> dict[str, Any]:
@@ -413,7 +421,7 @@ class CardHost:
         없는 후보이거나 자기 인물이면 False."""
         account = self._player_account(플레이어)
         name = str(이름)
-        value = 후보.key if isinstance(후보, Ref) and 후보.kind == "인물" else 후보
+        value = _vote_value(후보) if isinstance(후보, Ref) and 후보.kind in VOTE_REF_KINDS else 후보
         if _is_int(value):
             if not any(c["순서"] == value for c in self.game.snapshot.get("인물") or []):
                 return False
@@ -582,6 +590,16 @@ def _tally(game, name: str) -> dict[int | str, int]:
     for slot in game.votes.get(name, {}).values():
         counts[slot] = counts.get(slot, 0) + 1
     return counts
+
+
+VOTE_REF_KINDS = ("인물", "장소", "단서")
+
+
+def _vote_value(option: Any) -> Any:
+    """투표칸 후보의 값. 인물은 순서 번호, 장소·단서는 "장소:2" 같은 글, 글은 그대로."""
+    if isinstance(option, Ref):
+        return option.key if option.kind == "인물" else f"{option.kind}:{option.key}"
+    return option
 
 
 def _is_int(value: Any) -> bool:
@@ -771,6 +789,11 @@ def _item(game, viewer: int, item: Any) -> dict[str, Any]:
     return {"값": item, "이름": str(item)}
 
 
+def _clue_label(game, order: int) -> str:
+    row = next((c for c in game.snapshot.get("단서") or [] if c["순서"] == order), None) or {}
+    return row.get("공개이름") or row.get("이름") or f"단서 {order}"
+
+
 def _block(game, viewer: int, block: dict[str, Any]) -> dict[str, Any]:
     out = {k: v for k, v in block.items() if k != "항목"}
     kind = block.get("종류")
@@ -787,7 +810,13 @@ def _block(game, viewer: int, block: dict[str, Any]) -> dict[str, Any]:
         items = [_item(game, viewer, i) for i in raw]
         for item, original in zip(items, raw):
             item.pop("선택한_계정", None)
-            item["기타"] = not isinstance(original, Ref)                  # 인물이 아닌 선택지(예: 사고사)
+            item["기타"] = not isinstance(original, Ref)                  # 인물·장소·단서가 아닌 선택지(예: 사고사)
+            item["종류"] = original.kind if isinstance(original, Ref) else "기타"
+            if isinstance(original, Ref) and original.kind != "인물":
+                item["값"] = _vote_value(original)
+                item["이름"] = clues.place_path(game, original.key) if original.kind == "장소" else _clue_label(game, original.key)
+                for extra in ("유형", "특징"):
+                    item.pop(extra, None)
             item["비활성"] = player is None or (mine is not None and item["값"] == mine)   # 관전자는 고르지 못하고 자기 인물에게는 투표할 수 없다
         out["항목"] = items
         out["내_선택"] = game.votes.get(block["이름"], {}).get(viewer)

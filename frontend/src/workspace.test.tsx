@@ -765,6 +765,39 @@ describe("진행 탭", () => {
       expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: { 후보: [1, 2, "사고사"] } });
     });
 
+    it("투표 동률·능력 대상 같은 단순 설정은 선택지와 입력칸으로 정하고, 기본값과 같으면 저장하지 않는다", async () => {
+      routes["PATCH /api/works/7/content/phase-steps/9"] = () => json({});
+      twoPhases();
+      (bundle.library as { phases: Record<string, object> }).phases[5] = {
+        번호: 5, 이름: "최종 투표", 버전: 1, 설명: "d", 삭제됨: false, 사용설정: ["동률", "재투표한도", "대상", "횟수"],
+      };
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));
+      await pickCard("1차 조사");
+      const card = within(editor().getByRole("group", { name: "1차 조사 수정" }));
+      expect(card.queryByLabelText("재투표 후보")).not.toBeInTheDocument();                         // 스크립트가 쓰지 않는 설정은 보이지 않는다
+      await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: null });
+      await userEvent.selectOptions(card.getByLabelText("투표가 동률일 때"), "재투표");
+      await userEvent.clear(card.getByLabelText("재투표 한도(0은 한도 없음)"));
+      await userEvent.type(card.getByLabelText("재투표 한도(0은 한도 없음)"), "0");
+      await userEvent.clear(card.getByLabelText("조사 횟수(1인당)"));
+      await userEvent.type(card.getByLabelText("조사 횟수(1인당)"), "5");
+      await userEvent.click(card.getByLabelText("장소"));
+      await userEvent.click(card.getByLabelText("단서"));
+      await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
+      await waitFor(() => expect(sent("PATCH /api/works/7/content/phase-steps/9")).toHaveLength(2));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[1].req.json()).toEqual({
+        설정: { 동률: "재투표", 재투표한도: 0, 횟수: 5, 대상: ["인물", "장소", "단서"] },
+      });
+      await userEvent.click(card.getByLabelText("인물"));                                           // 하나도 고르지 않으면 저장하지 않는다
+      await userEvent.click(card.getByLabelText("장소"));
+      await userEvent.click(card.getByLabelText("단서"));
+      await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
+      expect(await card.findByText(/능력의 지목 대상: 하나 이상 골라 주세요/)).toBeInTheDocument();
+      expect(sent("PATCH /api/works/7/content/phase-steps/9")).toHaveLength(2);
+    });
+
     it("스크립트가 개인 서사 공개를 쓰지 않는 카드에는 서사 선택이 없다", async () => {
       twoPhases();
       bundle.characters = [{ 순서: 1, 이름: "의사", 직업: null, NPC: false, 범인: false, 서사_부분수: 2 }];
