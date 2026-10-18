@@ -36,13 +36,16 @@ def make_scripted_game(client, make_account, db):
         if setup:
             setup(client, host, wid)
         swaps = {}
+        libs = {}                                                                   # 같은 이름의 카드를 여러 번 놓으면 같은 진행단계를 가리킨다
         for position, (name, script, settings) in enumerate(cards, 1):
             if name in unchecked:
                 swaps[f"{name}-{wid}"], script = script, ""
-            lib = client.post("/api/library/phases", headers=host.headers, json={
-                "이름": f"{name}-{wid}", "설명": name, "규칙": {"스크립트": script} if script else {},
-            })
-            assert lib.status_code == 201, lib.text
+            if name not in libs:
+                libs[name] = client.post("/api/library/phases", headers=host.headers, json={
+                    "이름": f"{name}-{wid}", "설명": name, "규칙": {"스크립트": script} if script else {},
+                })
+                assert libs[name].status_code == 201, libs[name].text
+            lib = libs[name]
             made = client.post(f"/api/works/{wid}/phases/insert", headers=host.headers, json={"position": position})
             assert made.status_code == 201, made.text
             slot = made.json()["phases"][position - 1]["순서"]

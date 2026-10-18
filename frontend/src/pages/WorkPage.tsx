@@ -8,6 +8,7 @@ import { ConfirmPanel } from "../workspace/ConfirmPanel";
 import { ContentPanel } from "../workspace/ContentPanel";
 import { FlowReview, PhasesPanel } from "../workspace/PhasesPanel";
 import { CharacterForm, type Character } from "./CharacterForm";
+import { CommonStoryEditor } from "./CommonStoryEditor";
 import { RoomPanel } from "./RoomPanel";
 import { TestersPanel } from "./TestersPanel";
 import { VisibilityPanel } from "./VisibilityPanel";
@@ -115,7 +116,12 @@ export function WorkPage() {
       {tab === "places" && <ContentPanel workId={workId} keys={["places"]} />}
       {tab === "clues" && <ContentPanel workId={workId} keys={["clues", "testimonies", "combos"]} />}
       {tab === "incidents" && <ContentPanel workId={workId} keys={["incidents", "incident-details", "timelines"]} />}
-      {tab === "relations" && <ContentPanel workId={workId} keys={["materials"]} />}
+      {tab === "relations" && (
+        <div className="stack">
+          <CommonStoryEditor key={work.번호} work={work} onSaved={load} />
+          <ContentPanel workId={workId} keys={["materials"]} />
+        </div>
+      )}
       {tab === "phases" && (
         <PhasesPanel workId={workId} />
       )}

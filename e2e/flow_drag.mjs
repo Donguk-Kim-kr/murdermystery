@@ -15,7 +15,7 @@ const tok = (await api("/api/auth/login", { method: "POST", body: { 아이디: i
 const lib = (await api("/api/library/phases", { token: tok })).filter((p) => p.공통).sort((a, b) => b.버전 - a.버전);
 const pick = (n) => lib.find((p) => p.이름 === n).번호;
 const w = (await api("/api/works", { method: "POST", token: tok, body: { 제목: "끌기 시험" } })).번호;
-for (const [i, n] of ["프롤로그", "캐릭터 선택", "프로필 숙지", "자기소개", "조사"].entries()) {
+for (const [i, n] of ["공통 스토리", "캐릭터 선택", "프로필 숙지", "자기소개", "조사"].entries()) {
   const made = await api(`/api/works/${w}/phases/insert`, { method: "POST", token: tok, body: { position: i + 1 } });
   await api(`/api/works/${w}/content/phase-steps`, { method: "POST", token: tok, body: { 진행순서_순서: made.phases[i].순서, 진행단계_번호: pick(n) } });
 }

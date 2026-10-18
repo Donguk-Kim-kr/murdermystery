@@ -525,7 +525,7 @@ function PhaseEditor({ ws, phase, index, total, call, onNavigate, onClose }: {
       </div>
       <AttachedCards key={`step:${no}`} title="진행단계" empty="붙은 진행단계가 없습니다. 아래 진행카드를 이 페이즈에 끌어다 놓으세요." rows={steps}
         lib={ws.bundle.library.phases} libCol="진행단계_번호" resource="phase-steps" call={call}
-        characters={(ws.bundle.characters as Row[] | undefined) ?? []} />
+        characters={(ws.bundle.characters as Row[] | undefined) ?? []} storyParts={ws.bundle.story?.공통스토리_부분수 ?? 1} />
       {uses.length > 0 && (
         <AttachedCards key={`gimmick:${no}`} title="기믹" empty="" rows={uses} lib={ws.bundle.library.gimmicks} libCol="기믹_번호" resource="gimmick-uses"
           call={call} />
@@ -535,9 +535,9 @@ function PhaseEditor({ ws, phase, index, total, call, onNavigate, onClose }: {
 }
 
 /** 페이즈에 붙은 진행단계(또는 기믹) 목록. 하나를 골라야 그 카드의 수정 항목과 삭제 버튼이 나타난다(다시 누르면 접힌다). */
-function AttachedCards({ title, empty, rows, lib, libCol, resource, call, characters = [] }: {
+function AttachedCards({ title, empty, rows, lib, libCol, resource, call, characters = [], storyParts = 1 }: {
   title: string; empty: string; rows: Row[]; lib: Record<string, LibraryRef>; libCol: string; resource: string; call: Call;
-  characters?: Row[];
+  characters?: Row[]; storyParts?: number;
 }) {
   const [selected, setSelected] = useState<number | null>(null);
   const isCard = resource === "phase-steps";
@@ -580,7 +580,8 @@ function AttachedCards({ title, empty, rows, lib, libCol, resource, call, charac
             </button>
           </div>
           <SettingsEditor key={`${selected}:${JSON.stringify(current.설정 ?? null)}`} resource={resource} id={current[idCol] as number}
-            value={current.설정} showTab={isCard} call={call} characters={characters} settingKeys={ref?.사용설정 ?? []} defs={ref?.설정정의 ?? []} declared={ref?.설정정의 != null} />
+            value={current.설정} showTab={isCard} call={call} characters={characters} settingKeys={ref?.사용설정 ?? []} defs={ref?.설정정의 ?? []} declared={ref?.설정정의 != null}
+            storyParts={storyParts} />
         </div>
       )}
     </div>
@@ -594,8 +595,8 @@ const asObject = (v: unknown): Record<string, unknown> =>
  * 카드·기믹을 이 페이즈에 놓을 때만 적용하는 세부 설정. 비우면 정의의 기본값을 쓴다.
  * 카드에는 "내용 유지"(이 페이즈가 끝나도 내용을 남겨 계속 볼 수 있게 함)를 따로 보여 준다(기본: 남김). 상세 설명 글은 아직 두지 않는다. 나머지는 JSON 으로 직접 쓴다(내부 구조는 엔진 설계에서 정함).
  */
-function SettingsEditor({ resource, id, value, showTab, call, characters, settingKeys, defs, declared }: {
-  resource: string; id: number; value: unknown; showTab: boolean; call: Call; characters: Row[]; settingKeys: string[]; defs: SettingDef[]; declared: boolean;
+function SettingsEditor({ resource, id, value, showTab, call, characters, settingKeys, defs, declared, storyParts }: {
+  resource: string; id: number; value: unknown; showTab: boolean; call: Call; characters: Row[]; settingKeys: string[]; defs: SettingDef[]; declared: boolean; storyParts: number;
 }) {
   const current = asObject(value);
   const showPicks = settingKeys.includes(STORY_PICKS);
@@ -603,9 +604,15 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
   const showQuestions = settingKeys.includes(QUESTIONS);
   const { [KEEP_TAB]: keepRaw, [STORY_PICKS]: picksRaw, [CANDIDATES]: candidatesRaw, [QUESTIONS]: questionsRaw, ...restAll } = current;
   const simpleShown = defs.filter((d) => GENERIC_KINDS.includes(d.종류));
+  const commonDef = defs.find((d) => d.종류 === "공통서사");               // 공통 스토리 카드: 보여 줄 부분 번호
   // 전용 입력으로 다루는 설정만 JSON 칸에서 뺀다(스크립트가 쓰지 않는 카드에서는 값을 그대로 둔다).
   const rest: Record<string, unknown> = { ...restAll };
   for (const d of simpleShown) delete rest[d.키];
+  if (commonDef) delete rest[commonDef.키];
+  const [commonPicked, setCommonPicked] = useState<number[]>(() => {
+    const raw = commonDef ? current[commonDef.키] : undefined;
+    return Array.isArray(raw) ? raw.filter((n): n is number => Number.isInteger(n) && n >= 1) : [1];
+  });
   const [simple, setSimple] = useState<Record<string, unknown>>(() =>
     Object.fromEntries(simpleShown.map((d) => [d.키, current[d.키] ?? d.기본 ?? (d.종류 === "글" ? "" : null)])));
   if (!showPicks && picksRaw !== undefined) rest[STORY_PICKS] = picksRaw;
@@ -648,6 +655,14 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
     if (showQuestions && Object.keys(asked).length) next = { ...next, [QUESTIONS]: asked };
     if (showCandidates && !isDefault) next = { ...next, [CANDIDATES]: [...[...candidates].sort((a, b) => a - b), ...extras] };
     if (showTab && !keepTab) next = { ...next, [KEEP_TAB]: false };
+    if (commonDef) {
+      const list = [...commonPicked].sort((a, b) => a - b);
+      if (list.length === 0) {
+        setError("보여 줄 공통 스토리 부분을 하나 이상 골라 주세요");
+        return;
+      }
+      if (JSON.stringify(list) !== JSON.stringify([1])) next = { ...next, [commonDef.키]: list };
+    }
     for (const d of simpleShown) {
       const v = simple[d.키];
       if (d.종류 === "글") {
@@ -680,6 +695,21 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
           <input type="checkbox" checked={keepTab} onChange={(e) => setKeepTab(e.target.checked)} />
           내용 유지
         </label>
+      )}
+      {commonDef && (
+        <fieldset className="story-picks">
+          <legend>{commonDef.이름}</legend>
+          <div className="row start">
+            {Array.from({ length: Math.max(storyParts, ...commonPicked, 1) }, (_, i) => i + 1).map((n) => (
+              <label key={n} className="check">
+                <input type="checkbox" checked={commonPicked.includes(n)}
+                  onChange={(e) => setCommonPicked(e.target.checked ? [...commonPicked, n] : commonPicked.filter((x) => x !== n))} />
+                {`${n}부분`}
+              </label>
+            ))}
+          </div>
+          {storyParts > commonPicked.length && <span className="hint">작품의 공통 스토리는 {storyParts}부분입니다. 고르지 않은 부분은 이 카드에서 보이지 않습니다</span>}
+        </fieldset>
       )}
       {simpleShown.map((d) => (
         <SimpleSettingInput key={d.키} d={d} value={simple[d.키]} onChange={(v) => setSimple({ ...simple, [d.키]: v })} />

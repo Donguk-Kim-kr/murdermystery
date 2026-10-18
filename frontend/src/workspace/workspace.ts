@@ -57,7 +57,7 @@ export interface LibraryRef {
 export interface SettingDef {
   키: string;
   이름: string;
-  종류: "숫자" | "선택" | "켜짐" | "글" | "여러선택" | "서사" | "후보" | "질문";
+  종류: "숫자" | "선택" | "켜짐" | "글" | "여러선택" | "서사" | "공통서사" | "후보" | "질문";
   기본?: unknown;
   최소?: number;
   선택?: [string | number, string][];
@@ -82,6 +82,8 @@ export interface ConditionDef {
 
 export interface Bundle {
   [key: string]: unknown;
+  /** 공통 스토리를 나눈 부분 수(공통 스토리 카드가 보여 줄 부분을 고르는 범위) */
+  story?: { 공통스토리_부분수: number };
   library: { phases: Record<string, LibraryRef>; gimmicks: Record<string, LibraryRef> };
 }
 

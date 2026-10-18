@@ -8,6 +8,7 @@
 """
 import functools
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -51,10 +52,10 @@ class CardRun:
 
 # ---- 호스트(스크립트가 부르는 엔진 기능) -------------------------------------------------------
 
-MUTATING = {"변수설정", "배정", "투표", "투표초기화", "조사", "양도", "공개설정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
+MUTATING = {"탭이어쓰기", "변수설정", "배정", "투표", "투표초기화", "조사", "양도", "공개설정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
 FUNCTION_NAMES = {
     "플레이어들", "플레이어수", "인물들", "공통스토리", "서사들", "배정된_플레이어수", "인물_없는_플레이어가_있다",
-    "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "모든_장소", "단서들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
+    "공통스토리부분들", "탭이어쓰기", "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "모든_장소", "단서들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
     "단계_끝내기", "게임_종료",
 }
 FUNCTION_NAMES |= BUILDER_NAMES          # 제작 화면을 정하는 함수들(app/declare.py). 게임 중에 불러도 값만 만들 뿐이다
@@ -108,8 +109,35 @@ class CardHost:
     def fn_인물들(self) -> list[Ref]:
         return [Ref("인물", c["순서"]) for c in self.game.characters]
 
+    def _common_story_parts(self) -> list[str]:
+        """작품의 공통 스토리를 부분(본문)들로. 부분 표기가 없는 글은 부분 하나이다."""
+        raw = ((self.game.snapshot.get("작품") or {}).get("공통스토리")) or ""
+        return [p.text for p in narrative.split(raw)]
+
     def fn_공통스토리(self) -> str:
-        return ((self.game.snapshot.get("작품") or {}).get("공통스토리")) or ""
+        """공통 스토리 전체(부분들을 이은 글)."""
+        return "\n\n".join(self._common_story_parts())
+
+    def fn_공통스토리부분들(self, 번호들: Any) -> str:
+        """공통 스토리에서 번호(1부터)로 고른 부분들을 번호 순서로 이은 글. 없는 번호는 건너뛴다."""
+        if not isinstance(번호들, (list, tuple)):
+            raise ScriptError("공통스토리부분들() 에는 번호 목록을 넘겨야 합니다(예: [1, 2])")
+        return narrative.pick(self._common_story_parts(), list(번호들))
+
+    def fn_탭이어쓰기(self, 대상: Any, 이름: Any, 글내용: Any) -> None:
+        """이미 있는 글 탭의 끝에 글을 이어 붙인다(탭의 자리는 그대로). 그 이름의 탭이 없으면 새 탭으로 만든다."""
+        if not isinstance(대상, Ref) or 대상.kind not in (ALL, "플레이어"):
+            raise ScriptError("탭이어쓰기() 의 대상은 모두 또는 플레이어여야 합니다")
+        key = self._target_key(대상)
+        name, text = str(이름), _text(글내용)
+        old = self.game.tabs.get(key, {}).get(name)
+        if old is None or old["내용"].get("종류") != "글":
+            self.m_탭(대상, name, text)
+            return
+        merged = "\n\n".join(t for t in (str(old["내용"].get("내용", "")), text) if t)
+        order = old["순번"]                                         # 탭이 놓인 자리는 바꾸지 않는다
+        self.m_탭(대상, name, merged)
+        self.game.tabs[key][name]["순번"] = order
 
     def fn_서사들(self, 인물: Any, 번호들: Any) -> str:
         if 인물 is None:
@@ -518,6 +546,8 @@ class CardHost:
                 return self.run.library.get("이름")
             if name == "표시이름":
                 return self.run.title
+            if name == "차수":
+                return _ordinal_prefix(self.run.title, self.run.library.get("이름"))
         raise ScriptError(f"{ref.kind} 의 '{name}' 을(를) 읽을 수 없습니다")
 
     def method(self, ref: Ref, name: str, args: list[Any], kwargs: dict[str, Any]) -> Any:
@@ -585,6 +615,16 @@ class CardHost:
         if ref.key not in self.game.players:
             raise ScriptError("게임에 없는 플레이어입니다")
         return [ref.key]
+
+
+def _ordinal_prefix(title: str, library_name: Any) -> str:
+    """같은 진행단계를 여러 번 놓았을 때 둘째부터 붙는 "2차 " 같은 앞말. 하나뿐이거나 첫째이면 빈 글.
+
+    카드의 표시 이름은 같은 이름이 여럿일 때 "1차 이름", "2차 이름" 이 된다(첫째는 "1차 "이지만 탭 이름에는 붙이지 않는다)."""
+    match = re.fullmatch(r"(\d+)차 (.*)", title or "", re.S)
+    if match and match.group(2) == library_name and int(match.group(1)) >= 2:
+        return f"{match.group(1)}차 "
+    return ""
 
 
 def _tally(game, name: str) -> dict[int | str, int]:

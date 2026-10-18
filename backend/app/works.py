@@ -7,12 +7,13 @@
 * `공개여부`·`공개권한` 은 여기서 바꾸지 않는다. 공개/비공개 전환은 `publishing.py` (B35)에서 한다.
 """
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, status
 from psycopg import Connection, errors
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
+from . import narrative
 from .auth import CurrentSession, CurrentUser
 from .db import Conn
 from .visibility import Level, actor_level
@@ -28,12 +29,43 @@ WORK_COLUMNS = (
 UNTITLED = "제목없음"   # 임시 저장 이름. 제목을 비워서 만들면 이 이름으로 시작한다. 특별한 이름이 아니라 평범한 제목이며 같은 이름이 여럿이어도, 직접 "제목없음"으로 지어도 된다(제목은 언제든 고칠 수 있다)
 
 
+class PartIn(BaseModel):
+    """공통 스토리 한 부분. ID 는 이미 있는 부분을 다시 보낼 때만 넣고, 새 부분은 비운다(서버가 만든다)."""
+
+    ID: str | None = Field(default=None, max_length=6)
+    본문: str = Field(max_length=narrative.COMMON_TOTAL_LIMIT)
+
+
+class PartOut(BaseModel):
+    ID: str | None
+    본문: str
+
+
+def stored_common_story(raw: str | None, parts: list[PartIn] | None) -> str | None:
+    """저장할 공통 스토리 글. 부분 목록(`공통스토리_부분`)이나 글(`공통스토리`) 중 하나로 받고, 둘 다 없으면 None(바꾸지 않음).
+
+    글로 받으면 부분으로 나눠 다시 합친다(표기 검사, 글자 수 검사, 표기 없는 부분에 ID 붙이기). 개인 서사와 같은 규칙이다.
+    """
+    if parts is not None and raw:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "공통스토리와 공통스토리_부분 중 하나로만 보내 주세요")
+    kwargs = {"total": narrative.COMMON_TOTAL_LIMIT, "noun": "공통 스토리"}
+    try:
+        if parts is not None:
+            return narrative.join([narrative.Part(p.ID, p.본문) for p in parts], **kwargs)
+        if raw is None:
+            return None
+        return narrative.join(narrative.split(raw), **kwargs)
+    except narrative.NarrativeError as err:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(err)) from None
+
+
 class WorkIn(BaseModel):
     제목: str = Field(default="", max_length=100)
     시놉시스: str = Field(default="", max_length=5000)
     장르: str = Field(default="", max_length=50)
     예상시간: str = Field(default="3시간", min_length=1, max_length=50)
-    공통스토리: str = Field(default="", max_length=20000)
+    공통스토리: str = Field(default="", max_length=narrative.COMMON_TOTAL_LIMIT + 400)
+    공통스토리_부분: list[PartIn] | None = None
 
 
 class WorkPatch(BaseModel):
@@ -42,7 +74,8 @@ class WorkPatch(BaseModel):
     장르: Annotated[str, Field(max_length=50)] | None = None
     예상시간: Annotated[str, Field(min_length=1, max_length=50)] | None = None
     최소인원: Annotated[int, Field(ge=1, le=100)] | None = None
-    공통스토리: Annotated[str, Field(max_length=20000)] | None = None
+    공통스토리: Annotated[str, Field(max_length=narrative.COMMON_TOTAL_LIMIT + 400)] | None = None
+    공통스토리_부분: list[PartIn] | None = None
 
 
 class WorkOut(BaseModel):
@@ -60,6 +93,19 @@ class WorkOut(BaseModel):
     생성일시: datetime
     수정일시: datetime | None
     확정버전_있음: bool
+
+    공통스토리_부분: list[PartOut] = []
+    """공통 스토리를 나눈 부분들(ID, 본문). 화면은 부분 표기 줄을 보지 않는다."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _split_story(cls, row: Any) -> Any:
+        """DB 에는 부분 표기가 붙은 글로 저장되어 있다. 응답의 `공통스토리` 는 표기 없이 부분을 이은 글, 부분은 따로 담는다."""
+        if not isinstance(row, dict) or "공통스토리" not in row:
+            return row
+        parts = narrative.split(row["공통스토리"] or "")
+        return {**row, "공통스토리": "\n\n".join(p.text for p in parts) if row["공통스토리"] is not None else None,
+                "공통스토리_부분": [{"ID": p.id, "본문": p.text} for p in parts]}
 
 
 def not_found() -> HTTPException:
@@ -100,7 +146,8 @@ def create_work(body: WorkIn, conn: Conn, me: CurrentUser) -> dict:
     return conn.execute(
         f'INSERT INTO "작품" ("제목", "시놉시스", "장르", "예상시간", "공통스토리", "최소인원", "최대인원", "계정_번호") '
         f"VALUES (%s, %s, %s, %s, %s, 1, 1, %s) RETURNING {WORK_COLUMNS}",
-        (body.제목.strip() or UNTITLED, body.시놉시스, body.장르, body.예상시간, body.공통스토리, me.계정.번호),
+        (body.제목.strip() or UNTITLED, body.시놉시스, body.장르, body.예상시간,
+         stored_common_story(body.공통스토리, body.공통스토리_부분) or "", me.계정.번호),
     ).fetchone()
 
 
@@ -126,7 +173,11 @@ def get_work(work_id: int, conn: Conn, me: CurrentUser) -> dict:
 @router.patch("/{work_id}", response_model=WorkOut)
 def update_work(work_id: int, body: WorkPatch, conn: Conn, me: CurrentUser) -> dict:
     work = lock_work(conn, work_id, me.계정.번호)
-    changes = body.model_dump(exclude_unset=True)
+    changes = body.model_dump(exclude_unset=True, exclude={"공통스토리_부분"})
+    if body.공통스토리_부분 is not None or "공통스토리" in changes:
+        story = stored_common_story(changes.get("공통스토리"), body.공통스토리_부분)
+        if story is not None:
+            changes["공통스토리"] = story
     if None in changes.values():
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "값을 비울 수 없는 항목입니다")
     if not changes:

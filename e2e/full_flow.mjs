@@ -1,4 +1,4 @@
-// 실제 브라우저 3개로 공통 진행단계 12개 전체(프롤로그 … 전체 공개)를 진행하는 시험. 사용법은 e2e/README.md
+// 실제 브라우저 3개로 공통 진행단계 12개 전체(공통 스토리 … 전체 공개)를 진행하는 시험. 사용법은 e2e/README.md
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? "playwright");
 const OUT = process.argv[2];
 const rnd = () => Math.random().toString(36).slice(2, 7);
@@ -21,7 +21,7 @@ const tok = (await api("/api/auth/login", { method: "POST", body: { 아이디: i
 const latest = {};
 for (const p of (await api("/api/library/phases", { token: tok })).filter((p) => p.공통)) if (!latest[p.이름] || latest[p.이름].버전 < p.버전) latest[p.이름] = p;
 const lib = Object.fromEntries(Object.entries(latest).map(([n, p]) => [n, p.번호]));
-const flow = [["프롤로그"], ["캐릭터 선택"], ["프로필 숙지"], ["자기소개"], ["조사", { 횟수: 2 }], ["토론"], ["밀담"], ["추리 발표"], ["최종 투표", { 후보: [1, 2, 3, "사고사"] }], ["엔딩"], ["후일담"], ["전체 공개"]];
+const flow = [["공통 스토리"], ["캐릭터 선택"], ["프로필 숙지"], ["자기소개"], ["조사", { 횟수: 2 }], ["토론"], ["밀담"], ["추리 발표"], ["최종 투표", { 후보: [1, 2, 3, "사고사"] }], ["엔딩"], ["후일담"], ["전체 공개"]];
 for (const [n] of flow) if (!lib[n]) throw new Error("공통 진행단계가 없습니다: " + n);
 const w = await api("/api/works", { method: "POST", token: tok, body: { 제목: "전체 흐름 시험", 시놉시스: "시험", 공통스토리: "폭풍우가 치는 밤, 저택에 손님들이 모였다." } });
 const W = w.번호;
@@ -64,7 +64,7 @@ const waitTitle = async (name) => { for (const p of pages) await p.locator("h1",
 const next = async (name) => { await host.getByRole("button", { name: "다음 단계" }).click(); await waitTitle(name); };
 const text = (p) => p.locator("main").innerText();
 
-await waitTitle("프롤로그");
+await waitTitle("공통 스토리");
 for (const p of pages) await p.getByRole("button", { name: "확인", exact: true }).click();
 await host.getByText("확인 3/3").waitFor({ timeout: 8000 });
 check(true, "프롤로그: 전원 확인 3/3");

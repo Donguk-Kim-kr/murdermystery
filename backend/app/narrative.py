@@ -34,9 +34,12 @@ class Part:
     text: str
 
 
-def part_limit(count: int) -> int:
+COMMON_TOTAL_LIMIT = 20000   # 작품의 공통 스토리: 전체 글자 수(부분이 늘수록 각 부분의 제한이 줄어드는 규칙은 서사와 같다)
+
+
+def part_limit(count: int, total: int = TOTAL_LIMIT) -> int:
     """부분이 `count` 개일 때 부분 하나의 글자 수 제한."""
-    return TOTAL_LIMIT // max(count, 1)
+    return total // max(count, 1)
 
 
 def _normalize(text: str) -> str:
@@ -87,25 +90,28 @@ def new_id(taken: set[str]) -> str:
             return candidate
 
 
-def join(parts: list[Part]) -> str:
-    """부분 목록을 검사하고 저장할 글로 합친다. ID 가 없는 부분에는 새 ID 를 붙인다(주어진 목록을 바꾸지 않는다). 문제가 있으면 `NarrativeError`."""
+def join(parts: list[Part], *, total: int = TOTAL_LIMIT, noun: str = "서사", scope: str = "인물마다 ") -> str:
+    """부분 목록을 검사하고 저장할 글로 합친다. ID 가 없는 부분에는 새 ID 를 붙인다(주어진 목록을 바꾸지 않는다). 문제가 있으면 `NarrativeError`.
+
+    `noun`·`scope` 는 오류 문장에만 쓴다(서사는 "서사는 인물마다 5개까지", 공통 스토리는 "공통 스토리는 5개까지").
+    """
     cleaned = [Part(p.id, _trim(_normalize(p.text))) for p in parts]
     if len(cleaned) > MAX_PARTS:
-        raise NarrativeError(f"서사는 인물마다 {MAX_PARTS}개까지만 나눌 수 있습니다")
-    limit = part_limit(len(cleaned))
+        raise NarrativeError(f"{noun}는 {scope}{MAX_PARTS}개까지만 나눌 수 있습니다" if noun == "서사" else f"{noun}는 {MAX_PARTS}개까지만 나눌 수 있습니다")
+    limit = part_limit(len(cleaned), total)
     ids: set[str] = set()
     for i, p in enumerate(cleaned, 1):
         if MARK in p.text:
-            raise NarrativeError(f"서사 {i}에 예약된 표기({MARK})가 들어 있어 저장할 수 없습니다")
+            raise NarrativeError(f"{noun} {i}에 예약된 표기({MARK})가 들어 있어 저장할 수 없습니다")
         if not p.text.strip():
-            raise NarrativeError(f"서사 {i}이(가) 비어 있습니다")
+            raise NarrativeError(f"{noun} {i}이(가) 비어 있습니다")
         if len(p.text) > limit:
-            raise NarrativeError(f"서사 {i}이(가) 너무 깁니다({len(p.text)}자, 서사가 {len(cleaned)}개이면 각 {limit}자까지)")
+            raise NarrativeError(f"{noun} {i}이(가) 너무 깁니다({len(p.text)}자, {noun}가 {len(cleaned)}개이면 각 {limit}자까지)")
         if p.id is not None:
             if not re.fullmatch(r"[a-z0-9]{6}", p.id):
-                raise NarrativeError(f"서사 {i}의 ID 가 올바르지 않습니다")
+                raise NarrativeError(f"{noun} {i}의 ID 가 올바르지 않습니다")
             if p.id in ids:
-                raise NarrativeError(f"서사 {i}의 ID 가 다른 서사와 겹칩니다")
+                raise NarrativeError(f"{noun} {i}의 ID 가 다른 {noun}와 겹칩니다")
             ids.add(p.id)
     lines: list[str] = []
     for p in cleaned:

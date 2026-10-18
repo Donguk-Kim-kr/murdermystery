@@ -200,6 +200,23 @@ describe("작업공간 탭", () => {
     expect(form.getByRole("option", { name: /바깥/ })).toBeInTheDocument();
   });
 
+  it("자료 탭의 공통 스토리를 부분으로 나누어 저장한다", async () => {
+    Object.assign(work, { 공통스토리: "첫 글", 공통스토리_부분: [{ ID: "abc123", 본문: "첫 글" }] });
+    routes["PATCH /api/works/7"] = () => json({ ...work, 공통스토리: "첫 글\n\n둘째 글", 공통스토리_부분: [{ ID: "abc123", 본문: "첫 글" }, { ID: "def456", 본문: "둘째 글" }] });
+    renderApp("/works/7?tab=relations");
+    const section = within(await screen.findByRole("region", { name: "공통 스토리" }));
+    expect(section.getByLabelText(/공통 스토리 1/)).toHaveValue("첫 글");
+    await userEvent.click(section.getByRole("button", { name: "부분 추가하기" }));
+    await userEvent.type(section.getByLabelText(/공통 스토리 2/), "둘째 글");
+    expect(section.getByText(/2개로 나누면|3개로 나누면/)).toBeInTheDocument();
+    await userEvent.click(section.getByRole("button", { name: "공통 스토리 저장" }));
+    await waitFor(() => expect(sent("PATCH /api/works/7")).toHaveLength(1));
+    expect(await sent("PATCH /api/works/7")[0].req.json()).toEqual({ 공통스토리_부분: [{ ID: "abc123", 본문: "첫 글" }, { ID: null, 본문: "둘째 글" }] });
+    expect(await section.findByRole("status")).toHaveTextContent("저장했습니다");
+    expect(section.getByRole("button", { name: "공통 스토리 2 삭제" })).toBeInTheDocument();
+    Object.assign(work, { 공통스토리: "", 공통스토리_부분: [] });
+  });
+
   it("확인 탭은 게임 흐름을 세로로 보여 주고 확정 검사를 함께 한다", async () => {
     bundle.phases = [{ 순서: 1, 이름: "도입", 표시이름: "도입", 진행시간: 10 }, { 순서: 2, 이름: null, 표시이름: "조사", 진행시간: 20 }];
     bundle["phase-steps"] = [{ 번호: 9, 진행순서_순서: 2, 진행단계_번호: 5, 설정: null, 표시이름: "조사" }];
@@ -911,6 +928,41 @@ describe("진행 탭", () => {
       await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
       expect(await card.findByText(/능력의 지목 대상: 하나 이상 골라 주세요/)).toBeInTheDocument();
       expect(sent("PATCH /api/works/7/content/phase-steps/9")).toHaveLength(2);
+    });
+
+    it("공통 스토리 카드는 보여 줄 부분 번호를 고르고(기본 1부분), 탭 이름·방식도 입력칸으로 정한다", async () => {
+      routes["PATCH /api/works/7/content/phase-steps/9"] = () => json({});
+      twoPhases();
+      bundle.story = { 공통스토리_부분수: 3 };
+      (bundle.library as { phases: Record<string, object> }).phases[5] = {
+        번호: 5, 이름: "공통 스토리", 버전: 1, 설명: "d", 삭제됨: false, 사용설정: ["공개부분", "탭이름", "탭방식"],
+        설정정의: [
+          { 키: "공개부분", 이름: "보여 줄 공통 스토리 부분", 종류: "공통서사" },
+          { 키: "탭이름", 이름: "탭 이름", 종류: "글", 기본: "" },
+          { 키: "탭방식", 이름: "탭에 보여 주는 방식", 종류: "선택", 기본: "새탭", 선택: [["새탭", "새 탭을 추가"], ["이어서", "기존 탭에 이어서 보여 주기"]] },
+        ],
+      };
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));
+      await pickCard("1차 조사");
+      const card = within(editor().getByRole("group", { name: "1차 조사 수정" }));
+      expect(card.getByLabelText("1부분")).toBeChecked();
+      expect(card.getByLabelText("2부분")).not.toBeChecked();
+      expect(card.getByLabelText("3부분")).not.toBeChecked();
+      await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: null });         // 기본과 같으면 저장하지 않는다
+      await userEvent.click(card.getByLabelText("1부분"));
+      await userEvent.click(card.getByLabelText("3부분"));
+      await userEvent.type(card.getByLabelText("탭 이름"), "사건의 배경");
+      await userEvent.selectOptions(card.getByLabelText("탭에 보여 주는 방식"), "이어서");
+      await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
+      await waitFor(() => expect(sent("PATCH /api/works/7/content/phase-steps/9")).toHaveLength(2));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[1].req.json()).toEqual({
+        설정: { 공개부분: [3], 탭이름: "사건의 배경", 탭방식: "이어서" },
+      });
+      await userEvent.click(card.getByLabelText("3부분"));                                              // 하나도 고르지 않으면 저장하지 않는다
+      await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
+      expect(await card.findByText(/하나 이상 골라 주세요/)).toBeInTheDocument();
     });
 
     it("칸을 선언하지 않은 진행단계(옛 방식)에는 JSON 칸이 남아 있다", async () => {

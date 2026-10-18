@@ -859,7 +859,7 @@ export interface components {
              */
             "\uC11C\uC0AC"?: string;
             /** 서사 부분 */
-            "\uC11C\uC0AC_\uBD80\uBD84"?: components["schemas"]["PartIn"][] | null;
+            "\uC11C\uC0AC_\uBD80\uBD84"?: components["schemas"]["app__characters__PartIn"][] | null;
             /** 타임라인 */
             "\uD0C0\uC784\uB77C\uC778"?: string | null;
             /** 능력 */
@@ -934,7 +934,7 @@ export interface components {
             /** 서사 */
             "\uC11C\uC0AC"?: string | null;
             /** 서사 부분 */
-            "\uC11C\uC0AC_\uBD80\uBD84"?: components["schemas"]["PartIn"][] | null;
+            "\uC11C\uC0AC_\uBD80\uBD84"?: components["schemas"]["app__characters__PartIn"][] | null;
             /** 타임라인 */
             "\uD0C0\uC784\uB77C\uC778"?: string | null;
             /** 능력 */
@@ -1165,16 +1165,6 @@ export interface components {
         MoveBody: {
             /** Position */
             position: number;
-        };
-        /**
-         * PartIn
-         * @description 서사 한 부분. ID 는 이미 있는 부분을 다시 보낼 때만 넣고, 새 부분은 비운다(서버가 만든다).
-         */
-        PartIn: {
-            /** Id */
-            ID?: string | null;
-            /** 본문 */
-            "\uBCF8\uBB38": string;
         };
         /** PartOut */
         PartOut: {
@@ -1413,6 +1403,8 @@ export interface components {
              * @default
              */
             "\uACF5\uD1B5\uC2A4\uD1A0\uB9AC"?: string;
+            /** 공통스토리 부분 */
+            "\uACF5\uD1B5\uC2A4\uD1A0\uB9AC_\uBD80\uBD84"?: components["schemas"]["app__works__PartIn"][] | null;
         };
         /** WorkOut */
         WorkOut: {
@@ -1450,6 +1442,11 @@ export interface components {
             "\uC218\uC815\uC77C\uC2DC": string | null;
             /** 확정버전 있음 */
             "\uD655\uC815\uBC84\uC804_\uC788\uC74C": boolean;
+            /**
+             * 공통스토리 부분
+             * @default []
+             */
+            "\uACF5\uD1B5\uC2A4\uD1A0\uB9AC_\uBD80\uBD84"?: components["schemas"]["PartOut"][];
         };
         /** WorkPatch */
         WorkPatch: {
@@ -1465,6 +1462,28 @@ export interface components {
             "\uCD5C\uC18C\uC778\uC6D0"?: number | null;
             /** 공통스토리 */
             "\uACF5\uD1B5\uC2A4\uD1A0\uB9AC"?: string | null;
+            /** 공통스토리 부분 */
+            "\uACF5\uD1B5\uC2A4\uD1A0\uB9AC_\uBD80\uBD84"?: components["schemas"]["app__works__PartIn"][] | null;
+        };
+        /**
+         * PartIn
+         * @description 서사 한 부분. ID 는 이미 있는 부분을 다시 보낼 때만 넣고, 새 부분은 비운다(서버가 만든다).
+         */
+        app__characters__PartIn: {
+            /** Id */
+            ID?: string | null;
+            /** 본문 */
+            "\uBCF8\uBB38": string;
+        };
+        /**
+         * PartIn
+         * @description 공통 스토리 한 부분. ID 는 이미 있는 부분을 다시 보낼 때만 넣고, 새 부분은 비운다(서버가 만든다).
+         */
+        app__works__PartIn: {
+            /** Id */
+            ID?: string | null;
+            /** 본문 */
+            "\uBCF8\uBB38": string;
         };
     };
     responses: never;
