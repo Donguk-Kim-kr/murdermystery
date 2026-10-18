@@ -583,7 +583,7 @@ describe("방", () => {
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "입장하기" }));
     expect(await screen.findByRole("heading", { name: "저택의 비밀" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(await calls.find((c) => c.key === "POST /api/rooms/join")!.req.json()).toEqual({ 입장코드: "K7M2QX" });
+    expect(await calls.find((c) => c.key === "POST /api/rooms/join")!.req.json()).toEqual({ 입장코드: "K7M2QX", 관전: false });
   });
 
   it("입장 창에서 코드가 틀리면 창 안에 이유를 보여 준다", async () => {
@@ -594,6 +594,93 @@ describe("방", () => {
     await user.type(screen.getByLabelText("입장코드"), "ZZZZZZ");
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "입장하기" }));
     expect(await within(screen.getByRole("dialog")).findByRole("alert")).toHaveTextContent("입장코드가 올바르지 않습니다");
+  });
+
+  it("입장 창에는 안내 글과 예시가 없다", async () => {
+    renderApp();
+    await userEvent.click(await screen.findByRole("button", { name: "입장코드" }));
+    expect(screen.queryByText(/6자리/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("입장코드")).not.toHaveAttribute("placeholder");
+  });
+
+  it("진행 중인 방이면 그렇게 안내하고 관전 참여 버튼으로 관전자로 들어간다", async () => {
+    let inRoom = false;
+    const running = { ...baseRoom, 상태: "진행", 내가_방장: false };
+    routes["GET /api/rooms/me"] = () => json(inRoom ? running : null);
+    routes["POST /api/rooms/join"] = async (req) => {
+      if (!(await req.clone().json()).관전) return json({ detail: "진행 중인 방입니다." }, 409);
+      inRoom = true;
+      return json(running);
+    };
+    routes["GET /api/game/me/state"] = () => json({}, 404);
+    renderApp();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "입장코드" }));
+    await user.type(screen.getByLabelText("입장코드"), "k7m2qx");
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "입장하기" }));
+    expect(await within(screen.getByRole("dialog")).findByRole("alert")).toHaveTextContent("진행 중인 방입니다.");
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "관전 참여" }));
+    await waitFor(() => expect(calls.filter((c) => c.key === "POST /api/rooms/join")).toHaveLength(2));
+    expect(await calls.filter((c) => c.key === "POST /api/rooms/join")[1].req.json()).toEqual({ 입장코드: "K7M2QX", 관전: true });
+  });
+
+  it("다른 이유로 입장하지 못하면 관전 참여 버튼은 나오지 않는다", async () => {
+    routes["POST /api/rooms/join"] = () => json({ detail: "다른 방에 참여 중입니다." }, 409);
+    renderApp();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "입장코드" }));
+    await user.type(screen.getByLabelText("입장코드"), "k7m2qx");
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "입장하기" }));
+    expect(await within(screen.getByRole("dialog")).findByRole("alert")).toHaveTextContent("다른 방에 참여 중입니다.");
+    expect(screen.queryByRole("button", { name: "관전 참여" })).not.toBeInTheDocument();
+  });
+
+  it("방장이 준 링크를 열면 바로 입장해서 대기실로 간다", async () => {
+    let inRoom = false;
+    const asGuest = { ...baseRoom, 내가_방장: false };
+    routes["GET /api/rooms/me"] = () => json(inRoom ? asGuest : null);
+    routes["POST /api/rooms/join"] = () => {
+      inRoom = true;
+      return json(asGuest);
+    };
+    renderApp("/join/K7M2QX");
+    expect(await screen.findByRole("heading", { name: "저택의 비밀" })).toBeInTheDocument();
+    expect(calls.filter((c) => c.key === "POST /api/rooms/join")).toHaveLength(1);
+    expect(await calls.find((c) => c.key === "POST /api/rooms/join")!.req.json()).toEqual({ 입장코드: "K7M2QX", 관전: false });
+  });
+
+  it("링크로 들어왔는데 진행 중인 방이면 안내와 관전 참여 버튼이 나온다", async () => {
+    routes["POST /api/rooms/join"] = () => json({ detail: "진행 중인 방입니다." }, 409);
+    renderApp("/join/K7M2QX");
+    expect(await screen.findByRole("alert")).toHaveTextContent("진행 중인 방입니다.");
+    expect(screen.getByRole("button", { name: "관전 참여" })).toBeInTheDocument();
+  });
+
+  it("로그인하지 않은 채로 링크를 열면 로그인 화면이 먼저 나오고, 로그인하면 바로 그 방에 입장한다", async () => {
+    localStorage.clear();
+    let inRoom = false;
+    const asGuest = { ...baseRoom, 내가_방장: false };
+    routes["GET /api/rooms/me"] = () => json(inRoom ? asGuest : null);
+    routes["POST /api/auth/login"] = () => json({ 토큰: "tok-1", 만료일시: "2030-01-01T00:00:00Z", 계정: account });
+    routes["POST /api/rooms/join"] = () => {
+      inRoom = true;
+      return json(asGuest);
+    };
+    renderApp("/join/K7M2QX");
+    await userEvent.type(await screen.findByLabelText("아이디"), "alice");
+    await userEvent.type(screen.getByLabelText("패스워드"), "password123");
+    await userEvent.click(screen.getByRole("button", { name: "로그인" }));
+    expect(await screen.findByRole("heading", { name: "저택의 비밀" })).toBeInTheDocument();
+    expect(await calls.find((c) => c.key === "POST /api/rooms/join")!.req.json()).toEqual({ 입장코드: "K7M2QX", 관전: false });
+  });
+
+  it("대기실의 링크 복사 버튼은 입장 링크를 복사한다", async () => {
+    routes["GET /api/rooms/me"] = () => json(baseRoom);
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    renderApp("/room");
+    await userEvent.click(await screen.findByRole("button", { name: "링크 복사" }));
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/join/K7M2QX`);
   });
 
   it("입장코드를 대문자로 바꿔 입장하고 대기실을 보여 준다", async () => {
@@ -609,7 +696,7 @@ describe("방", () => {
     expect(screen.getByLabelText("입장코드")).toHaveValue("K7M2QX");
     await userEvent.click(screen.getByRole("button", { name: "입장하기" }));
     expect(await screen.findByRole("heading", { name: "저택의 비밀" })).toBeInTheDocument();
-    expect(await calls.find((c) => c.key === "POST /api/rooms/join")!.req.json()).toEqual({ 입장코드: "K7M2QX" });
+    expect(await calls.find((c) => c.key === "POST /api/rooms/join")!.req.json()).toEqual({ 입장코드: "K7M2QX", 관전: false });
     expect(screen.getByRole("button", { name: "나가기" })).toBeInTheDocument();
   });
 

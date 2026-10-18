@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from .auth import CurrentSession, CurrentUser
 from .db import Conn
+from .engine import Observer
 from .roomstate import JoinLimiter, RoomError, RoomRegistry, WaitingRoom
 from .testers import can_private_play
 
@@ -62,6 +63,8 @@ class RoomCreateIn(BaseModel):
 
 class JoinIn(BaseModel):
     입장코드: str = Field(min_length=1, max_length=20)
+    # 이미 진행 중인 방에 관전자로 들어간다(진행 중인 방은 플레이어로 들어갈 수 없다)
+    관전: bool = False
 
 
 class ParticipationIn(BaseModel):
@@ -245,11 +248,32 @@ def create_room(body: RoomCreateIn, conn: Conn, me: CurrentUser, request: Reques
     return build_room_out(row, room, me.계정.번호)
 
 
+ROOM_IN_PROGRESS = "진행 중인 방입니다."
+
+
+def join_as_observer(conn: Connection, request: Request, row: dict, me: CurrentSession) -> RoomOut:
+    """진행 중인 방에 관전자로 들어간다. 관전자는 모두에게 공개된 내용만 본다."""
+    reg = registry(request)
+    game = request.app.state.games.get(row["번호"])
+    if game is None or reg.get(row["번호"]) is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, ROOM_IN_PROGRESS)
+    try:
+        room = reg.join_observer(row["번호"], me.계정.번호, me.계정.닉네임)
+    except RoomError as err:
+        raise_room_error(err)
+    with game.lock:
+        if me.계정.번호 not in game.players and me.계정.번호 not in game.observers:
+            game.observers[me.계정.번호] = Observer(me.계정.번호, me.계정.닉네임)
+            game.last_seen[me.계정.번호] = game.clock()
+            game.bump()
+    return build_room_out(row, room, me.계정.번호)
+
+
 @router.post("/join", response_model=RoomOut)
 def join_room(body: JoinIn, conn: Conn, me: CurrentUser, request: Request) -> RoomOut:
     reg, lim = registry(request), limiter(request)
     if lim.blocked(me.계정.번호):
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "입장코드를 너무 많이 틀렸습니다. 잠시 뒤에 다시 시도해 주세요")
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "잠시 뒤에 다시 시도해 주세요.")
     expire_stale(request)
     lock_account(conn, me.계정.번호)
     # 종료된 방의 코드는 다시 쓰일 수 있으므로 종료되지 않은 방만 찾는다(그런 방은 코드마다 하나뿐이다).
@@ -259,13 +283,17 @@ def join_room(body: JoinIn, conn: Conn, me: CurrentUser, request: Request) -> Ro
     if row is None:
         lim.record_failure(me.계정.번호)
         raise HTTPException(status.HTTP_404_NOT_FOUND, "입장코드가 올바르지 않습니다")
-    if row["상태"] != "대기":
-        raise HTTPException(status.HTTP_409_CONFLICT, "이미 시작했거나 종료된 방입니다")
     lim.reset(me.계정.번호)
 
     mine = find_my_room(conn, reg, me)
     if mine is not None and mine[0]["번호"] != row["번호"]:
-        raise HTTPException(status.HTTP_409_CONFLICT, "이미 다른 방에 참여 중입니다. 먼저 나가 주세요")
+        raise HTTPException(status.HTTP_409_CONFLICT, "다른 방에 참여 중입니다.")
+    if mine is not None:                                  # 이미 이 방에 있다(다시 코드를 넣었다): 그대로 돌려준다
+        return build_room_out(mine[0], mine[1], me.계정.번호)
+    if row["상태"] != "대기":
+        if row["상태"] == "진행" and body.관전:
+            return join_as_observer(conn, request, row, me)
+        raise HTTPException(status.HTTP_409_CONFLICT, ROOM_IN_PROGRESS)
     if reg.get(row["번호"]) is None:  # 서버 재시작 등으로 대기실이 사라졌고, 방장이 돌아오면 DB 로 복원된다
         raise HTTPException(status.HTTP_409_CONFLICT, "방장이 아직 대기실에 돌아오지 않았습니다. 잠시 뒤에 다시 시도해 주세요")
     try:
@@ -319,3 +347,9 @@ def leave_room(conn: Conn, me: CurrentUser, request: Request) -> None:
         reg.remove_room(row["번호"])
     else:
         reg.leave(me.계정.번호)
+        game = request.app.state.games.get(row["번호"])
+        if game is not None:
+            with game.lock:                                   # 관전자가 나가면 게임의 관전자 목록에서도 뺀다
+                if game.observers.pop(me.계정.번호, None) is not None:
+                    game.last_seen.pop(me.계정.번호, None)
+                    game.bump()

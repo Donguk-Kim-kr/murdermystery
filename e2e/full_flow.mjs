@@ -57,7 +57,10 @@ await mshot("home");
 await host.getByRole("link", { name: "방 만들기" }).first().click();
 await host.getByRole("button", { name: "방 만들기" }).click();
 const code = (await host.getByLabel("입장코드", { exact: false }).locator("xpath=self::strong").textContent()).trim();
-for (const p of pages.slice(1)) { await p.goto(BASE + "/rooms/join"); await p.getByLabel("입장코드").fill(code); await p.getByRole("button", { name: "입장하기" }).click(); await p.getByRole("region", { name: "참가자" }).waitFor(); }
+// 둘째(모바일)는 입장코드로, 셋째는 방장이 준 링크로 들어간다
+await p1.goto(BASE + "/rooms/join"); await p1.getByLabel("입장코드").fill(code); await p1.getByRole("button", { name: "입장하기" }).click(); await p1.getByRole("region", { name: "참가자" }).waitFor();
+await p2.goto(BASE + "/join/" + encodeURIComponent(code)); await p2.getByRole("region", { name: "참가자" }).waitFor({ timeout: 8000 });
+check(true, "입장: 링크를 열면 바로 방에 입장한다");
 await host.getByText("플레이어 3/3명").waitFor({ timeout: 8000 });
 await mshot("lobby");
 await host.getByRole("button", { name: "게임 시작" }).click();
@@ -68,6 +71,18 @@ const next = async (name) => { await host.getByRole("button", { name: "다음 �
 const text = (p) => p.locator("main").innerText();
 
 await waitTitle("공통 스토리");
+
+// 진행 중인 방: 로그인하지 않은 사람이 링크를 열면 로그인 화면이 먼저 나오고, 로그인하면 진행 중이라는 안내와 관전 참여 버튼이 나온다
+const watcherId = "w" + rnd();
+await api("/api/auth/signup", { method: "POST", body: { 아이디: watcherId, 패스워드: "password123", 닉네임: "구경꾼" } });
+const watcher = await mk({ width: 1000, height: 800 });
+await watcher.goto(BASE + "/join/" + encodeURIComponent(code));
+await watcher.getByLabel("아이디").fill(watcherId); await watcher.getByLabel("패스워드").fill("password123"); await watcher.getByRole("button", { name: "로그인" }).click();
+await watcher.getByText("진행 중인 방입니다.").waitFor({ timeout: 8000 });
+await watcher.getByRole("button", { name: "관전 참여" }).click();
+await watcher.locator("h1", { hasText: "공통 스토리" }).first().waitFor({ timeout: 8000 });
+check((await text(watcher)).includes("관전자"), "입장: 진행 중인 방에는 관전 참여로 들어가 관전자로 보인다");
+check((await watcher.getByRole("button", { name: "다음 단계" }).count()) === 0, "입장: 관전자에게는 진행 버튼이 없다");
 for (const p of pages) await p.getByRole("button", { name: "확인", exact: true }).click();
 await host.getByText("확인 3/3").waitFor({ timeout: 8000 });
 check(true, "프롤로그: 전원 확인 3/3");

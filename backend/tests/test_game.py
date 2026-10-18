@@ -131,11 +131,62 @@ def test_start_without_room(client, make_account):
     assert start(client, make_account()).status_code == 404
 
 
-def test_cannot_join_after_start(client, make_account, make_game_work):
+def test_cannot_join_after_start_as_a_player_and_is_told_the_room_is_in_progress(client, make_account, make_game_work):
     host, _, room, _ = full_room(client, make_account, make_game_work)
     assert start(client, host).status_code == 200
     late = client.post("/api/rooms/join", headers=make_account().headers, json={"입장코드": room["입장코드"]})
-    assert late.status_code == 409
+    assert late.status_code == 409 and late.json()["detail"] == "진행 중인 방입니다."
+
+
+def observe(client, who, code):
+    return client.post("/api/rooms/join", headers=who.headers, json={"입장코드": code, "관전": True})
+
+
+def test_a_running_room_can_be_joined_as_an_observer(client, make_account, make_game_work):
+    host, others, room, _ = full_room(client, make_account, make_game_work)
+    assert start(client, host).status_code == 200
+    watcher = make_account()
+    res = observe(client, watcher, room["입장코드"])
+    assert res.status_code == 200, res.text
+    assert res.json()["상태"] == "진행"
+    me = state(client, watcher).json()["나"]
+    assert me["역할"] == "관전자" and me["인물_순서"] is None and me["방장"] is False and me["진행_권한"] is False
+    body = state(client, host).json()
+    assert watcher.number not in [p["계정_번호"] for p in body["플레이어"]]                # 플레이어 목록과 인원은 그대로다
+    assert client.get("/api/rooms/me", headers=watcher.headers).json()["입장코드"] == room["입장코드"]
+
+
+def test_an_observer_cannot_act_in_the_game_and_leaving_removes_them(client, make_account, make_game_work):
+    host, others, room, _ = full_room(client, make_account, make_game_work)
+    start(client, host)
+    watcher = make_account()
+    observe(client, watcher, room["입장코드"])
+    assert client.post("/api/game/me/advance", headers=watcher.headers).status_code in (403, 409)      # 관전자는 단계를 넘기지 못한다
+    assert client.post("/api/rooms/leave", headers=watcher.headers).status_code == 204
+    assert client.get("/api/game/me/state", headers=watcher.headers).status_code == 404
+    assert client.get("/api/rooms/me", headers=watcher.headers).json() is None
+
+
+def test_observer_join_needs_a_running_room_and_repeats_are_harmless(client, make_account, make_game_work):
+    host, others, room, _ = full_room(client, make_account, make_game_work)
+    waiting_host = make_account()
+    waiting = create_room(client, waiting_host, make_game_work(waiting_host, players=2))
+    res = observe(client, make_account(), waiting["입장코드"])                              # 대기 중인 방은 관전 표시와 상관없이 플레이어로 들어간다
+    assert res.status_code == 200 and res.json()["상태"] == "대기"
+    start(client, host)
+    watcher = make_account()
+    assert observe(client, watcher, room["입장코드"]).status_code == 200
+    assert observe(client, watcher, room["입장코드"]).status_code == 200                    # 다시 넣어도 그대로
+    player_again = client.post("/api/rooms/join", headers=others[0].headers, json={"입장코드": room["입장코드"]})
+    assert player_again.status_code == 200                                                  # 이미 이 방에 있는 플레이어가 코드를 다시 넣어도 돌아온다
+
+
+def test_someone_in_another_room_gets_a_short_notice(client, make_account, make_game_work):
+    host, _, room, _ = full_room(client, make_account, make_game_work)
+    other_host = make_account()
+    other = create_room(client, other_host, make_game_work(other_host, players=1))
+    res = client.post("/api/rooms/join", headers=other_host.headers, json={"입장코드": room["입장코드"]})
+    assert res.status_code == 409 and res.json()["detail"] == "다른 방에 참여 중입니다."
 
 
 # ---- 상태 조회 (1-2) ----------------------------------------------------------------------

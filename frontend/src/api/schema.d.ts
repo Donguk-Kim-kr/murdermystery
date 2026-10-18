@@ -1136,6 +1136,11 @@ export interface components {
         JoinIn: {
             /** 입장코드 */
             "\uC785\uC7A5\uCF54\uB4DC": string;
+            /**
+             * 관전
+             * @default false
+             */
+            "\uAD00\uC804"?: boolean;
         };
         /** LoginIn */
         LoginIn: {

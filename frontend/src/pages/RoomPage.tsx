@@ -10,6 +10,7 @@ export function RoomPage() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   // 체크박스는 누르면 바로 바뀌고, 서버가 거부하면 원래대로 돌아간다 (서버 응답을 기다리면 반응이 느려 보인다).
   const [pending, setPending] = useState<boolean | null>(null);
 
@@ -35,6 +36,16 @@ export function RoomPage() {
       setTimeout(() => setCopied(false), 1500);
     } catch {
       /* 복사 권한이 없으면 코드를 직접 선택해서 복사한다 */
+    }
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/join/${encodeURIComponent(room!.입장코드)}`);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 1500);
+    } catch {
+      /* 복사 권한이 없으면 코드를 알려 준다 */
     }
   }
 
@@ -84,8 +95,11 @@ export function RoomPage() {
           <button type="button" className="small secondary" onClick={() => void copyCode()}>
             {copied ? "복사됨" : "복사"}
           </button>
+          <button type="button" className="small secondary" onClick={() => void copyLink()}>
+            {copiedLink ? "링크 복사됨" : "링크 복사"}
+          </button>
         </div>
-        <p className="muted">이 코드를 아는 사람은 누구나 입장할 수 있습니다. 함께할 사람에게만 알려 주세요.</p>
+        <p className="muted">이 코드나 링크를 아는 사람은 누구나 입장할 수 있습니다. 함께할 사람에게만 알려 주세요.</p>
       </div>
 
       <section aria-label="참가자" className="card">
