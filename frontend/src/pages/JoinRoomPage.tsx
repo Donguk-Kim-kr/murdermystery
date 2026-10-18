@@ -54,8 +54,9 @@ export function JoinCodeForm({ plain = false, autoFocus = false }: { plain?: boo
   return (
     <form onSubmit={onSubmit} className={plain ? "join-plain" : "card"} aria-label="방 입장">
       {!plain && <h2>방 입장</h2>}
+      {/* 창에서는 제목이 이미 "입장코드"라서 입력칸 위의 글자는 빼고, 스크린리더용 이름만 둔다 */}
       <label>
-        입장코드
+        {!plain && "입장코드"}
         <input
           className="code-input"
           value={code}
@@ -65,6 +66,7 @@ export function JoinCodeForm({ plain = false, autoFocus = false }: { plain?: boo
           autoFocus={autoFocus}
           autoCapitalize="characters"
           spellCheck={false}
+          aria-label={plain ? "입장코드" : undefined}
           required
         />
       </label>
@@ -122,9 +124,9 @@ export function JoinCodeDialog({ onClose }: { onClose: () => void }) {
   }, [onClose]);
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="dialog" role="dialog" aria-modal="true" aria-label="입장코드로 입장" onClick={(e) => e.stopPropagation()}>
+      <div className="dialog join-dialog" role="dialog" aria-modal="true" aria-label="입장코드로 입장" onClick={(e) => e.stopPropagation()}>
         <div className="row">
-          <h2>입장코드로 입장</h2>
+          <h2>입장코드</h2>
           <button type="button" className="small secondary" onClick={onClose}>닫기</button>
         </div>
         <JoinCodeForm plain autoFocus />
