@@ -35,6 +35,24 @@ docker compose up --build
 * 이 방식은 서버 컨테이너가 하나(프로세스 하나)여야 대기실이 동작한다. 컨테이너 수를 늘리지 않는다.
 * 개발자용 실행(아래)과 같은 PostgreSQL 이 이미 설치되어 있어도 충돌하지 않는다(DB 포트를 바깥에 열지 않는다).
 
+## AI 플레이어
+
+AI 가 플레이어로 들어와 게임을 한다(`backend/scripts/ai_players.py`). Anthropic API 키가 필요하다.
+
+1. 프로젝트 폴더에 `.env` 파일을 만들고 한 줄을 적는다(이 파일은 저장소에 올라가지 않는다). 모델은 `MM_AI_MODEL=...` 로 바꿀 수 있다.
+   ```
+   ANTHROPIC_API_KEY=sk-ant-...
+   ```
+2. `docker compose up --build` 로 켠다.
+3. 브라우저에서 방을 만든다. AI 가 4명을 다 채우도록 **"방장도 플레이어로 참여"를 끄고**, 대기실에서 관전 방식을 **GM** 으로 바꾼다. 입장코드를 확인한다.
+4. 다른 터미널에서 AI 를 입장시킨다(코드를 바꿔 넣는다).
+   ```
+   docker compose exec app python backend/scripts/ai_players.py --code 1234 --count 4
+   ```
+5. 방장이 게임을 시작하고 단계를 넘긴다. GM 관전이면 AI 들의 대화와 개인 정보를 모두 볼 수 있다. 끝나면 `Ctrl+C`.
+
+키 없이 흐름만 보려면 `--brain simple` 을 붙인다(말투는 살지 않는다). `--verbose` 를 붙이면 AI 에게 준 글이 출력된다.
+
 ## 실행 (개발자용: 백엔드·프론트엔드를 따로)
 
 접속 정보는 libpq 표준 환경변수를 따른다.
