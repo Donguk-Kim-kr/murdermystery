@@ -36,6 +36,10 @@
   --radius: 12px;
   --radius-sm: 8px;
   --gap: 1rem;
+
+  /* 채팅에서 사람마다 다른 글자 색 */
+  --chat-0: #1d4ed8; --chat-1: #c2410c; --chat-2: #15803d; --chat-3: #a21caf;
+  --chat-4: #be123c; --chat-5: #0f766e; --chat-6: #a16207; --chat-7: #4338ca;
 }
 
 /* 다크 모드: 사용자가 고른 값(html 의 data-theme)이 우선이고, 고르기 전(스크립트가 돌기 전)에는 기기 설정을 따른다. */
@@ -65,6 +69,9 @@
     --ring: 0 0 0 3px rgba(129, 140, 248, 0.4);
     --shadow-sm: none;
     --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.4);
+
+    --chat-0: #7aa2ff; --chat-1: #ff9a5c; --chat-2: #5fd58a; --chat-3: #e08cf0;
+    --chat-4: #ff7a95; --chat-5: #4fd1c5; --chat-6: #f0c24b; --chat-7: #a5a8ff;
   }
 }
 :root[data-theme="dark"] {
@@ -92,6 +99,9 @@
   --ring: 0 0 0 3px rgba(129, 140, 248, 0.4);
   --shadow-sm: none;
   --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.4);
+
+  --chat-0: #7aa2ff; --chat-1: #ff9a5c; --chat-2: #5fd58a; --chat-3: #e08cf0;
+  --chat-4: #ff7a95; --chat-5: #4fd1c5; --chat-6: #f0c24b; --chat-7: #a5a8ff;
 }
 
 /* ==========================================================================
@@ -783,3 +793,11 @@ button.clue-head:hover { background: transparent; }
 .chat.big .chat-places { grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
 .chat.big .chat-log { height: auto; min-height: 0; font-size: 1.05rem; }
 .chat.big .chat-form input { font-size: 1.05rem; }
+.chat-c0 { color: var(--chat-0); }
+.chat-c1 { color: var(--chat-1); }
+.chat-c2 { color: var(--chat-2); }
+.chat-c3 { color: var(--chat-3); }
+.chat-c4 { color: var(--chat-4); }
+.chat-c5 { color: var(--chat-5); }
+.chat-c6 { color: var(--chat-6); }
+.chat-c7 { color: var(--chat-7); }

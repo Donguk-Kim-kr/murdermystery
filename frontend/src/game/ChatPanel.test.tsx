@@ -109,4 +109,26 @@ describe("게임 채팅", () => {
     await userEvent.keyboard("{Escape}");
     expect(panel).not.toHaveClass("big");
   });
+
+  it("대화에는 닉네임이 아니라 캐릭터 이름이 보이고, 사람마다 글자 색이 다르다", async () => {
+    const a = person(11, "AI 1", "오태훈");
+    const b = person(12, "AI 2", "황칠성");
+    view = {
+      내_위치: "전체", 역할: "플레이어",
+      장소들: [{ 이름: "전체", 최대인원: null, 사람들: [a, b] }, { 이름: "밀담 A", 최대인원: 2, 사람들: [] }],
+      메시지: [msg(1, "전체", { ...a, 인물_이름: null }, "확인했습니다."), msg(2, "전체", b, "뭘 보냐?")],
+    };
+    render(<ChatPanel />);
+    const log = await screen.findByRole("list", { name: "전체 대화" });
+    const first = (await within(log).findByText("확인했습니다.")).closest("li")!;
+    const second = within(log).getByText("뭘 보냐?").closest("li")!;
+    expect(within(first).getByText("오태훈")).toBeInTheDocument();                       // 받아 올 때 이름이 없었어도 지금의 캐릭터 이름으로 보인다
+    expect(within(second).getByText("황칠성")).toBeInTheDocument();
+    expect(screen.queryByText("AI 1")).not.toBeInTheDocument();
+    const color = (li: HTMLElement) => [...li.classList].find((c) => /^chat-c\d$/.test(c));
+    expect(color(first)).toBeDefined();
+    expect(color(first)).not.toEqual(color(second));
+    const places = screen.getByRole("list", { name: "채팅 장소" });
+    expect(within(places).getByText("오태훈")).toHaveClass(color(first)!);               // 장소의 이름도 같은 색
+  });
 });

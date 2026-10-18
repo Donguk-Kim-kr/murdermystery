@@ -9,9 +9,9 @@ type Person = components["schemas"]["ChatMemberOut"];
 
 const POLL_MS = import.meta.env.MODE === "test" ? 60 : 1500;
 
-function who(p: Person): string {
-  return p.인물_이름 ? `${p.닉네임}(${p.인물_이름})` : p.닉네임;
-}
+/** 대화에 보이는 이름: 캐릭터 이름(인물을 고르기 전에는 닉네임) */
+const label = (p: Person): string => p.인물_이름 || p.닉네임;
+const PALETTE = 8;                                      // 사람마다 글자 색이 다르다(styles.css 의 --chat-0 … --chat-7)
 
 /**
  * 게임 채팅. 장소(전체·밀담 A …)가 있고, 플레이어는 한 번에 한 곳에만 있다. 장소를 누르면 그곳으로 옮기며, 그 장소에 있던 동안의 말만 보인다.
@@ -59,6 +59,11 @@ export function ChatPanel() {
 
   if (!chat) return <section className="card chat" aria-label="채팅"><h2>채팅</h2><p className="muted">불러오는 중…</p></section>;
   const gm = chat.역할 === "GM 관전";
+  // 보낸 사람의 이름과 색: 지금 방에 있는 모든 사람(플레이어는 항상 어느 장소엔가 있다)을 계정 번호 순으로 세어 색을 정한다
+  const people = new Map<number, Person>();
+  chat.장소들.forEach((room) => room.사람들.forEach((p) => people.set(p.계정_번호, p)));
+  const order = [...people.keys()].sort((a, b) => a - b);
+  const colorOf = (account: number) => `chat-c${Math.max(0, order.indexOf(account)) % PALETTE}`;
 
   async function go(place: string) {
     setError(null);
@@ -111,7 +116,9 @@ export function ChatPanel() {
               >
                 <span className="chat-place-name">{room.이름}</span>
                 <span className="chat-place-people">
-                  {room.사람들.length === 0 ? "비어 있음" : room.사람들.map((p) => p.닉네임).join(", ")}
+                  {room.사람들.length === 0 ? "비어 있음" : room.사람들.map((p, i) => (
+                    <span key={p.계정_번호} className={colorOf(p.계정_번호)}>{i > 0 && ", "}{label(p)}</span>
+                  ))}
                 </span>
               </button>
             </li>
@@ -121,8 +128,8 @@ export function ChatPanel() {
       <ul className="chat-log" aria-label={`${viewing} 대화`} ref={listRef}>
         {shown.length === 0 && <li className="muted">아직 대화가 없습니다.</li>}
         {shown.map((m) => (
-          <li key={m.번호}>
-            <strong>{who(m.보낸이)}</strong> <span>{m.내용}</span>
+          <li key={m.번호} className={colorOf(m.보낸이.계정_번호)}>
+            <strong>{label(people.get(m.보낸이.계정_번호) ?? m.보낸이)}</strong> <span>{m.내용}</span>
           </li>
         ))}
       </ul>
