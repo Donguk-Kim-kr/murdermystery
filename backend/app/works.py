@@ -9,7 +9,7 @@
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from psycopg import Connection, errors
 from pydantic import BaseModel, Field, model_validator
 
@@ -195,15 +195,20 @@ def update_work(work_id: int, body: WorkPatch, conn: Conn, me: CurrentUser) -> d
 
 
 @router.delete("/{work_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_work(work_id: int, conn: Conn, me: CurrentUser) -> None:
-    """내 작품을 지운다. 제작용 콘텐츠·확정 버전·테스터는 함께 지워진다(되돌릴 수 없다).
+def delete_work(work_id: int, conn: Conn, me: CurrentUser, request: Request) -> None:
+    """내 작품을 지운다. 제작용 콘텐츠·확정 버전·테스터는 물론 이 작품으로 만든 방과 플레이 기록도 함께 지워진다(되돌릴 수 없다).
 
-    이 작품으로 만든 방이나 플레이 기록이 있으면 DB 가 거부하므로 지울 수 없다(409, docs/DB_RULES.md B11).
+    시험 삼아 플레이해 본 작품도 지울 수 있어야 해서(사용자 결정 2026-10-18) 방·진행·참여 기록을 먼저 지운 뒤 작품을 지운다.
+    열려 있는 방(대기·진행 중)이 있으면 그 방도 닫힌다. DB 의 외래키는 여전히 직접 지우는 것을 막는다(docs/DB_RULES.md B11).
     """
     lock_work(conn, work_id, me.계정.번호)
+    room_ids = [r["번호"] for r in conn.execute('SELECT "번호" FROM "방" WHERE "작품_번호" = %s', (work_id,)).fetchall()]
     try:
+        conn.execute('DELETE FROM "진행" WHERE "작품_번호" = %s', (work_id,))     # 참여·획득·공개·기믹실행·엔딩·투표결과가 함께 지워진다
+        conn.execute('DELETE FROM "방" WHERE "작품_번호" = %s', (work_id,))
         conn.execute('DELETE FROM "작품" WHERE "번호" = %s', (work_id,))
     except errors.ForeignKeyViolation as exc:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT, "이 작품으로 만든 방이나 플레이 기록이 있어 삭제할 수 없습니다"
-        ) from exc
+        raise HTTPException(status.HTTP_409_CONFLICT, "이 작품을 쓰는 기록이 남아 있어 삭제할 수 없습니다") from exc
+    for room_id in room_ids:                                                      # 열려 있던 방은 서버 메모리에서도 닫는다
+        request.app.state.rooms.remove_room(room_id)
+        request.app.state.games.remove(room_id)

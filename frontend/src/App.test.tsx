@@ -300,7 +300,7 @@ describe("작품", () => {
   it("작품 목록에서 확인 후 삭제하고, 서버가 거부하면 사유를 보여 준다", async () => {
     routes["GET /api/works"] = () => json([work, { ...work, 번호: 8, 제목: "방이 있는 작품" }]);
     routes["DELETE /api/works/7"] = () => new Response(null, { status: 204 });
-    routes["DELETE /api/works/8"] = () => json({ detail: "이 작품으로 만든 방이나 플레이 기록이 있어 삭제할 수 없습니다" }, 409);
+    routes["DELETE /api/works/8"] = () => json({ detail: "이 작품을 쓰는 기록이 남아 있어 삭제할 수 없습니다" }, 409);
     renderApp("/make/games");
     await userEvent.click(await screen.findByRole("button", { name: "저택의 비밀 삭제" }));
     await answerConfirm(false);
@@ -310,7 +310,7 @@ describe("작품", () => {
     await waitFor(() => expect(screen.queryByText("저택의 비밀")).not.toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: "방이 있는 작품 삭제" }));
     await answerConfirm(true);
-    expect(await screen.findByRole("alert")).toHaveTextContent("방이나 플레이 기록이 있어");
+    expect(await screen.findByRole("alert")).toHaveTextContent("기록이 남아 있어");
     expect(screen.getByText("방이 있는 작품")).toBeInTheDocument();             // 목록에 그대로 남는다
   });
 

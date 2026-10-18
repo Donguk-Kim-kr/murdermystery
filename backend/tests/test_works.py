@@ -131,14 +131,14 @@ def test_only_the_owner_can_delete(client, new_user):
     assert client.get(f"/api/works/{w}", headers=owner).status_code == 200          # 그대로 남아 있다
 
 
-def test_work_with_a_room_cannot_be_deleted(client, headers, confirm):
+def test_work_with_a_room_can_be_deleted_and_the_room_closes(client, headers, confirm):
     w = create(client, headers)["번호"]
     client.post(f"/api/works/{w}/characters", headers=headers, json={"이름": "A"})
     confirm(w)
     assert client.post("/api/rooms", headers=headers, json={"작품_번호": w}).status_code == 201
-    res = client.delete(f"/api/works/{w}", headers=headers)
-    assert res.status_code == 409 and "방" in res.json()["detail"]
-    assert client.get(f"/api/works/{w}", headers=headers).status_code == 200
+    assert client.delete(f"/api/works/{w}", headers=headers).status_code == 204
+    assert client.get(f"/api/works/{w}", headers=headers).status_code == 404
+    assert client.get("/api/rooms/me", headers=headers).json() is None                # 열려 있던 방도 닫혔다
 
 
 def test_time_format_defaults_to_time_only_and_can_be_changed_to_the_allowed_values(client, headers):
