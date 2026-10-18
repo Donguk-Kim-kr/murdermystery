@@ -18,12 +18,14 @@ def api(client, host, wid, kind, **body):
     return res.json()
 
 
-def play(client, make_scripted_game, endings, epilogues=(), votes=None, flag=None, players=3, extra_cards=(), unchecked=None):
+def play(client, make_scripted_game, endings, epilogues=(), votes=None, flag=None, players=3, extra_cards=(), unchecked=None, setup_extra=None):
     """캐릭터 선택 → 최종 투표 → (변수 정하기) → 엔딩 → 후일담. `votes(people, slots)` 가 투표를 한다."""
     holder = {}
 
     def setup(client_, host, wid):
         holder["wid"] = wid
+        if setup_extra:
+            setup_extra(client_, host, wid)
         for name, condition, text in endings:
             api(client_, host, wid, "endings", 이름=name, 조건=condition, 내용=text)
         for person, condition, text in epilogues:
@@ -197,3 +199,26 @@ def test_reveal_all_ends_the_game_and_shows_every_clue_and_every_narrative(clien
         assert f"인물{i}\n{i}번의 서사 하나\n\n{i}번의 서사 둘" in story                      # 모든 인물의 서사가 모든 부분으로
     assert db.execute('SELECT "상태" FROM "진행" WHERE "방_번호" = %s', (room["번호"],)).fetchone()[0] == "종료"
     assert advance(client, host).status_code == 409                                        # 끝난 게임은 더 진행하지 않는다
+
+
+def test_ending_condition_arrested_the_culprit_by_vote(client, make_scripted_game):
+    """"투표로 범인을 검거했다": 최다 득표가 인물이고 그 인물이 범인으로 표시되어 있다."""
+    caught = '결과_인물("최종 투표") is not None and 결과_인물("최종 투표").범인'
+    endings = [("검거", {"식": caught}, "범인을 검거했습니다."), ("검거 실패", {"식": "not (" + caught + ")"}, "범인이 달아났습니다.")]
+
+    def mark_culprit(client_, host, wid):
+        res = client_.patch(f"/api/works/{wid}/characters/1", headers=host.headers, json={"범인": True})
+        assert res.status_code == 200, res.text
+
+    def run(target_order):
+        def votes(people, slots):
+            by_name = {p["이름"]: p["순서"] for p in state(client, people[0]).json()["인물"]}
+            for who in people[1:]:
+                cast(client, who, by_name[target_order])
+        return votes
+
+    for target, expected in (("인물0", "범인을 검거했습니다."), ("인물1", "범인이 달아났습니다.")):
+        host, people, _ = play(client, make_scripted_game, endings, votes=run(target), setup_extra=mark_culprit)
+        go_to_endings(client, host, 1)
+        shown = [b for b in state(client, people[0]).json()["화면"] if b["이름"].startswith("엔딩")]
+        assert [b["내용"] for b in shown] == [expected], target
