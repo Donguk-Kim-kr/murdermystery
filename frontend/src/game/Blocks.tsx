@@ -16,6 +16,8 @@ interface Item {
   유형?: string | null;
   특징?: string | null;
   비활성?: boolean;
+  /** 투표: 인물이 아닌 선택지(예: 사고사) */
+  기타?: boolean;
 }
 
 interface Card {
@@ -78,8 +80,8 @@ function TextBlock({ block }: { block: Block }) {
 /** 비공개 투표. 후보를 고르고 "투표"를 누르며, 다음 단계로 넘어가기 전에는 다시 골라 바꿀 수 있다. 남의 표는 보이지 않는다. */
 function VoteBlock({ block, state, onAnswer }: { block: Block; state: GameState; onAnswer: Props["onAnswer"] }) {
   const items = (block.항목 as Item[] | undefined) ?? [];
-  const mine = typeof block.내_선택 === "number" ? block.내_선택 : null;
-  const [picked, setPicked] = useState<number | null>(null);
+  const mine = typeof block.내_선택 === "number" || typeof block.내_선택 === "string" ? block.내_선택 : null;
+  const [picked, setPicked] = useState<number | string | null>(null);
   const [busy, setBusy] = useState(false);
   const isPlayer = state.나.역할 === "플레이어";
   const chosen = picked ?? mine;
@@ -97,10 +99,12 @@ function VoteBlock({ block, state, onAnswer }: { block: Block; state: GameState;
               className={`choice${chosen === item.값 ? " on" : ""}`}
               aria-pressed={chosen === item.값}
               disabled={!isPlayer || item.비활성 === true || busy}
-              onClick={() => setPicked(item.값 as number)}
+              onClick={() => setPicked(item.값 as number | string)}
             >
               <strong>{text(item.이름) || "이름 없음"}</strong>
-              <span className="muted">{[item.직업, item.나이 != null ? `${item.나이}세` : null, item.성별].filter(Boolean).join(" · ")}</span>
+              {!item.기타 && (
+                <span className="muted">{[item.직업, item.나이 != null ? `${item.나이}세` : null, item.성별].filter(Boolean).join(" · ")}</span>
+              )}
               {mine === item.값 && <span className="chip accent">내 투표</span>}
             </button>
           </li>

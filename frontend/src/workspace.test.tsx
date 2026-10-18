@@ -676,6 +676,26 @@ describe("진행 탭", () => {
       expect(await sent("PATCH /api/works/7/content/phase-steps/9")[1].req.json()).toEqual({ 설정: { 후보: [1, 3] } });
     });
 
+    it("투표 후보에 사고사·자살 같은 인물이 아닌 후보를 더하고 뺄 수 있다", async () => {
+      routes["PATCH /api/works/7/content/phase-steps/9"] = () => json({});
+      twoPhases();
+      (bundle.library as { phases: Record<string, object> }).phases[5] = { 번호: 5, 이름: "최종 투표", 버전: 1, 설명: "d", 삭제됨: false, 사용설정: ["후보"] };
+      bundle.characters = [
+        { 순서: 1, 이름: "의사", 직업: null, NPC: false, 범인: false, 서사_부분수: 1 },
+        { 순서: 2, 이름: "집사", 직업: null, NPC: false, 범인: false, 서사_부분수: 1 },
+      ];
+      (bundle["phase-steps"] as { 설정: unknown }[])[0].설정 = { 후보: [1, 2, "자살"] };
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));
+      await pickCard("1차 조사");
+      const card = within(editor().getByRole("group", { name: "1차 조사 수정" }));
+      expect(card.getByText("자살")).toBeInTheDocument();
+      await userEvent.type(card.getByLabelText("인물이 아닌 후보"), "사고사{Enter}");
+      await userEvent.click(card.getByRole("button", { name: "자살 후보 삭제" }));
+      await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: { 후보: [1, 2, "사고사"] } });
+    });
+
     it("스크립트가 개인 서사 공개를 쓰지 않는 카드에는 서사 선택이 없다", async () => {
       twoPhases();
       bundle.characters = [{ 순서: 1, 이름: "의사", 직업: null, NPC: false, 범인: false, 서사_부분수: 2 }];

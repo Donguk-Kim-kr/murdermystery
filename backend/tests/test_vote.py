@@ -83,7 +83,7 @@ def test_voting_for_yourself_or_a_non_candidate_is_refused_with_a_notice(client,
     assert block(state(client, a).json(), "투표 완료")["완료"] == 0
 
 
-@pytest.mark.parametrize("value", ["abc", None, [1], {"a": 1}, 1.5, True])
+@pytest.mark.parametrize("value", [None, [1], {"a": 1}, 1.5, True, "", "가" * 51])
 def test_malformed_vote_values_are_rejected_and_the_card_keeps_working(client, make_scripted_game, value):
     host, people, slots = voting(make_scripted_game, client)
     a, b, _ = people
@@ -195,3 +195,100 @@ def test_vote_results_never_leak_into_other_players_state(client, make_scripted_
     assert block(state(client, b).json(), "최종 투표")["내_선택"] == slots[c.number]
     for who in people:
         assert "득표" not in state(client, who).text and "구속" not in state(client, who).text
+
+
+# ---- 인물이 아닌 후보(사고사, 자살 …) ------------------------------------------------------------------
+
+OTHERS = {"후보": [1, 2, 3, "사고사", "자살"]}
+
+PROBE_KIND = '''
+def 실행(카드):
+    인물 = 결과_인물("최종 투표")
+    기타 = 결과_기타("최종 투표")
+    if 인물 is not None:
+        모두.보이기(글("결과", "인물:" + 인물.이름))
+    elif 기타 is not None:
+        모두.보이기(글("결과", "기타:" + 기타))
+    elif 결과("최종 투표") is None:
+        모두.보이기(글("결과", "없음"))
+'''
+
+
+def kinds(make_scripted_game, client, settings=OTHERS, players=3):
+    host, others, room, wid = make_scripted_game(
+        [("캐릭터 선택", CHARACTER_SELECT, None), ("최종 투표", FINAL_VOTE, settings), ("결과 확인", PROBE_KIND, None)], players=players,
+    )
+    people = players_of(host, others)
+    all_pick(client, people)
+    assert advance(client, host).status_code == 200
+    slots = {who.number: state(client, who).json()["나"]["인물_순서"] for who in people}
+    return host, people, slots
+
+
+def test_candidates_can_include_non_character_options(client, make_scripted_game):
+    host, people, slots = kinds(make_scripted_game, client)
+    box = block(state(client, people[0]).json(), "최종 투표")
+    values = [i["값"] for i in box["항목"]]
+    assert values == sorted(s for s in values if isinstance(s, int)) + ["사고사", "자살"]
+    assert [i["기타"] for i in box["항목"]] == [False, False, False, True, True]
+    mine = slots[people[0].number]
+    assert [i["이름"] for i in box["항목"] if i["비활성"]] == [next(i["이름"] for i in box["항목"] if i["값"] == mine)]   # 자기 인물만 비활성
+    assert not next(i for i in box["항목"] if i["값"] == "사고사")["비활성"]
+
+
+def test_voting_for_a_non_character_option_and_reading_its_result(client, make_scripted_game):
+    host, people, slots = kinds(make_scripted_game, client)
+    a, b, c = people
+    assert vote(client, a, "사고사").status_code == 200
+    assert block(state(client, a).json(), "최종 투표")["내_선택"] == "사고사"
+    assert vote(client, b, "사고사").status_code == 200
+    vote(client, c, slots[a.number])
+    assert result(client, host) == "기타:사고사"                                         # 2표 대 1표
+
+
+def test_result_helpers_tell_characters_from_other_options(client, make_scripted_game):
+    host, people, slots = kinds(make_scripted_game, client)
+    a, b, c = people
+    vote(client, a, slots[c.number])
+    vote(client, b, slots[c.number])
+    vote(client, c, "자살")
+    assert result(client, host).startswith("인물:")
+
+
+def test_unknown_text_option_is_refused_and_other_option_cannot_be_voted_when_not_a_candidate(client, make_scripted_game):
+    host, people, slots = kinds(make_scripted_game, client, settings={"후보": [1, "사고사"]})
+    a = people[0]
+    res = vote(client, a, "자살")                                                         # 후보로 두지 않은 글
+    assert res.status_code == 200 and res.json()["알림"][-1]["글"] == "이 인물에게는 투표할 수 없습니다."
+    assert block(state(client, a).json(), "투표 완료")["완료"] == 0
+    assert vote(client, a, "사고사").status_code == 200
+
+
+def test_tie_between_a_character_and_an_option_can_trigger_revote_with_both_as_candidates(client, make_scripted_game):
+    host, people, slots = kinds(make_scripted_game, client, settings={"후보": [1, 2, 3, "사고사"], "동률": "재투표"}, players=4)
+    p0, p1, p2, p3 = people
+    vote(client, p0, "사고사")
+    vote(client, p1, "사고사")
+    vote(client, p2, slots[p0.number])
+    vote(client, p3, slots[p0.number])                                                   # 사고사 2표, p0 인물 2표
+    box = block(state(client, p0).json(), "최종 투표")
+    assert sorted(str(i["값"]) for i in box["항목"]) == sorted([str(slots[p0.number]), "사고사"])   # 동률자만 후보로 남는다
+    assert block(state(client, p0).json(), "투표 완료")["완료"] == 0
+
+
+@pytest.mark.parametrize("value", [["a"], {"a": 1}, "", "가" * 51, None, 1.5, True])
+def test_malformed_option_values_are_rejected(client, make_scripted_game, value):
+    host, people, slots = kinds(make_scripted_game, client)
+    a = people[0]
+    qid = block(state(client, a).json(), "최종 투표")["질문ID"]
+    assert answer(client, a, qid, value).status_code == 422
+
+
+def test_invalid_candidate_settings_do_not_break_the_card(client, make_scripted_game):
+    host, people, slots = kinds(make_scripted_game, client, settings={"후보": [1, "", "  ", 99, ["x"], "사고사", "사고사"]})
+    # 비어 있거나 없는 번호, 글이 아닌 값은 건너뛰고 겹치는 글은 하나만 남지 않으므로 카드 오류로 알린다
+    errors = state(client, host).json()["오류"]
+    assert errors and "겹칩니다" in errors[0]["메시지"]
+    host2, people2, _ = kinds(make_scripted_game, client, settings={"후보": [1, "", "  ", 99, ["x"], "사고사"]})
+    box = block(state(client, people2[0]).json(), "최종 투표")
+    assert [i["값"] for i in box["항목"]] == [1, "사고사"]

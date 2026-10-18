@@ -594,6 +594,10 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
   const [candidates, setCandidates] = useState<number[]>(
     Array.isArray(candidatesRaw) ? candidatesRaw.filter((n): n is number => Number.isInteger(n)) : allPlayable,
   );
+  // 인물이 아닌 후보(사고사, 자살 …)
+  const [extras, setExtras] = useState<string[]>(
+    Array.isArray(candidatesRaw) ? candidatesRaw.filter((v): v is string => typeof v === "string") : [],
+  );
   const [keepTab, setKeepTab] = useState(keepRaw !== false);
   const [text, setText] = useState(Object.keys(rest).length ? JSON.stringify(rest, null, 2) : "");
   const [picked, setPicked] = useState<Record<string, number[]>>(() => storyPicks(picksRaw));
@@ -617,8 +621,8 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
     );
     let next: Record<string, unknown> = showPicks && Object.keys(changed).length ? { ...extra, [STORY_PICKS]: changed } : extra;
     // 기본(플레이어가 맡는 인물 모두)과 같은 선택은 따로 저장하지 않는다.
-    const isDefault = candidates.length === allPlayable.length && allPlayable.every((n) => candidates.includes(n));
-    if (showCandidates && !isDefault) next = { ...next, [CANDIDATES]: [...candidates].sort((a, b) => a - b) };
+    const isDefault = extras.length === 0 && candidates.length === allPlayable.length && allPlayable.every((n) => candidates.includes(n));
+    if (showCandidates && !isDefault) next = { ...next, [CANDIDATES]: [...[...candidates].sort((a, b) => a - b), ...extras] };
     if (showTab && !keepTab) next = { ...next, [KEEP_TAB]: false };
     setError(null);
     await call("PATCH", `${resource}/${id}`, { 설정: Object.keys(next).length ? next : null });
@@ -633,7 +637,9 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
         </label>
       )}
       {showPicks && <StoryPicks characters={characters} picked={picked} onChange={setPicked} />}
-      {showCandidates && <CandidatePicks characters={characters} selected={candidates} onChange={setCandidates} />}
+      {showCandidates && (
+        <CandidatePicks characters={characters} selected={candidates} onChange={setCandidates} extras={extras} onExtras={setExtras} />
+      )}
       <label>
         그 밖의 세부 설정 (JSON)
         <textarea rows={4} value={text} placeholder="비우면 정의의 기본값을 씁니다" onChange={(e) => setText(e.target.value)} />
@@ -655,14 +661,20 @@ function storyPicks(raw: unknown): Record<string, number[]> {
   return out;
 }
 
-/** 투표 카드: 투표할 수 있는 후보를 고른다(NPC 도 후보로 둘 수 있다). 기본은 플레이어가 맡는 인물 모두이다. */
-function CandidatePicks({ characters, selected, onChange }: {
-  characters: Row[]; selected: number[]; onChange: (next: number[]) => void;
+/** 투표 카드: 투표할 수 있는 후보를 고른다. 인물(NPC 포함)과 인물이 아닌 선택지(사고사, 자살 …)를 둘 수 있다. 기본은 플레이어가 맡는 인물 모두이다. */
+function CandidatePicks({ characters, selected, onChange, extras, onExtras }: {
+  characters: Row[]; selected: number[]; onChange: (next: number[]) => void; extras: string[]; onExtras: (next: string[]) => void;
 }) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const text = draft.trim();
+    if (text && !extras.includes(text) && text.length <= 50) onExtras([...extras, text]);
+    setDraft("");
+  };
   return (
     <fieldset className="story-picks">
       <legend>투표 후보</legend>
-      <p className="muted">투표에서 고를 수 있는 인물입니다. 자기 인물에게는 투표할 수 없습니다.</p>
+      <p className="muted">투표에서 고를 수 있는 후보입니다. 자기 인물에게는 투표할 수 없습니다.</p>
       <div className="story-pick">
         {characters.map((c) => {
           const slot = Number(c.순서);
@@ -678,6 +690,32 @@ function CandidatePicks({ characters, selected, onChange }: {
             </label>
           );
         })}
+      </div>
+      <div className="story-pick">
+        {extras.map((text) => (
+          <span key={text} className="chip">
+            {text}
+            <button type="button" className="small secondary" aria-label={`${text} 후보 삭제`} onClick={() => onExtras(extras.filter((t) => t !== text))}>
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="row start">
+        <input
+          aria-label="인물이 아닌 후보"
+          value={draft}
+          maxLength={50}
+          placeholder="예: 사고사"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+        />
+        <button type="button" className="small secondary" onClick={add}>후보 추가</button>
       </div>
     </fieldset>
   );

@@ -505,6 +505,20 @@ describe("투표 블록", () => {
     await waitFor(() => expect(posts.at(-1)?.body).toEqual({ 질문ID: "1:7:최종 투표", 값: 12 }));
   });
 
+  it("인물이 아닌 후보(사고사)에도 투표할 수 있고 인물 정보는 보이지 않는다", async () => {
+    state = makeState({
+      화면: [box({ 항목: [
+        { 값: 11, 이름: "집사", 직업: "집사", 나이: 60, 성별: null, 비활성: false, 기타: false },
+        { 값: "사고사", 이름: "사고사", 직업: null, 나이: null, 성별: null, 비활성: false, 기타: true },
+      ] })],
+    });
+    render(<GamePage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /사고사/ }));
+    await user.click(screen.getByRole("button", { name: "투표" }));
+    await waitFor(() => expect(posts.at(-1)?.body).toEqual({ 질문ID: "1:7:최종 투표", 값: "사고사" }));
+  });
+
   it("관전자는 투표할 수 없다", async () => {
     state = makeState({ 나: { 계정_번호: 9, 역할: "관전자", 인물_순서: null, 방장: false, 진행_권한: false }, 화면: [box()] });
     render(<GamePage />);
