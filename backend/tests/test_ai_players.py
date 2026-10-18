@@ -118,6 +118,7 @@ def test_claude_brain_sends_one_fresh_conversation_and_returns_tool_calls():
     sent = calls[0]
     assert sent["model"] == "claude-sonnet-5-5" and sent["messages"] == [{"role": "user", "content": "상황"}]    # 이전 응답을 다시 보내지 않는다
     assert sent["system"][0]["text"] == "시스템" and sent["output_config"] == {"effort": "low"}
+    assert sent["system"][0]["cache_control"] == {"type": "ephemeral"} and "cache_control" not in sent    # 캐시는 바뀌지 않는 앞부분에 건다
     assert [t["name"] for t in sent["tools"]] == [t["name"] for t in TOOLS] and "tool_choice" not in sent        # 강제 호출을 쓰지 않는다
     assert "temperature" not in sent and "thinking" not in sent
 
@@ -202,14 +203,14 @@ def test_claude_brain_backs_off_after_failures_and_explains_a_low_credit_balance
 
 def test_claude_brain_tallies_token_usage_every_ten_calls():
     logged = []
-    usage = SimpleNamespace(input_tokens=4000, output_tokens=300, cache_read_input_tokens=0)
+    usage = SimpleNamespace(input_tokens=4000, output_tokens=300, cache_read_input_tokens=1000, cache_creation_input_tokens=2000)
     client, _ = fake_client([SimpleNamespace(type="tool_use", name="wait", input={}, id="t")])
     base = client.messages.create
     client.messages.create = lambda **kw: (lambda r: (setattr(r, "usage", usage), r)[1])(base(**kw))
     brain = ClaudeBrain(client=client, log=logged.append)
     for _ in range(10):
         brain.decide("s", "u")
-    assert brain.usage == {"호출": 10, "입력": 40000, "출력": 3000, "캐시읽기": 0} and "사용량" in logged[-1]
+    assert brain.usage == {"호출": 10, "입력": 40000, "출력": 3000, "캐시읽기": 10000, "캐시쓰기": 20000} and "캐시에 씀 20,000" in logged[-1]
 
 
 def test_a_choice_the_card_refuses_is_reported_as_not_accepted_not_as_success(client, make_scripted_game):

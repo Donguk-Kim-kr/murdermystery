@@ -96,7 +96,7 @@ class ClaudeBrain:
             client = anthropic.Anthropic()        # ANTHROPIC_API_KEY 환경변수
         self.client, self.model, self.effort, self.log = client, model, effort, log
         self.clock, self.failures, self.blocked_until = time.monotonic, 0, 0.0     # 호출이 계속 실패하면 잠시 쉰다
-        self.usage = {"호출": 0, "입력": 0, "출력": 0, "캐시읽기": 0}                 # 누적 사용량(비용 가늠용)
+        self.usage = {"호출": 0, "입력": 0, "출력": 0, "캐시읽기": 0, "캐시쓰기": 0}                 # 누적 사용량(비용 가늠용)
 
     def decide(self, system: str, situation: str) -> list[dict[str, Any]]:
         if self.clock() < self.blocked_until:
@@ -104,11 +104,11 @@ class ClaudeBrain:
         try:
             res = self.client.messages.create(
                 model=self.model, max_tokens=4096,
-                system=[{"type": "text", "text": system}],
+                # 캐시는 거의 바뀌지 않는 앞부분(규칙과 내 정보)에 건다. 매번 바뀌는 상황 글(사용자 글)에 걸면 쓰기만 하고 읽지 못한다.
+                system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
                 tools=TOOLS,
                 messages=[{"role": "user", "content": situation}],
                 output_config={"effort": self.effort},
-                cache_control={"type": "ephemeral"},
             )
         except Exception as err:                       # 연결·한도·인증 오류 등: 이번 차례는 건너뛰고, 계속 실패하면 점점 더 오래 쉰다
             self.failures += 1
@@ -128,9 +128,10 @@ class ClaudeBrain:
             self.usage["입력"] += getattr(used, "input_tokens", 0) or 0
             self.usage["출력"] += getattr(used, "output_tokens", 0) or 0
             self.usage["캐시읽기"] += getattr(used, "cache_read_input_tokens", 0) or 0
+            self.usage["캐시쓰기"] += getattr(used, "cache_creation_input_tokens", 0) or 0
             if self.usage["호출"] % 10 == 0:
                 u = self.usage
-                self.log(f"  (사용량: 호출 {u['호출']}회, 입력 {u['입력']:,} · 출력 {u['출력']:,} · 캐시에서 읽음 {u['캐시읽기']:,} 토큰 — 이 AI 한 명 기준)")
+                self.log(f"  (사용량: 호출 {u['호출']}회, 입력 {u['입력']:,} · 캐시에 씀 {u['캐시쓰기']:,} · 캐시에서 읽음 {u['캐시읽기']:,} · 출력 {u['출력']:,} 토큰 — 이 AI 한 명 기준. 입력은 캐시와 상관없이 새로 보낸 부분만)")
         stop = getattr(res, "stop_reason", None)
         calls = [{"tool": b.name, "input": dict(b.input)} for b in res.content if getattr(b, "type", None) == "tool_use"]
         if not calls:                                  # 아무 도구도 부르지 않았다: 이유를 남긴다(글만 썼거나, 토큰이 모자랐거나, 거절)
