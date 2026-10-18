@@ -42,7 +42,7 @@ export function PlayHomePage() {
       )}
       <div className="row">
         <h2>플레이할 작품</h2>
-        <button type="button" className="secondary" onClick={() => setJoining(true)}>입장 코드</button>
+        <button type="button" className="secondary" onClick={() => setJoining(true)}>입장코드</button>
       </div>
       {error && <p role="alert" className="error">{error}</p>}
       {works === null && !error && <p className="muted">불러오는 중…</p>}
