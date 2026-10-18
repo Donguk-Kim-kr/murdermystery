@@ -299,14 +299,32 @@ def test_member_leaves_and_host_closes_the_room(client, make_account, make_work,
     assert client.post("/api/rooms/leave", headers=host.headers).status_code == 404
 
 
-def test_host_can_toggle_participation_but_guests_cannot(client, make_account, make_work):
+def test_everyone_moves_self_and_only_host_moves_others(client, make_account, make_work):
     host, guest = make_account(), make_account()
     code = create(client, host, make_work(host, players=2)).json()["입장코드"]
     join(client, guest, code)
-    res = client.patch("/api/rooms/me", headers=host.headers, json={"플레이": False})
+    patch = lambda who, **body: client.patch("/api/rooms/me", headers=who.headers, json=body)
+    res = patch(host, 플레이=False)
     assert res.status_code == 200 and res.json()["플레이어_수"] == 1
-    assert client.patch("/api/rooms/me", headers=guest.headers, json={"플레이": False}).status_code == 403
-    assert client.patch("/api/rooms/me", headers=make_account().headers, json={"플레이": True}).status_code == 404
+    res = patch(guest, 플레이=False)                                      # 참가자도 자기 자리는 옮길 수 있다
+    assert res.status_code == 200 and res.json()["플레이어_수"] == 0
+    assert patch(guest, 플레이=True, 계정_번호=host.number).status_code == 403   # 남은 방장만
+    res = patch(host, 플레이=True, 계정_번호=guest.number)                # 방장이 참가자를 옮긴다
+    assert res.status_code == 200 and res.json()["플레이어_수"] == 1
+    assert patch(host, 플레이=True, 계정_번호=999999999).status_code == 404
+    assert patch(make_account(), 플레이=True).status_code == 404
+
+
+def test_gm_observe_choice_is_own_only(client, make_account, make_work):
+    host, guest = make_account(), make_account()
+    code = create(client, host, make_work(host, players=2)).json()["입장코드"]
+    join(client, guest, code)
+    patch = lambda who, **body: client.patch("/api/rooms/me", headers=who.headers, json=body)
+    res = patch(guest, 플레이=False, GM관전=True)
+    assert res.status_code == 200
+    me = [m for m in res.json()["참가자"] if m["계정_번호"] == guest.number][0]
+    assert me["플레이"] is False and me["GM관전"] is True
+    assert patch(host, GM관전=True, 계정_번호=guest.number).status_code == 403
 
 
 def test_host_cannot_rejoin_as_player_when_room_is_full(client, make_account, make_work):

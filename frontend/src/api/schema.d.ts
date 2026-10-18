@@ -125,9 +125,11 @@ export interface paths {
         post?: never;
         /**
          * Delete Work
-         * @description 내 작품을 지운다. 제작용 콘텐츠·확정 버전·테스터는 함께 지워진다(되돌릴 수 없다).
+         * @description 내 작품을 지운다(되돌릴 수 없다).
          *
-         *     이 작품으로 만든 방이나 플레이 기록이 있으면 DB 가 거부하므로 지울 수 없다(409, docs/DB_RULES.md B11).
+         *     * 이 작품으로 만든 방이 하나도 없으면 제작용 콘텐츠·확정 버전·테스터와 함께 실제로 지운다.
+         *     * 방이나 플레이 기록이 있으면 작품 행은 남기고 상태만 '삭제'로 바꿔 숨긴다(사용자 결정 2026-10-18). 플레이 기록은 그대로 남고,
+         *       제작자 목록·플레이 목록·제작 화면에서는 없는 작품이 된다. 열려 있는 방(대기·진행 중)은 닫힌다.
          */
         delete: operations["delete_work_api_works__work_id__delete"];
         options?: never;
@@ -620,7 +622,7 @@ export interface paths {
         head?: never;
         /**
          * Set Participation
-         * @description 방장이 플레이어로 참여할지 바꾼다.
+         * @description 참여/관전 자리를 옮긴다. 자기 자리는 누구나, 다른 사람의 자리는 방장만 옮긴다. GM 관전 여부는 본인만 고른다.
          */
         patch: operations["set_participation_api_rooms_me_patch"];
         trace?: never;
@@ -1177,6 +1179,8 @@ export interface components {
             "\uBC29\uC7A5": boolean;
             /** 플레이 */
             "\uD50C\uB808\uC774": boolean;
+            /** Gm관전 */
+            "GM\uAD00\uC804": boolean;
         };
         /** MoveBody */
         MoveBody: {
@@ -1193,7 +1197,11 @@ export interface components {
         /** ParticipationIn */
         ParticipationIn: {
             /** 플레이 */
-            "\uD50C\uB808\uC774": boolean;
+            "\uD50C\uB808\uC774"?: boolean | null;
+            /** Gm관전 */
+            "GM\uAD00\uC804"?: boolean | null;
+            /** 계정 번호 */
+            "\uACC4\uC815_\uBC88\uD638"?: number | null;
         };
         /** PlayWorkOut */
         PlayWorkOut: {
@@ -1273,6 +1281,8 @@ export interface components {
             "\uBC84\uC804": string;
             /** 내가 방장 */
             "\uB0B4\uAC00_\uBC29\uC7A5": boolean;
+            /** 내 계정 번호 */
+            "\uB0B4_\uACC4\uC815_\uBC88\uD638": number;
             /** 참가자 */
             "\uCC38\uAC00\uC790": components["schemas"]["MemberOut"][];
             /** 플레이어 수 */

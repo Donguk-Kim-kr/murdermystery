@@ -62,7 +62,7 @@ const code = (await host.getByLabel("입장코드", { exact: false }).locator("x
 await p1.goto(BASE + "/rooms/join"); await p1.getByLabel("입장코드").fill(code); await p1.getByRole("button", { name: "입장" }).click(); await p1.getByRole("region", { name: "참가자" }).waitFor();
 await p2.goto(BASE + "/join/" + encodeURIComponent(code)); await p2.getByRole("region", { name: "참가자" }).waitFor({ timeout: 8000 });
 check(true, "입장: 링크를 열면 바로 방에 입장한다");
-await host.getByText("플레이어 3/3명").waitFor({ timeout: 8000 });
+await host.getByText("3/3명").waitFor({ timeout: 8000 });
 await host.screenshot({ path: `${OUT}/lobby-host.png` });
 await mshot("lobby");
 await host.getByRole("button", { name: "게임 시작" }).click();

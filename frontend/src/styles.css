@@ -528,6 +528,18 @@ a.work-card:hover {
 .person .body { flex: 1; min-width: 0; display: grid; gap: 0.1rem; }
 .person .name { font-weight: 600; }
 .person .tags { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+
+/* 대기실의 참가·관전 */
+.seat-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin: 0.5rem 0; }
+.seat-title { background: none; border: 0; padding: 0.15rem 0.4rem; margin-left: -0.4rem; font: inherit; font-size: 1.15rem; font-weight: 700; color: var(--text); cursor: pointer; border-radius: var(--radius-sm); }
+.seat-title:hover { background: var(--surface-2); }
+.seat-title[aria-pressed="true"] { color: var(--accent-soft-text); }
+.person-name { display: inline-flex; align-items: center; gap: 0.35rem; }
+.person-name .name, .person-name button.link { font-weight: 600; }
+.person-name button.link { padding: 0; }
+.crown { font-size: 0.95em; line-height: 1; }
+.observer-list { list-style: none; margin: 0 0 1rem; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; }
+.observer-list:empty { display: none; }
 .subform {
   padding: 1rem;
   background: var(--surface-2);

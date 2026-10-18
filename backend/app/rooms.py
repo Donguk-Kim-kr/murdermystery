@@ -68,7 +68,10 @@ class JoinIn(BaseModel):
 
 
 class ParticipationIn(BaseModel):
-    플레이: bool
+    플레이: bool | None = None
+    GM관전: bool | None = None
+    # 방장이 다른 사람을 옮길 때만 쓴다. 비우면 나 자신
+    계정_번호: int | None = None
 
 
 class MemberOut(BaseModel):
@@ -76,6 +79,7 @@ class MemberOut(BaseModel):
     닉네임: str
     방장: bool
     플레이: bool
+    GM관전: bool
 
 
 class RoomWorkOut(BaseModel):
@@ -95,6 +99,7 @@ class RoomOut(BaseModel):
     작품: RoomWorkOut
     버전: str
     내가_방장: bool
+    내_계정_번호: int
     참가자: list[MemberOut]
     플레이어_수: int
     생성일시: datetime
@@ -151,7 +156,7 @@ def expire_stale(request: Request) -> None:
 
 def build_room_out(row: dict, room: WaitingRoom, me_id: int) -> RoomOut:
     members = [
-        MemberOut(계정_번호=m.account_id, 닉네임=m.nickname, 방장=m.account_id == room.host_id, 플레이=m.playing)
+        MemberOut(계정_번호=m.account_id, 닉네임=m.nickname, 방장=m.account_id == room.host_id, 플레이=m.playing, GM관전=m.gm)
         for m in sorted(room.members.values(), key=lambda m: (m.account_id != room.host_id, m.account_id))
     ]
     return RoomOut(
@@ -160,7 +165,7 @@ def build_room_out(row: dict, room: WaitingRoom, me_id: int) -> RoomOut:
             번호=row["작품_번호"], 제목=row["제목"], 시놉시스=row["시놉시스"], 장르=row["장르"],
             예상시간=row["예상시간"], 최소인원=row["최소인원"], 최대인원=row["최대인원"],
         ),
-        버전=row["버전_버전"], 내가_방장=room.host_id == me_id, 참가자=members,
+        버전=row["버전_버전"], 내가_방장=room.host_id == me_id, 내_계정_번호=me_id, 참가자=members,
         플레이어_수=room.player_count(), 생성일시=row["생성일시"],
     )
 
@@ -317,16 +322,26 @@ def my_room(conn: Conn, me: CurrentUser, request: Request) -> RoomOut | None:
 
 @router.patch("/me", response_model=RoomOut)
 def set_participation(body: ParticipationIn, conn: Conn, me: CurrentUser, request: Request) -> RoomOut:
-    """방장이 플레이어로 참여할지 바꾼다."""
+    """참여/관전 자리를 옮긴다. 자기 자리는 누구나, 다른 사람의 자리는 방장만 옮긴다. GM 관전 여부는 본인만 고른다."""
     reg = registry(request)
     mine = find_my_room(conn, reg, me)
     if mine is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "참여 중인 방이 없습니다")
     row, room = mine
-    if room.host_id != me.계정.번호:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "방장만 바꿀 수 있습니다")
+    if row["상태"] != "대기":
+        raise HTTPException(status.HTTP_409_CONFLICT, ROOM_IN_PROGRESS)
+    target = body.계정_번호 if body.계정_번호 is not None else me.계정.번호
+    if target != me.계정.번호 and room.host_id != me.계정.번호:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "방장만 다른 사람을 옮길 수 있습니다")
+    if target not in room.members:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "방에 없는 사람입니다")
+    if body.GM관전 is not None and target != me.계정.번호:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "관전 방식은 본인만 고를 수 있습니다")
     try:
-        reg.set_playing(row["번호"], me.계정.번호, body.플레이, row["최대인원"])
+        if body.플레이 is not None:
+            reg.set_playing(row["번호"], target, body.플레이, row["최대인원"])
+        if body.GM관전 is not None:
+            reg.set_gm(row["번호"], target, body.GM관전)
     except RoomError as err:
         raise_room_error(err)
     return build_room_out(row, room, me.계정.번호)

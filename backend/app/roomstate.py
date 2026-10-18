@@ -6,7 +6,7 @@
 
 * 한 계정은 한 번에 한 방에만 있을 수 있다 (사용자 결정).
 * 폴링이 `member_timeout` 초 끊기면 방에서 나간 것으로 본다. 방장은 방 소유자라서 끊겨도 자리에서 빠지지 않는다.
-* 방장은 플레이어로 참여할지 선택한다. 참여하지 않는 방장은 인원 수에 포함되지 않는다.
+* 누구나 자기 자리를 참여/관전 사이에서 옮길 수 있고, 방장은 다른 사람도 옮길 수 있다. 관전하는 사람은 인원 수에 포함되지 않는다.
 """
 import threading
 import time
@@ -29,6 +29,7 @@ class Member:
     nickname: str
     playing: bool
     last_seen: float
+    gm: bool = False  # 관전할 때 GM 으로 볼지(아직 게임 진행에는 반영되지 않는다)
 
 
 @dataclass
@@ -135,6 +136,13 @@ class RoomRegistry:
             if playing and not member.playing and room.player_count() >= capacity:
                 raise RoomError("full", "방이 가득 차서 플레이어로 참여할 수 없습니다")
             member.playing = playing
+
+    def set_gm(self, room_id: int, account_id: int, gm: bool) -> None:
+        with self._lock:
+            room = self._rooms.get(room_id)
+            if room is None or account_id not in room.members:
+                raise RoomError("closed", "방을 찾을 수 없습니다")
+            room.members[account_id].gm = gm
 
     def remove_room(self, room_id: int) -> None:
         """방이 닫혔다: 모든 사람을 내보낸다."""

@@ -75,7 +75,7 @@ for (const p of pages.slice(1)) {
   await p.getByRole("button", { name: "입장" }).click();
   await p.getByRole("region", { name: "참가자" }).waitFor();
 }
-await host.getByText("플레이어 3/3명").waitFor({ timeout: 8000 });
+await host.getByText("3/3명").waitFor({ timeout: 8000 });
 log("방 준비 완료: " + code);
 
 // ---- 시작 ----

@@ -845,11 +845,52 @@ describe("방", () => {
     expect(await screen.findByLabelText("입장코드", { selector: "strong" })).toHaveTextContent("K7M2QX");
     const list = screen.getByRole("region", { name: "참가자" });
     expect(within(list).getByText("의사")).toBeInTheDocument();
-    expect(within(list).getByText("플레이어 2/4명")).toBeInTheDocument();
+    expect(within(list).getByText("2/4명")).toBeInTheDocument();
+    expect(within(list).getByRole("img", { name: "방장" })).toBeInTheDocument();                      // 방장 표시는 왕관
+    expect(within(list).queryByText("플레이")).not.toBeInTheDocument();
     expect(within(list).getByRole("button", { name: "게임 시작" })).toBeInTheDocument();
     expect(within(list).queryByRole("button", { name: "방 닫기" })).not.toBeInTheDocument();            // 방 닫기·참여 선택·시작 조건 안내는 없다
     expect(within(list).queryByLabelText("나도 플레이어로 참여")).not.toBeInTheDocument();
     expect(within(list).queryByText(/시작할 수 있습니다/)).not.toBeInTheDocument();
+  });
+
+  it("대기실: 누구나 참가·관전 제목을 눌러 자기 자리를 옮기고, 관전 방식은 일반↔GM 으로 바뀐다", async () => {
+    const patches: unknown[] = [];
+    routes["GET /api/rooms/me"] = () => json({
+      ...baseRoom, 내가_방장: false, 내_계정_번호: 2,
+      참가자: [
+        { 계정_번호: 1, 닉네임: "탐정", 방장: true, 플레이: true, GM관전: false },
+        { 계정_번호: 2, 닉네임: "의사", 방장: false, 플레이: false, GM관전: false },
+        { 계정_번호: 3, 닉네임: "조수", 방장: false, 플레이: false, GM관전: false },
+      ],
+      플레이어_수: 1,
+    });
+    routes["PATCH /api/rooms/me"] = (req) => { patches.push(req); return json(baseRoom); };
+    renderApp("/room");
+    const list = await screen.findByRole("region", { name: "참가자" });
+    expect(within(list).queryByRole("button", { name: "조수" })).not.toBeInTheDocument();           // 방장이 아니면 남을 옮길 수 없다
+    await userEvent.click(within(list).getByRole("button", { name: "참가" }));
+    await waitFor(() => expect(patches).toHaveLength(1));
+    await userEvent.click(within(list).getByRole("button", { name: "관전 방식" }));
+    await waitFor(() => expect(patches).toHaveLength(2));
+  });
+
+  it("대기실: 방장은 다른 사람의 닉네임을 눌러 참가↔관전으로 옮긴다", async () => {
+    const patches: unknown[] = [];
+    routes["GET /api/rooms/me"] = () => json({
+      ...baseRoom, 내_계정_번호: 1,
+      참가자: [
+        { 계정_번호: 1, 닉네임: "탐정", 방장: true, 플레이: true, GM관전: false },
+        { 계정_번호: 2, 닉네임: "의사", 방장: false, 플레이: true, GM관전: false },
+      ],
+      플레이어_수: 2,
+    });
+    routes["PATCH /api/rooms/me"] = (req) => { patches.push(req); return json(baseRoom); };
+    renderApp("/room");
+    const list = await screen.findByRole("region", { name: "참가자" });
+    expect(within(list).queryByRole("button", { name: "탐정" })).not.toBeInTheDocument();
+    await userEvent.click(within(list).getByRole("button", { name: "의사" }));
+    await waitFor(() => expect(patches).toHaveLength(1));
   });
 
   it("대기실은 주기적으로 갱신되어 새 입장자를 보여 준다", async () => {

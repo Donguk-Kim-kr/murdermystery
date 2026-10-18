@@ -2,16 +2,17 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { api, errorMessage } from "../api/client";
+import type { components } from "../api/schema";
 import { GamePage } from "../game/GamePage";
 import { useRoom } from "../rooms/RoomContext";
+
+type RoomMember = components["schemas"]["MemberOut"];
 
 export function RoomPage() {
   const { room, refresh } = useRoom();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
-  // 체크박스는 누르면 바로 바뀌고, 서버가 거부하면 원래대로 돌아간다 (서버 응답을 기다리면 반응이 느려 보인다).
-
   const [starting, setStarting] = useState(false);
 
   if (room === undefined) return <p className="center">불러오는 중…</p>;
@@ -48,6 +49,23 @@ export function RoomPage() {
     navigate("/");
   }
 
+  async function patchSeat(body: { 플레이?: boolean; GM관전?: boolean; 계정_번호?: number }) {
+    setError(null);
+    const { error } = await api.PATCH("/api/rooms/me", { body });
+    if (error) setError(errorMessage(error, "자리를 옮기지 못했습니다"));
+    await refresh();
+  }
+
+  async function moveTo(accountId: number, playing: boolean) {
+    const target = room!.참가자.find((m) => m.계정_번호 === accountId);
+    if (!target || target.플레이 === playing) return;
+    await patchSeat(accountId === room!.내_계정_번호 ? { 플레이: playing } : { 플레이: playing, 계정_번호: accountId });
+  }
+
+  async function toggleGm() {
+    await patchSeat({ GM관전: !meObserver?.GM관전 });
+  }
+
   async function startGame() {
     setError(null);
     setStarting(true);
@@ -55,6 +73,28 @@ export function RoomPage() {
     if (error) setError(errorMessage(error, "게임을 시작하지 못했습니다"));
     await refresh();
     setStarting(false);
+  }
+
+  const players = room.참가자.filter((m) => m.플레이);
+  const observers = room.참가자.filter((m) => !m.플레이);
+  const meObserver = observers.find((m) => m.계정_번호 === room.내_계정_번호);
+  const meSeat = meObserver ? "관전" : "참가";
+
+  // 방장은 다른 사람의 닉네임을 눌러 반대쪽으로 옮긴다. 방장 표시는 닉네임 바로 오른쪽의 왕관이다.
+  function personName(m: RoomMember) {
+    const canMove = room!.내가_방장 && m.계정_번호 !== room!.내_계정_번호;
+    return (
+      <span className="person-name">
+        {canMove ? (
+          <button type="button" className="link" title={m.플레이 ? "관전으로 옮기기" : "참가로 옮기기"} onClick={() => void moveTo(m.계정_번호, !m.플레이)}>
+            {m.닉네임}
+          </button>
+        ) : (
+          <span className="name">{m.닉네임}</span>
+        )}
+        {m.방장 && <span className="crown" role="img" aria-label="방장" title="방장">👑</span>}
+      </span>
+    );
   }
 
   return (
@@ -84,23 +124,31 @@ export function RoomPage() {
       </div>
 
       <section aria-label="참가자" className="card">
-        <div className="row">
-          <h2>참가자</h2>
-          <span className="chip">
-            플레이어 {room.플레이어_수}/{room.작품.최대인원}명
-          </span>
+        <div className="seat-head">
+          <button type="button" className="seat-title" aria-pressed={meSeat === "참가"} onClick={() => void moveTo(room.내_계정_번호, true)}>
+            참가
+          </button>
+          <span className="chip">{room.플레이어_수}/{room.작품.최대인원}명</span>
         </div>
         <ul className="person-list">
-          {room.참가자.map((m) => (
+          {players.map((m) => (
             <li key={m.계정_번호} className="person">
-              <span className="order" aria-hidden="true">{m.닉네임.slice(0, 1)}</span>
-              <span className="body">
-                <span className="name">{m.닉네임}</span>
-              </span>
-              <span className="tags">
-                {m.방장 && <span className="chip accent">방장</span>}
-                <span className="chip">{m.플레이 ? "플레이" : "플레이 안 함"}</span>
-              </span>
+              {personName(m)}
+            </li>
+          ))}
+        </ul>
+        <div className="seat-head">
+          <button type="button" className="seat-title" aria-pressed={meSeat === "관전"} onClick={() => void moveTo(room.내_계정_번호, false)}>
+            관전
+          </button>
+          <button type="button" className="small secondary" aria-label="관전 방식" disabled={meSeat !== "관전"} onClick={() => void toggleGm()}>
+            {meObserver?.GM관전 ? "GM" : "일반"}
+          </button>
+        </div>
+        <ul className="observer-list">
+          {observers.map((m) => (
+            <li key={m.계정_번호}>
+              {personName(m)}
             </li>
           ))}
         </ul>
