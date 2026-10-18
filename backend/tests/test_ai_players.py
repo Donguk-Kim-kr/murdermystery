@@ -146,3 +146,40 @@ def test_agent_ignores_unknown_question_ids_and_keeps_going(client, make_scripte
     assert any("없는 질문ID" in m for m in agent.memory)
     chat = client.get("/api/game/me/chat", headers=people[0].headers).json()["메시지"]
     assert len(chat[-1]["내용"]) == 500                                              # 긴 말은 500자에서 자른다
+
+
+def test_tool_schemas_use_only_plain_types():
+    for tool in TOOLS:
+        for prop in tool["input_schema"].get("properties", {}).values():
+            assert isinstance(prop["type"], str), tool["name"]                          # 유니온 타입을 쓰지 않는다
+
+
+def test_claude_brain_logs_why_no_action_was_chosen():
+    logged = []
+    client, calls = fake_client([SimpleNamespace(type="thinking", thinking="")], stop="max_tokens")
+    assert ClaudeBrain(client=client, log=logged.append).decide("s", "u") == []
+    assert "max_tokens" in logged[0] and calls[0]["max_tokens"] >= 4096                 # 생각에 쓰는 토큰까지 넉넉히
+
+
+def test_choose_accepts_a_number_written_as_text_and_share_targets_as_text(client, make_scripted_game):
+    people = game(client, make_scripted_game)
+    host, clock = people[0], Clock()
+    run(agents_for(client, people, clock), clock, 2)
+    advance(client, host)                                                               # 캐릭터 선택
+    slot = block(state(client, host).json(), "캐릭터 선택")["항목"][0]["값"]
+
+    class AsText:
+        def decide(self, system, situation):
+            qid = _json_after(situation, "## 지금 할 수 있는 일")[0]["질문ID"]
+            return [{"tool": "choose", "input": {"question_id": qid, "value": str(slot)}}]
+
+    agent = Agent("AI", client, host.headers, AsText(), log=lambda _t: None, clock=clock, think_seconds=0, nudge_seconds=0)
+    clock.now += 10
+    assert agent.tick() == "choose"
+    assert state(client, host).json()["나"]["인물_순서"] == slot                          # 글자로 온 값이 서버가 아는 숫자 값으로 바뀌어 받아들여졌다
+
+    posted = []
+    agent.http = SimpleNamespace(post=lambda path, headers=None, json=None: posted.append(json) or SimpleNamespace(status_code=200, json=lambda: {}))
+    agent._act([{"tool": "share_clue", "input": {"question_id": "q", "clue": "3", "targets": "12, 15"}}],
+               [{"질문ID": "q", "종류": "단서 보여주기"}], {"내_위치": "전체"})
+    assert posted[0]["값"] == {"동작": "보여주기", "단서": 3, "대상": [12, 15]}

@@ -45,20 +45,20 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "question_id": {"type": "string", "description": "질문ID"},
-                "value": {"type": ["integer", "string"], "description": "고른 항목의 값(또는 글)"},
+                "value": {"type": "string", "description": "고른 항목의 값(숫자도 글자로 적는다). 글로 답하는 질문이면 답할 글"},
             },
             "required": ["question_id", "value"],
         },
     },
     {
         "name": "share_clue",
-        "description": "내가 가진 단서를 다른 사람에게 보여 준다. targets 는 계정 번호 목록이거나 모두에게 보여 줄 때는 \"전체\".",
+        "description": "내가 가진 단서를 다른 사람에게 보여 준다.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "question_id": {"type": "string", "description": "내 단서 목록의 질문ID"},
                 "clue": {"type": "integer", "description": "단서 번호"},
-                "targets": {"type": ["array", "string"], "items": {"type": "integer"}, "description": "계정 번호 목록 또는 \"전체\""},
+                "targets": {"type": "string", "description": "모두에게 보여 줄 때는 \"전체\", 아니면 계정 번호를 쉼표로 구분해 적는다(예: \"12,15\")"},
             },
             "required": ["question_id", "clue", "targets"],
         },
@@ -99,7 +99,7 @@ class ClaudeBrain:
     def decide(self, system: str, situation: str) -> list[dict[str, Any]]:
         try:
             res = self.client.messages.create(
-                model=self.model, max_tokens=1024,
+                model=self.model, max_tokens=4096,
                 system=[{"type": "text", "text": system}],
                 tools=TOOLS,
                 messages=[{"role": "user", "content": situation}],
@@ -109,9 +109,12 @@ class ClaudeBrain:
         except Exception as err:                       # 연결·한도·인증 오류 등: 이번 차례는 건너뛴다
             self.log(f"  (AI 호출 실패: {type(err).__name__}: {err})")
             return []
-        if getattr(res, "stop_reason", None) == "refusal":
-            return []
-        return [{"tool": b.name, "input": dict(b.input)} for b in res.content if getattr(b, "type", None) == "tool_use"]
+        stop = getattr(res, "stop_reason", None)
+        calls = [{"tool": b.name, "input": dict(b.input)} for b in res.content if getattr(b, "type", None) == "tool_use"]
+        if not calls:                                  # 아무 도구도 부르지 않았다: 이유를 남긴다(글만 썼거나, 토큰이 모자랐거나, 거절)
+            text = " ".join(getattr(b, "text", "") for b in res.content if getattr(b, "type", None) == "text").strip()
+            self.log(f"  (AI 가 행동을 고르지 않음: stop_reason={stop}" + (f", 글: {text[:80]}" if text else "") + ")")
+        return calls
 
 
 class SimpleBrain:
@@ -227,7 +230,8 @@ class Agent:
         notices = [n for n in state["알림"] if n["번호"] > self.seen_notice]
         others_spoke = any(m["보낸이"]["계정_번호"] != self.me and m["번호"] > self.seen_message and m["장소"] == chat["내_위치"] for m in self.messages)
         changed = state["상태_버전"] != self.seen_version
-        if not (others_spoke or notices or (changed and actions) or now - self.last_decide >= self.nudge_seconds):
+        retry = bool(actions) and now - self.last_decide >= max(self.think_seconds * 2, 8.0)     # 할 일이 남아 있으면 30초를 기다리지 않는다
+        if not (others_spoke or notices or (changed and actions) or retry or now - self.last_decide >= self.nudge_seconds):
             return None
         if now - self.last_decide < self.think_seconds:
             return None
@@ -314,8 +318,7 @@ class Agent:
         res = self._post("/api/game/me/answer", {"질문ID": qid, "값": value})
         ok = res.status_code == 200
         self.memory.append(f"{what}: " + ("성공" if ok else f"실패 ({_detail(res)})"))
-        if self.verbose or not ok:
-            self.log(f"[{self.nickname}] {what} → {res.status_code}")
+        self.log(f"[{self.nickname}] {what}: " + ("성공" if ok else f"실패 ({_detail(res)})"))
         return ok
 
     def _act(self, decided: list[dict[str, Any]], actions: list[dict[str, Any]], chat: dict[str, Any]) -> str:
@@ -344,7 +347,10 @@ class Agent:
                     self.memory.append(f"없는 질문ID {qid} 로 답하려 했음")
                     continue
                 value = args.get("value")
-                label = next((i.get("이름") for i in valid[qid].get("항목", []) if i.get("값") == value), None)
+                match = next((i for i in valid[qid].get("항목", []) if str(i.get("값")) == str(value)), None)
+                if match is not None:
+                    value = match["값"]                         # 숫자 값을 글자로 받았으면 원래 값으로
+                label = match.get("이름") if match else None
                 if self._answer(qid, value, f"'{valid[qid].get('이름')}'에서 {label or value} 선택"):
                     done.append("choose")
             elif tool == "share_clue":
@@ -352,7 +358,12 @@ class Agent:
                 if qid not in valid:
                     self.memory.append(f"없는 질문ID {qid} 로 단서를 보여 주려 했음")
                     continue
-                if self._answer(qid, {"동작": "보여주기", "단서": args.get("clue"), "대상": args.get("targets")}, f"단서 {args.get('clue')} 공개 {args.get('targets')}"):
+                targets = args.get("targets")
+                if isinstance(targets, str) and targets.strip() != "전체":
+                    targets = [int(x) for x in re.findall(r"\d+", targets)]
+                clue = args.get("clue")
+                clue = int(clue) if str(clue).isdigit() else clue
+                if self._answer(qid, {"동작": "보여주기", "단서": clue, "대상": targets}, f"단서 {clue} 공개 {targets}"):
                     done.append("share")
         return ",".join(done)
 
