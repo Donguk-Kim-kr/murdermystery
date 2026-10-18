@@ -78,7 +78,7 @@ def test_picking_an_item_gives_exactly_that_item_and_uses_a_count(client, game, 
     assert (got["이름"], got["공개이름"], got["내용"], got["장소"]) == ("독이 든 컵", "독이 든 컵", "컵 내용 XYZ3", "저택 › 주방")
     assert block(view, "조사 횟수")["완료"] == 1 and block(view, "조사 횟수")["전체"] == 2
     assert block(view, "조사 결과") is None
-    assert notices(view) == ["'독이 든 컵'을(를) 획득했습니다. '내 단서' 탭에서 확인하세요."]     # 획득한 순간의 알림
+    assert notices(view) == ["'독이 든 컵'을 획득했습니다. '내 단서' 탭에서 확인하세요."]     # 획득한 순간의 알림
     rows = db.execute('SELECT 단서_순서, 증언_순서, 획득방법, 보유여부 FROM "획득" WHERE 진행_번호 = (SELECT 번호 FROM "진행" WHERE 방_번호 = %s)', (room["번호"],)).fetchall()
     assert rows == [(3, None, "조사", True)]
 
@@ -86,7 +86,7 @@ def test_picking_an_item_gives_exactly_that_item_and_uses_a_count(client, game, 
 def test_the_notice_uses_the_public_name_and_the_tab_has_both_names(client, game):
     people, qid, _ = game
     view = pick(client, people[0], qid, LETTER).json()
-    assert notices(view) == ["'서랍 속 종이'을(를) 획득했습니다. '내 단서' 탭에서 확인하세요."]            # 알림에는 진짜 이름을 적지 않는다
+    assert notices(view) == ["'서랍 속 종이'를 획득했습니다. '내 단서' 탭에서 확인하세요."]            # 알림에는 진짜 이름을 적지 않는다
     mine = newest(view)
     assert (mine["이름"], mine["공개이름"]) == ("찢어진 편지", "서랍 속 종이")             # 내 단서 탭에는 둘 다 있다
 
@@ -100,7 +100,7 @@ def test_a_clue_taken_by_someone_is_grey_for_everyone_else_and_for_the_owner(cli
     assert other[GLASSES]["비활성"] is False                                               # 같은 장소의 다른 단서는 그대로 고를 수 있다
     late = pick(client, people[1], qid, LETTER).json()                                     # 그래도 보내면 얻지 못하고 횟수도 쓰지 않는다
     assert tab(late, "내 단서")["항목"] == [] and block(late, "조사 횟수")["완료"] == 0
-    assert "지금은 획득할 수 없는 항목" in notices(late)[-1]
+    assert notices(late) == []                                                             # 실패 알림은 없다(회색으로 이미 보인다)
 
 
 def test_testimonies_are_gotten_once_by_each_player(client, game):

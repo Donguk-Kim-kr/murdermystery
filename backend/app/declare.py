@@ -13,6 +13,7 @@ import re
 from typing import Any
 
 from .script import Ref, ScriptError, VM, compile_source
+from .josa import attach
 
 MAX_SETTINGS = 50
 MAX_CONDITIONS = 100
@@ -30,10 +31,10 @@ PLACEHOLDER = re.compile(r"\{(@?)([^{}:]+)(?::글)?\}")
 def _text(value: Any, what: str, *, required: bool = True) -> str:
     if value is None or value == "":
         if required:
-            raise ScriptError(f"{what}을(를) 적어 주세요")
+            raise ScriptError(f"{attach(what, '을/를')} 적어 주세요")
         return ""
     if not isinstance(value, str) or len(value) > MAX_TEXT:
-        raise ScriptError(f"{what}은(는) {MAX_TEXT}자 이하의 글이어야 합니다")
+        raise ScriptError(f"{attach(what, '은/는')} {MAX_TEXT}자 이하의 글이어야 합니다")
     return value
 
 
@@ -193,10 +194,10 @@ def declarations(source: str, known_names: set[str] | frozenset[str]) -> dict[st
         params = program.funcs[func].params
         vm.start(func, [None] * len(params))
         if vm.run() != "done":
-            raise ScriptError(f"{func} 은(는) 입력을 기다릴 수 없습니다")
+            raise ScriptError(f"{attach(func, '은/는')} 입력을 기다릴 수 없습니다")
         result = vm.result
         if not isinstance(result, list) or len(result) > limit or not all(isinstance(r, dict) for r in result):
-            raise ScriptError(f"{func} 은(는) {limit}개 이하의 목록을 돌려줘야 합니다")
+            raise ScriptError(f"{attach(func, '은/는')} {limit}개 이하의 목록을 돌려줘야 합니다")
         out[key] = result
     keys = [s["키"] for s in out["설정"]]
     if len(set(keys)) != len(keys):

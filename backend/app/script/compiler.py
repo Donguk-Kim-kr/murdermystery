@@ -11,6 +11,7 @@
 import ast
 from dataclasses import dataclass, field
 from typing import Any
+from ..josa import attach, quoted
 
 # 명령 목록의 한 칸: (명령, 인자, 줄 번호)
 Instr = tuple[str, Any, int]
@@ -53,7 +54,7 @@ def _line(node: ast.AST) -> int:
 
 
 def _reject(node: ast.AST, what: str) -> ScriptError:
-    return ScriptError(f"{what}은(는) 쓸 수 없습니다", _line(node))
+    return ScriptError(f"{attach(what, '은/는')} 쓸 수 없습니다", _line(node))
 
 
 def compile_expression(expression: str, known_names: set[str] | frozenset[str] = frozenset()) -> Program:
@@ -100,7 +101,7 @@ def compile_source(source: str, known_names: set[str] | frozenset[str] = frozens
         if d.name.startswith("_"):
             raise ScriptError("함수 이름은 밑줄로 시작할 수 없습니다", _line(d))
         if names.count(d.name) > 1:
-            raise ScriptError(f"함수 '{d.name}' 이(가) 두 번 정의되었습니다", _line(d))
+            raise ScriptError(f"함수 {quoted(d.name, '이/가')} 두 번 정의되었습니다", _line(d))
     visible = set(known_names) | set(names)
     return Program({d.name: _FunctionCompiler(d, visible).compile() for d in defs})
 
@@ -126,7 +127,7 @@ class _FunctionCompiler:
         self.assigned = set(self.params) | self._collect_assigned(node.body)
         for name in self.assigned:
             if name.startswith("_"):
-                raise ScriptError(f"이름 '{name}' 은(는) 밑줄로 시작할 수 없습니다", _line(node))
+                raise ScriptError(f"이름 {quoted(name, '은/는')} 밑줄로 시작할 수 없습니다", _line(node))
 
     # ---- 준비 --------------------------------------------------------------------------
     def _collect_assigned(self, body: list[ast.stmt]) -> set[str]:
@@ -259,7 +260,7 @@ class _FunctionCompiler:
     # ---- 식 ----------------------------------------------------------------------------
     def name_load(self, node: ast.Name) -> None:
         if node.id.startswith("_"):
-            raise ScriptError(f"이름 '{node.id}' 은(는) 밑줄로 시작할 수 없습니다", _line(node))
+            raise ScriptError(f"이름 {quoted(node.id, '은/는')} 밑줄로 시작할 수 없습니다", _line(node))
         if node.id not in self.assigned and node.id not in self.visible:
             raise ScriptError(f"알 수 없는 이름 '{node.id}'", _line(node))
         self.emit("LOAD_NAME", node.id, node)
@@ -273,7 +274,7 @@ class _FunctionCompiler:
             self.name_load(node)
         elif isinstance(node, ast.Attribute):
             if node.attr.startswith("_"):
-                raise ScriptError(f"'{node.attr}' 은(는) 밑줄로 시작해서 쓸 수 없습니다", _line(node))
+                raise ScriptError(f"{quoted(node.attr, '은/는')} 밑줄로 시작해서 쓸 수 없습니다", _line(node))
             self.expr(node.value)
             self.emit("LOAD_ATTR", node.attr, node)
         elif isinstance(node, ast.Call):
@@ -357,13 +358,13 @@ class _FunctionCompiler:
         func = node.func
         if isinstance(func, ast.Name):
             if func.id.startswith("_"):
-                raise ScriptError(f"이름 '{func.id}' 은(는) 밑줄로 시작할 수 없습니다", _line(func))
+                raise ScriptError(f"이름 {quoted(func.id, '은/는')} 밑줄로 시작할 수 없습니다", _line(func))
             if func.id not in self.assigned and func.id not in self.visible:
                 raise ScriptError(f"알 수 없는 이름 '{func.id}'", _line(func))
             target: Any = ("name", func.id)
         elif isinstance(func, ast.Attribute):
             if func.attr.startswith("_"):
-                raise ScriptError(f"'{func.attr}' 은(는) 밑줄로 시작해서 쓸 수 없습니다", _line(func))
+                raise ScriptError(f"{quoted(func.attr, '은/는')} 밑줄로 시작해서 쓸 수 없습니다", _line(func))
             self.expr(func.value)
             target = ("method", func.attr)
         else:

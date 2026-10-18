@@ -56,7 +56,7 @@ describe("서사 입력", () => {
   it("추가하면 기존 서사가 새 제한을 넘을 때 미리 알리고, 취소하면 추가하지 않는다", async () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     renderForm(saved([{ ID: "abc123", 본문: "가".repeat(6000) }]));
-    expect(screen.getByText(/지금 서사 1이\(가\) 넘습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/지금 서사 1이 넘습니다/)).toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "서사 추가하기" }));
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining("각 서사는 5000자까지"));

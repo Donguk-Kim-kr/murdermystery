@@ -15,6 +15,7 @@ from .auth import CurrentUser
 from .db import Conn
 from .ordering import next_order
 from .works import lock_work, not_found
+from .josa import attach
 
 router = APIRouter(prefix="/api/works/{work_id}/characters", tags=["characters"])
 
@@ -186,7 +187,7 @@ def check_rank(npc: bool | None, rank: int | None) -> None:
 
 
 def rank_taken(rank: int | None) -> HTTPException:
-    return HTTPException(status.HTTP_409_CONFLICT, f"NPC 순위 {rank}은(는) 다른 인물이 이미 쓰고 있습니다. 순위는 인물마다 달라야 합니다")
+    return HTTPException(status.HTTP_409_CONFLICT, f"{attach(f'NPC 순위 {rank}', '은/는')} 다른 인물이 이미 쓰고 있습니다. 순위는 인물마다 달라야 합니다")
 
 
 def _ensure_mine(conn: Connection, work_id: int, account_id: int) -> None:

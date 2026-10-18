@@ -2,6 +2,7 @@ import createClient, { type Middleware } from "openapi-fetch";
 
 import type { paths } from "./schema";
 import { getToken } from "./token";
+import { josa } from "../josa";
 
 const authMiddleware: Middleware = {
   onRequest({ request }) {
@@ -30,17 +31,17 @@ function validationSentence(item: ValidationItem): string {
   const ctx = item.ctx ?? {};
   switch (item.type) {
     case "missing":
-      return `${name}을(를) 입력해 주세요`;
+      return `${josa(name, "을/를")} 입력해 주세요`;
     case "string_too_short":
-      return ctx.min_length === 1 ? `${name}을(를) 입력해 주세요` : `${name}은(는) ${ctx.min_length}자 이상이어야 합니다`;
+      return ctx.min_length === 1 ? `${josa(name, "을/를")} 입력해 주세요` : `${josa(name, "은/는")} ${ctx.min_length}자 이상이어야 합니다`;
     case "string_too_long":
-      return `${name}은(는) ${ctx.max_length}자 이하여야 합니다`;
+      return `${josa(name, "은/는")} ${ctx.max_length}자 이하여야 합니다`;
     case "string_pattern_mismatch":
-      return ctx.pattern === "^\\S+$" ? `${name}은(는) 공백 없이 입력해 주세요` : `${name}에 쓸 수 없는 글자가 있습니다`;
+      return ctx.pattern === "^\\S+$" ? `${josa(name, "은/는")} 공백 없이 입력해 주세요` : `${name}에 쓸 수 없는 글자가 있습니다`;
     case "greater_than_equal":
-      return `${name}은(는) ${ctx.ge} 이상이어야 합니다`;
+      return `${josa(name, "은/는")} ${ctx.ge} 이상이어야 합니다`;
     case "less_than_equal":
-      return `${name}은(는) ${ctx.le} 이하여야 합니다`;
+      return `${josa(name, "은/는")} ${ctx.le} 이하여야 합니다`;
     default:
       return `${name} 값을 확인해 주세요`;
   }

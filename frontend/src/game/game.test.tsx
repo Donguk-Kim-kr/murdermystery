@@ -362,17 +362,20 @@ describe("조사 목록(단서·증언을 직접 고른다)", () => {
     expect(study.getByRole("button", { name: /서랍 속 종이/ })).toBeEnabled();
     const taken = study.getByRole("button", { name: /깨진 안경/ });
     expect(taken).toBeDisabled();
-    expect(within(taken).getByText("다른 사람이 획득")).toBeInTheDocument();
+    expect(within(taken).queryByText(/획득/)).toBeNull();                                  // 조사 공개가 꺼져 있으면 이름 없이 회색일 뿐이다
     const garden = within(screen.getByRole("group", { name: "정원" }));
     expect(garden.getByRole("button", { name: /정원사/ })).toBeDisabled();
-    expect(garden.getByText("내가 획득")).toBeInTheDocument();
+    expect(within(garden.getByRole("button", { name: /정원사/ })).queryByText(/획득/)).toBeNull();
     expect(garden.getByRole("button", { name: /독이 든 컵/ })).toBeEnabled();
   });
 
-  it("조사 공개가 켜진 게임에서는 획득한 사람의 닉네임이 보인다", async () => {
-    state = makeState({ 화면: [list({ 가진_사람: ["조수"] })] });
+  it("조사 공개가 켜진 게임에서는 획득한 사람의 캐릭터 이름이 보이고, 내가 획득한 것은 내가 획득으로 보인다", async () => {
+    const shown = list({ 가진_사람: ["집사"] });
+    (shown.항목[2] as Record<string, unknown>).가진_사람 = [];
+    state = makeState({ 화면: [shown] });
     render(<GamePage />);
-    expect(await screen.findByText("조수 획득")).toBeInTheDocument();
+    expect(await screen.findByText("집사 획득")).toBeInTheDocument();
+    expect(screen.getByText("내가 획득")).toBeInTheDocument();
   });
 
   it("고르면 확인 없이 그 항목의 값을 바로 보낸다", async () => {

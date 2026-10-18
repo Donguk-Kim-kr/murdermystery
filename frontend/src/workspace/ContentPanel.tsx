@@ -6,6 +6,7 @@ import {
   metaOf, refLabel, rowsOf, titleOf, useWorkspace,
   type FieldMeta, type Part, type ResourceMeta, type Row, type Workspace,
 } from "./workspace";
+import { josa } from "../josa";
 
 /** 작업공간의 한 탭: 주어진 종류의 항목들을 목록과 입력 양식으로 보여 준다. 순서와 무관하게 아무거나 먼저 채울 수 있다. */
 export function ContentPanel({ workId, keys }: { workId: number; keys: string[] }) {
@@ -288,7 +289,7 @@ function PartsPicker({ ws, parts, onChange, selfOrder }: {
         <label>
           {`넣을 ${kind}`}
           <select value="" onChange={(e) => { if (e.target.value !== "") add(Number(e.target.value)); }}>
-            <option value="">{choices.length === 0 ? `넣을 수 있는 ${kind}이(가) 없습니다` : "선택…"}</option>
+            <option value="">{choices.length === 0 ? `넣을 수 있는 ${josa(kind, "이/가")} 없습니다` : "선택…"}</option>
             {choices.map((r) => (
               <option key={String(r.순서)} value={String(r.순서)}>{refLabel(ws, PART_KEYS[kind], r.순서 as number)}</option>
             ))}

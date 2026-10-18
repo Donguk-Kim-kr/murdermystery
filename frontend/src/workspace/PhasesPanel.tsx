@@ -5,6 +5,7 @@ import { errorMessage, http } from "../api/client";
 import type { Hit } from "./flowDrag";
 import { useFlowDrag, type Payload } from "./useFlowDrag";
 import { rowsOf, useWorkspace, type LibraryRef, type Row, type SettingDef, type Workspace } from "./workspace";
+import { josa } from "../josa";
 
 export interface LibraryItem {
   번호: number;
@@ -984,7 +985,7 @@ function StoryPicks({ characters, picked, onChange }: {
             )}
             {missing.length > 0 && total > 0 && (
               <span role="status" className="error">
-                {missing.map((n) => `서사 ${n}`).join(", ")}은(는) 없습니다(서사 {total}개)
+                {josa(missing.map((n) => `서사 ${n}`).join(", "), "은/는")} 없습니다(서사 {total}개)
               </span>
             )}
           </div>

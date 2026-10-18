@@ -193,7 +193,7 @@ def test_reveal_all_ends_the_game_and_shows_every_clue_and_every_narrative(clien
     assert view["종료"] is True
     assert "게임이 끝났습니다" in block(view, "게임 종료")["내용"]
     cards = tab(view, "전체 단서")["항목"]
-    assert sorted(c["이름"] for c in cards) == sorted(["찢어진 편지", "깨진 안경", "독이 든 컵", "정원사의 증언", "집사의 증언"])
+    assert sorted(c["이름"] for c in cards) == sorted(["찢어진 편지", "깨진 안경", "독이 든 컵", "장소 없는 단서", "정원사의 증언", "집사의 증언"])
     story = tab(view, "전체 서사")["내용"]
     for i in range(3):
         assert f"인물{i}\n{i}번의 서사 하나\n\n{i}번의 서사 둘" in story                      # 모든 인물의 서사가 모든 부분으로

@@ -78,7 +78,7 @@ await pages[2].getByRole("tab", { name: "자기소개" }).click();
 check((await text(pages[2])).includes("마을의 의사입니다."), "자기소개: 소개 멘트가 모두에게 보인다");
 await next("조사");
 const pick = async (p, item) => { await p.getByRole("button", { name: new RegExp(item) }).click(); };      // 장소가 아니라 단서·증언을 직접 고른다
-await pick(host, "서랍 속 종이"); await host.getByText("'서랍 속 종이'을(를) 획득했습니다").first().waitFor({ timeout: 8000 }).catch(() => {});
+await pick(host, "서랍 속 종이"); await host.getByText("'서랍 속 종이'를 획득했습니다").first().waitFor({ timeout: 8000 }).catch(() => {});
 let greyed = false;
 for (let i = 0; i < 40 && !greyed; i++) { greyed = await p1.getByRole("button", { name: /서랍 속 종이/ }).isDisabled().catch(() => false); if (!greyed) await p1.waitForTimeout(200); }
 check(greyed, "조사: 다른 사람이 가져간 단서는 회색(고를 수 없음)이다");

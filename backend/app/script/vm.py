@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
 
 from .compiler import Program, ScriptError
+from ..josa import quoted
 
 MAX_STEPS = 200_000        # 한 번 실행하는 동안 허용하는 명령 수(끝없는 반복을 막는다)
 MAX_DEPTH = 30             # 함수 호출이 겹칠 수 있는 깊이
@@ -87,7 +88,7 @@ class VM:
     # ---- 시작·이어서 실행 ----------------------------------------------------------------
     def start(self, func: str, args: list[Any] | None = None) -> None:
         if func not in self.program.funcs:
-            raise ScriptError(f"함수 '{func}' 이(가) 없습니다")
+            raise ScriptError(f"함수 {quoted(func, '이/가')} 없습니다")
         self.frames = []
         self.done, self.result, self.waiting = False, None, None
         self._push_frame(func, list(args or []), {})
@@ -160,7 +161,7 @@ class VM:
             raise ScriptError("함수 호출이 너무 깊게 겹쳤습니다")
         func = self.program.funcs[name]
         if len(args) > len(func.params):
-            raise ScriptError(f"'{name}' 은(는) 인자를 {len(func.params)}개까지만 받습니다")
+            raise ScriptError(f"{quoted(name, '은/는')} 인자를 {len(func.params)}개까지만 받습니다")
         values: dict[str, Any] = dict(zip(func.params, args))
         for key, value in kwargs.items():
             if key not in func.params:
@@ -287,7 +288,7 @@ class VM:
             if name in obj:
                 return obj[name]
             raise ScriptError(f"'{name}' 항목이 없습니다")
-        raise ScriptError(f"'{name}' 을(를) 읽을 수 없는 값입니다")
+        raise ScriptError(f"{quoted(name, '을/를')} 읽을 수 없는 값입니다")
 
     def _call(self, frame: Frame, kind: str, name: str, argc: int, kwnames: tuple[str, ...]) -> str | None:
         stack = frame.stack
@@ -308,12 +309,12 @@ class VM:
                 inspect.signature(fn).bind(*args, **kwargs)
             except TypeError:
                 names = ", ".join(inspect.signature(fn).parameters)
-                raise ScriptError(f"'{name}' 을(를) 부르는 방법이 맞지 않습니다. 사용법: {name}({names})") from None
+                raise ScriptError(f"{quoted(name, '을/를')} 부르는 방법이 맞지 않습니다. 사용법: {name}({names})") from None
             stack.append(fn(*args, **kwargs))
             return None
         if name in BUILTINS:
             if kwargs:
-                raise ScriptError(f"'{name}' 은(는) 이름 붙인 인자를 받지 않습니다")
+                raise ScriptError(f"{quoted(name, '은/는')} 이름 붙인 인자를 받지 않습니다")
             stack.append(BUILTINS[name](*args))
             return None
         raise ScriptError(f"알 수 없는 함수 '{name}'")

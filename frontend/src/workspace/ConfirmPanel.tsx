@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { errorMessage, http } from "../api/client";
+import { josa } from "../josa";
 
 interface Check {
   errors: string[];
@@ -45,7 +46,7 @@ export function ConfirmPanel({ workId, onConfirmed }: { workId: number; onConfir
     setBusy(false);
     if (res.error) setError(errorMessage(res.error, "확정하지 못했습니다"));
     else {
-      setDone(`버전 ${res.data!.버전}을(를) 확정했습니다.`);
+      setDone(`${josa(`버전 ${res.data!.버전}`, "을/를")} 확정했습니다.`);
       setNote("");
       await load();
       onConfirmed();

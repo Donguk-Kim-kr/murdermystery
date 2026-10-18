@@ -24,6 +24,7 @@ from .characters import COLUMNS as CHARACTER_COLUMNS
 from .content import RESOURCES, Resource, card_display_names, columns, ensure_mine, key_col, phase_display_names
 from .db import Conn
 from .works import lock_work
+from .josa import attach, quoted
 
 FORMAT_VERSION = 1
 router = APIRouter(prefix="/api/works/{work_id}", tags=["confirm"])
@@ -115,7 +116,7 @@ def check_work(conn: Connection, work_id: int) -> dict:
     for key, word in (("phase-steps", "진행단계"), ("gimmick-uses", "기믹")):
         for row in _deleted_links(conn, key, work_id):
             warnings.append(
-                f"페이즈 {row['phase']}에 연결된 {word} '{row['이름']}' v{row['버전']}은(는) 삭제되어 확정 내용에서 빠집니다."
+                f"페이즈 {row['phase']}에 연결된 {attach(f"{word} '{row['이름']}' v{row['버전']}", '은/는')} 삭제되어 확정 내용에서 빠집니다."
             )
     for combo in conn.execute(
         'SELECT c."이름" FROM "조합" c WHERE c."작품_번호" = %s AND NOT EXISTS '
@@ -179,7 +180,7 @@ def story_selection_warnings(conn: Connection, work_id: int) -> list[str]:
             missing = sorted(n for n in numbers if isinstance(n, int) and n > total)
             if missing:
                 nums = ", ".join(f"서사 {n}" for n in missing)
-                found.append(f"페이즈 {row['phase']}의 '{row['card']}'이(가) 인물 '{name}'의 {nums}을(를) 보여 주도록 했지만 그 서사가 없습니다(서사는 {total}개).")
+                found.append(f"페이즈 {row['phase']}의 {quoted(row['card'], '이/가')} 인물 '{name}'의 {attach(nums, '을/를')} 보여 주도록 했지만 그 서사가 없습니다(서사는 {total}개).")
     return found
 
 

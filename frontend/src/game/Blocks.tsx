@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import type { GameState } from "./useGame";
+import { josa } from "../josa";
 
 /** 서버가 화면에 보내는 블록. 종류마다 쓰는 필드가 달라서 느슨하게 받고, 모르는 종류는 그리지 않는다. */
 export type Block = Record<string, unknown> & { 종류?: string; 이름?: string };
@@ -246,7 +247,7 @@ function CardActions({ card, actions, state, onSend }: {
       </div>
       {open === "보여주기" && (
         <fieldset className="clue-panel">
-          <legend>{card.이름}을(를) 볼 수 있는 사람</legend>
+          <legend>{josa(card.이름, "을/를")} 볼 수 있는 사람</legend>
           <label className="check">
             <input type="checkbox" checked={everyone} onChange={(e) => setEveryone(e.target.checked)} />
             모두
@@ -270,7 +271,7 @@ function CardActions({ card, actions, state, onSend }: {
       )}
       {open === "양도" && (
         <fieldset className="clue-panel">
-          <legend>{card.이름}을(를) 넘길 사람</legend>
+          <legend>{josa(card.이름, "을/를")} 넘길 사람</legend>
           {others.map((p) => (
             <label key={p.계정_번호} className="check">
               <input type="radio" name={`receiver-${card.순서}`} checked={receiver === p.계정_번호} onChange={() => setReceiver(p.계정_번호)} />
@@ -406,8 +407,10 @@ function ChoiceBlock({ block, state, onAnswer }: { block: Block; state: GameStat
             <h4>{place}</h4>
             <ul className="choice-list">
               {items.filter((i) => (i.장소 ?? "") === place).map((item) => {
+                // 누가 획득했는지는 조사 공개가 켜져 있을 때만(가진_사람이 올 때) 캐릭터 이름으로 보인다. 꺼져 있으면 고를 수 없는(회색) 항목이 될 뿐이다.
+                const shown = item.가진_사람 !== undefined;
                 const others = item.가진_사람 ?? [];
-                const note = item.상태 === "얻음" ? "내가 획득" : item.상태 === "가져감" ? (others.length > 0 ? `${others.join(", ")} 획득` : "다른 사람이 획득") : null;
+                const note = !shown ? null : item.상태 === "얻음" ? "내가 획득" : item.상태 === "가져감" ? (others.length > 0 ? `${others.join(", ")} 획득` : null) : null;
                 return (
                   <li key={String(item.값)}>
                     <button

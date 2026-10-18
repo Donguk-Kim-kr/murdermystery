@@ -41,6 +41,6 @@ def test_the_old_prologue_phase_is_renamed_in_place(conn):
     number = conn.execute("""SELECT 번호 FROM "진행단계" WHERE 계정_번호 IS NULL AND 이름 = '공통 스토리'""").fetchone()[0]
     conn.execute("""UPDATE "진행단계" SET 이름 = '프롤로그' WHERE 번호 = %s""", (number,))
     done = register(conn)
-    assert done[0] == "프롤로그: 이름을 공통 스토리(으)로 바꿈"
+    assert done[0] == "프롤로그: 이름을 공통 스토리로 바꿈"
     assert conn.execute('SELECT 이름 FROM "진행단계" WHERE 번호 = %s', (number,)).fetchone()[0] == "공통 스토리"
     assert conn.execute("""SELECT count(*) FROM "진행단계" WHERE 계정_번호 IS NULL AND 이름 = '프롤로그'""").fetchone()[0] == 0

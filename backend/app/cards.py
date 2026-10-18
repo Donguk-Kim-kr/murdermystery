@@ -15,6 +15,7 @@ from typing import Any, Callable
 from . import clues, narrative
 from .declare import BUILDER_NAMES, DECL_FUNCTIONS
 from .script import VM, Program, Ref, ScriptError, Suspend, builtin_names, compile_expression, compile_source
+from .josa import PAIRS, attach, quoted
 
 MAX_ANSWER_BYTES = 2000
 MAX_NOTICES = 20
@@ -55,7 +56,7 @@ class CardRun:
 MUTATING = {"배정취소", "탭이어쓰기", "변수설정", "배정", "투표", "투표초기화", "조사", "양도", "공개설정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
 FUNCTION_NAMES = {
     "플레이어들", "플레이어수", "인물들", "공통스토리", "서사들", "배정된_플레이어수", "인물_없는_플레이어가_있다",
-    "공통스토리부분들", "탭이어쓰기", "배정취소", "조사항목들", "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "모든_장소", "단서들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
+    "공통스토리부분들", "탭이어쓰기", "배정취소", "조사항목들", "토씨", "글", "선택지", "입력", "카드목록", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "모든_장소", "단서들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
     "단계_끝내기", "게임_종료",
 }
 FUNCTION_NAMES |= BUILDER_NAMES          # 제작 화면을 정하는 함수들(app/declare.py). 게임 중에 불러도 값만 만들 뿐이다
@@ -94,7 +95,7 @@ class CardHost:
         @functools.wraps(fn)
         def guarded(*args: Any, **kwargs: Any) -> Any:
             if self.readonly:
-                raise ScriptError(f"진행 조건 안에서는 '{name}' 을(를) 쓸 수 없습니다")
+                raise ScriptError(f"진행 조건 안에서는 {quoted(name, '을/를')} 쓸 수 없습니다")
             return fn(*args, **kwargs)
 
         return guarded
@@ -423,6 +424,13 @@ class CardHost:
         return {"거부": _text(메시지)}
 
     # -- 엔진 명령 --
+    def fn_토씨(self, 단어: Any, 종류: Any) -> str:
+        """낱말 뒤에 받침에 맞는 조사를 붙인다. 종류는 "을/를", "이/가", "은/는", "과/와", "으로/로", "이나/나", "이라/라", "이랑/랑", "아/야" 중 하나.
+        예: 토씨("커터칼", "을/를") → "커터칼을", 토씨("'서랍'", "을/를") → "'서랍'을"(따옴표는 건너뛴다)."""
+        if not isinstance(종류, str) or 종류 not in PAIRS:
+            raise ScriptError(f"토씨의 종류는 {', '.join(PAIRS)} 중에서 골라야 합니다")
+        return attach(_text(단어), 종류)
+
     def fn_조사항목들(self) -> list[Ref]:
         """조사로 얻을 수 있는 단서·증언(장소가 있는 것). 장소 순서대로, 같은 장소에서는 단서가 먼저. `선택지()` 에 넘기면 화면에 장소별로 보인다."""
         return [Ref(kind, row["순서"]) for kind, row in clues.investigable(self.game)]
@@ -565,14 +573,14 @@ class CardHost:
                 return self.run.title
             if name == "차수":
                 return _ordinal_prefix(self.run.title, self.run.library.get("이름"))
-        raise ScriptError(f"{ref.kind} 의 '{name}' 을(를) 읽을 수 없습니다")
+        raise ScriptError(f"{ref.kind}의 {quoted(name, '을/를')} 읽을 수 없습니다")
 
     def method(self, ref: Ref, name: str, args: list[Any], kwargs: dict[str, Any]) -> Any:
         if ref.kind in (ALL, "플레이어") and name in ("보이기", "탭", "알림"):
             if self.readonly:
-                raise ScriptError(f"진행 조건 안에서는 '{name}' 을(를) 쓸 수 없습니다")
+                raise ScriptError(f"진행 조건 안에서는 {quoted(name, '을/를')} 쓸 수 없습니다")
             if kwargs:
-                raise ScriptError(f"'{name}' 은(는) 이름 붙인 인자를 받지 않습니다")
+                raise ScriptError(f"{quoted(name, '은/는')} 이름 붙인 인자를 받지 않습니다")
             return getattr(self, "m_" + name)(ref, *args)
         raise ScriptError(f"{ref.kind} 에는 '{name}' 메서드가 없습니다")
 
@@ -847,8 +855,12 @@ def _investigation_item(game, viewer: int, item: Ref, show_holders: bool) -> dic
     row = next((r for r in game.snapshot.get(item.kind) or [] if r["순서"] == item.key), None) or {}
     status = clues.availability(game, viewer, item.kind, item.key) if viewer in game.players else "가져감"
     shown: dict[str, Any] = {}
-    if show_holders:
-        shown["가진_사람"] = [game.players[a].nickname for a in clues.holders(game, item.kind, item.key) if a != viewer and a in game.players]
+    if show_holders:          # 누가 획득했는지는 캐릭터 이름으로 보인다(인물을 아직 고르지 않았으면 닉네임)
+        names = {c["순서"]: c.get("이름") for c in game.snapshot.get("인물") or []}
+        shown["가진_사람"] = [
+            names.get(game.players[a].character) or game.players[a].nickname
+            for a in clues.holders(game, item.kind, item.key) if a != viewer and a in game.players
+        ]
     return {
         "값": f"{item.kind}:{item.key}", "이름": row.get("공개이름") or row.get("이름") or f"{item.kind} {item.key}",
         "종류": item.kind, "장소": clues.place_path(game, row["장소_순서"]) if row.get("장소_순서") is not None else "",

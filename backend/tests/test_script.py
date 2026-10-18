@@ -21,7 +21,7 @@ class Host:
     def getattr(self, ref, name):
         if name == "이름":
             return f"{ref.kind}{ref.key}"
-        raise ScriptError(f"'{name}' 을(를) 읽을 수 없습니다")
+        raise ScriptError(f"'{name}'를 읽을 수 없습니다")
 
     def method(self, ref, name, args, kwargs):
         self.out.append((ref.kind, name, tuple(args), dict(kwargs)))

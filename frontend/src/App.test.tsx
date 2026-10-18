@@ -213,7 +213,7 @@ describe("회원가입", () => {
     await userEvent.type(screen.getByLabelText("패스워드"), "x");
     await userEvent.type(screen.getByLabelText("닉네임"), "A");
     await userEvent.click(screen.getByRole("button", { name: "가입하기" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("아이디은(는) 공백 없이 입력해 주세요 · 패스워드은(는) 8자 이상이어야 합니다");
+    expect(await screen.findByRole("alert")).toHaveTextContent("아이디는 공백 없이 입력해 주세요 · 패스워드는 8자 이상이어야 합니다");
   });
 
   it("가입 후 같은 정보로 로그인한다", async () => {
@@ -650,7 +650,7 @@ describe("방", () => {
     renderApp("/rooms/new/7");
     await userEvent.type(await screen.findByLabelText("입장코드"), "AB");
     await userEvent.click(screen.getByRole("button", { name: "방 만들기" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("입장코드은(는) 4자 이상이어야 합니다");
+    expect(await screen.findByRole("alert")).toHaveTextContent("입장코드는 4자 이상이어야 합니다");
   });
 
   it("방을 만들 수 없으면 사유를 보여 준다", async () => {

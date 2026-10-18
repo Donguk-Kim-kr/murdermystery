@@ -10,11 +10,11 @@ describe("errorMessage", () => {
   });
 
   it("검증 오류는 어느 항목이 왜 안 되는지 알려 준다", () => {
-    expect(errorMessage({ detail: [item("string_too_short", "패스워드", { min_length: 8 })] })).toBe("패스워드은(는) 8자 이상이어야 합니다");
-    expect(errorMessage({ detail: [item("string_too_long", "닉네임", { max_length: 30 })] })).toBe("닉네임은(는) 30자 이하여야 합니다");
-    expect(errorMessage({ detail: [item("string_pattern_mismatch", "아이디", { pattern: "^\\S+$" })] })).toBe("아이디은(는) 공백 없이 입력해 주세요");
-    expect(errorMessage({ detail: [item("string_too_short", "아이디", { min_length: 1 })] })).toBe("아이디을(를) 입력해 주세요");
-    expect(errorMessage({ detail: [item("missing", "닉네임")] })).toBe("닉네임을(를) 입력해 주세요");
+    expect(errorMessage({ detail: [item("string_too_short", "패스워드", { min_length: 8 })] })).toBe("패스워드는 8자 이상이어야 합니다");
+    expect(errorMessage({ detail: [item("string_too_long", "닉네임", { max_length: 30 })] })).toBe("닉네임은 30자 이하여야 합니다");
+    expect(errorMessage({ detail: [item("string_pattern_mismatch", "아이디", { pattern: "^\\S+$" })] })).toBe("아이디는 공백 없이 입력해 주세요");
+    expect(errorMessage({ detail: [item("string_too_short", "아이디", { min_length: 1 })] })).toBe("아이디를 입력해 주세요");
+    expect(errorMessage({ detail: [item("missing", "닉네임")] })).toBe("닉네임을 입력해 주세요");
   });
 
   it("여러 항목이 틀리면 함께 알려 주고 같은 문장은 한 번만 보여 준다", () => {
@@ -23,7 +23,7 @@ describe("errorMessage", () => {
       item("string_too_short", "패스워드", { min_length: 8 }),
       item("string_too_short", "패스워드", { min_length: 8 }),
     ];
-    expect(errorMessage({ detail })).toBe("아이디은(는) 공백 없이 입력해 주세요 · 패스워드은(는) 8자 이상이어야 합니다");
+    expect(errorMessage({ detail })).toBe("아이디는 공백 없이 입력해 주세요 · 패스워드는 8자 이상이어야 합니다");
   });
 
   it("알 수 없는 오류는 항목 이름과 함께 값을 확인하라고 한다", () => {

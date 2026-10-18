@@ -16,6 +16,7 @@
 import re
 import secrets
 from dataclasses import dataclass
+from .josa import attach
 
 MARK = "@@MMPART:"
 LINE_RE = re.compile(r"^@@MMPART:([a-z0-9]{6})@@$")
@@ -104,9 +105,9 @@ def join(parts: list[Part], *, total: int = TOTAL_LIMIT, noun: str = "서사", s
         if MARK in p.text:
             raise NarrativeError(f"{noun} {i}에 예약된 표기({MARK})가 들어 있어 저장할 수 없습니다")
         if not p.text.strip():
-            raise NarrativeError(f"{noun} {i}이(가) 비어 있습니다")
+            raise NarrativeError(f"{attach(f'{noun} {i}', '이/가')} 비어 있습니다")
         if len(p.text) > limit:
-            raise NarrativeError(f"{noun} {i}이(가) 너무 깁니다({len(p.text)}자, {noun}가 {len(cleaned)}개이면 각 {limit}자까지)")
+            raise NarrativeError(f"{attach(f'{noun} {i}', '이/가')} 너무 깁니다({len(p.text)}자, {attach(noun, '이/가')} {len(cleaned)}개이면 각 {limit}자까지)")
         if p.id is not None:
             if not re.fullmatch(r"[a-z0-9]{6}", p.id):
                 raise NarrativeError(f"{noun} {i}의 ID 가 올바르지 않습니다")

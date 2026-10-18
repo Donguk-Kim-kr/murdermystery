@@ -17,6 +17,7 @@ from .content import touch_work
 from .db import Conn
 from .ordering import next_order
 from .works import lock_work
+from .josa import attach
 
 router = APIRouter(prefix="/api/works/{work_id}/phases", tags=["phases"])
 
@@ -136,7 +137,7 @@ def delete_phase(work_id: int, order: int, conn: Conn, me: CurrentUser) -> dict:
         ).fetchone()["n"]
         if n:
             raise HTTPException(
-                status.HTTP_409_CONFLICT, f"이 페이즈에 {label}이(가) {n}개 붙어 있어 지울 수 없습니다. 먼저 옮기거나 지워 주세요"
+                status.HTTP_409_CONFLICT, f"이 페이즈에 {attach(label, '이/가')} {n}개 붙어 있어 지울 수 없습니다. 먼저 옮기거나 지워 주세요"
             )
     for table in DROPPED_WITH_SLOT:
         conn.execute(f'DELETE FROM "{table}" WHERE "작품_번호" = %s AND "진행순서_순서" = %s', (work_id, order))

@@ -816,7 +816,7 @@ describe("진행 탭", () => {
       await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));
       await pickCard("1차 조사");
       const doctor = within(editor().getByRole("group", { name: "의사의 개인 서사 공개" }));
-      expect(doctor.getByRole("status")).toHaveTextContent("서사 3은(는) 없습니다(서사 1개)");
+      expect(doctor.getByRole("status")).toHaveTextContent("서사 3은 없습니다(서사 1개)");
     });
 
     it("스크립트가 후보를 쓰는 카드는 투표 후보를 고르고, 기본(플레이어 인물 모두)이면 저장하지 않는다", async () => {

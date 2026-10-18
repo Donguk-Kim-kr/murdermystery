@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 
 import { api, errorMessage } from "../api/client";
 import type { components } from "../api/schema";
+import { josa } from "../josa";
 
 export type Character = components["schemas"]["CharacterOut"];
 
@@ -65,7 +66,7 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
       overAfterAdd.length > 0 &&
       !window.confirm(
         `서사를 ${parts.length + 1}개로 나누면 각 서사는 ${nextLimit}자까지 쓸 수 있습니다. ` +
-          `지금 서사 ${overAfterAdd.join(", ")}이(가) 넘으므로 줄여야 저장할 수 있습니다. 추가할까요?`,
+          `${josa(`지금 서사 ${overAfterAdd.join(", ")}`, "이/가")} 넘으므로 줄여야 저장할 수 있습니다. 추가할까요?`,
       )
     )
       return;
@@ -162,7 +163,7 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
               {parts.length >= MAX_PARTS
                 ? `서사는 ${MAX_PARTS}개까지 나눌 수 있습니다.`
                 : `서사를 ${parts.length + 1}개로 나누면 각 서사는 ${nextLimit}자까지 쓸 수 있습니다.` +
-                  (overAfterAdd.length > 0 ? ` 지금 서사 ${overAfterAdd.join(", ")}이(가) 넘습니다.` : "")}
+                  (overAfterAdd.length > 0 ? ` ${josa(`지금 서사 ${overAfterAdd.join(", ")}`, "이/가")} 넘습니다.` : "")}
             </span>
           </div>
         </div>

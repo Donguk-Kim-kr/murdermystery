@@ -21,6 +21,7 @@ from .auth import CurrentUser
 from .db import Conn
 from .ordering import next_order
 from .works import lock_work, not_found
+from .josa import attach
 
 NAME_HELP = "나중에 바꿀 수 있습니다"
 
@@ -288,7 +289,7 @@ def fetch_one(conn: Connection, res: Resource, work_id: int, item_id: int) -> di
         (work_id, item_id),
     ).fetchone()
     if row is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"{res.label}을(를) 찾을 수 없습니다")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"{attach(res.label, '을/를')} 찾을 수 없습니다")
     return with_materials(conn, res, work_id, [row])[0]
 
 

@@ -6,6 +6,7 @@
 from psycopg.types.json import Jsonb
 
 from .default_phases import COMMON_PHASES
+from .josa import attach
 
 
 RENAMED = {"프롤로그": "공통 스토리"}   # 이름이 바뀐 기본 진행단계: 옛 이름의 모든 버전을 새 이름으로 바꾼다(이미 놓은 카드는 번호로 가리키므로 그대로 이어진다)
@@ -19,7 +20,7 @@ def register(conn) -> list[str]:
             'SELECT 1 FROM "진행단계" WHERE "계정_번호" IS NULL AND "이름" = %s LIMIT 1', (name,)).fetchone() is not None
         if has(old) and not has(new):
             conn.execute('UPDATE "진행단계" SET "이름" = %s WHERE "계정_번호" IS NULL AND "이름" = %s', (new, old))
-            done.append(f"{old}: 이름을 {new}(으)로 바꿈")
+            done.append(f"{old}: 이름을 {attach(new, '으로/로')} 바꿈")
     for name, description, source, _settings in COMMON_PHASES:
         rule = {"스크립트": source}
         latest = conn.execute(
