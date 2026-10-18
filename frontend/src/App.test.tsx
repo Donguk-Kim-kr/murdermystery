@@ -690,6 +690,16 @@ describe("방", () => {
     expect(await calls.find((c) => c.key === "POST /api/rooms/join")!.req.json()).toEqual({ 입장코드: "K7M2QX", 관전: false });
   });
 
+  it("대기실 윗부분: 버전은 보이지 않고, 상태는 제목 오른쪽에 붙고, 복사 버튼은 링크 복사 하나뿐이다", async () => {
+    routes["GET /api/rooms/me"] = () => json(baseRoom);
+    renderApp("/room");
+    const title = await screen.findByRole("heading", { name: "저택의 비밀", level: 1 });
+    expect(title.parentElement).toHaveTextContent("대기 중");                            // 같은 줄(제목 옆)에 상태가 있다
+    expect(screen.queryByText(/버전/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "링크 복사" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "복사" })).not.toBeInTheDocument();
+  });
+
   it("대기실의 링크 복사 버튼은 입장 링크를 복사한다", async () => {
     routes["GET /api/rooms/me"] = () => json(baseRoom);
     const writeText = vi.fn(async () => undefined);
