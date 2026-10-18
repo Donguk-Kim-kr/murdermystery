@@ -224,16 +224,11 @@ def test_ending_condition_arrested_the_culprit_by_vote(client, make_scripted_gam
         assert [b["내용"] for b in shown] == [expected], target
 
 
-def test_tie_is_its_own_ending_and_not_a_failed_arrest(client, make_scripted_game):
-    """동률이면 '검거'도 '검거 실패'도 아니고 '동률' 분기만 나온다."""
+def test_tie_and_no_votes_count_as_a_failed_arrest(client, make_scripted_game):
+    """검거 조건은 '범인을 검거했다'와 '검거하지 못했다' 둘뿐이다. 동률·투표 없음·인물이 아닌 결과는 모두 검거하지 못한 것이다."""
     vote = "'최종 투표'"
     caught = f"결과_인물({vote}) is not None and 결과_인물({vote}).범인"
-    endings = [
-        ("검거", {"식": caught}, "검거"),
-        ("동률", {"식": f"len(최다득표({vote})) > 1"}, "동률"),
-        ("투표 없음", {"식": f"투표수({vote}) == 0"}, "투표 없음"),
-        ("검거 실패", {"식": f"결과({vote}) is not None and not ({caught})"}, "검거 실패"),
-    ]
+    endings = [("검거", {"식": caught}, "검거"), ("검거 실패", {"식": f"not ({caught})"}, "검거 실패")]
 
     def mark_culprit(client_, host, wid):
         assert client_.patch(f"/api/works/{wid}/characters/1", headers=host.headers, json={"범인": True}).status_code == 200
@@ -247,28 +242,26 @@ def test_tie_is_its_own_ending_and_not_a_failed_arrest(client, make_scripted_gam
         return votes
 
     for expected, picks in (
-        ("동률", ("인물1", "인물0", "사고사")),
-        ("투표 없음", (None, None, None)),
-        ("검거 실패", ("사고사", "사고사", "사고사")),
+        ("검거 실패", ("인물1", "인물0", "사고사")),            # 동률
+        ("검거 실패", (None, None, None)),                      # 투표 없음
+        ("검거 실패", ("사고사", "사고사", "사고사")),          # 인물이 아닌 후보
+        ("검거", (None, "인물0", "인물0")),
     ):
         host, people, slots = play(client, make_scripted_game, endings, votes=scenario(picks), setup_extra=mark_culprit)
         go_to_endings(client, host, 1)
         shown = [b["내용"] for b in state(client, people[0]).json()["화면"] if b["이름"].startswith("엔딩")]
-        assert shown == [expected], (expected, shown)
+        assert shown == [expected], (picks, shown)
 
 
 def test_conditions_declared_by_the_final_vote_phase_work_as_written(client, make_scripted_game):
     """최종 투표 진행단계가 스스로 내놓은 조건(조건정의)의 식을 그대로 엔딩 조건으로 써서 동작을 확인한다."""
-    import re
     from app.cards import known_names
     from app.declare import declarations
     from app.default_phases import FINAL_VOTE
 
     declared = {c["이름"]: c for c in declarations(FINAL_VOTE, known_names())["조건"]}
-    plain = ["범인을 검거했다", "범인이 아닌 쪽으로 결과가 났다(검거 실패)", "동률이다", "아무도 투표하지 않았다"]
-    endings = [(name, {"식": declared[name]["식"]}, name) for name in plain]
-    # 인자가 있는 조건은 자리표시자를 채워서 쓴다: 인물 1(범인)이 가장 많은 표
-    endings.append(("인물 지목", {"식": re.sub(r"\{인물\}", "1", declared["이 인물이 가장 많은 표를 받았다"]["식"])}, "인물 지목"))
+    assert list(declared) == ["범인을 검거했다", "범인을 검거하지 못했다(검거 실패)"]            # 동률·투표 없음·특정 인물 같은 조건은 내놓지 않는다
+    endings = [(name, {"식": c["식"]}, name) for name, c in declared.items()]
 
     def mark_culprit(client_, host, wid):
         assert client_.patch(f"/api/works/{wid}/characters/1", headers=host.headers, json={"범인": True}).status_code == 200
@@ -282,10 +275,10 @@ def test_conditions_declared_by_the_final_vote_phase_work_as_written(client, mak
         return run
 
     for picks, expected in (
-        ((None, "인물0", "인물0"), ["범인을 검거했다", "인물 지목"]),
-        ((None, "인물1", "인물1"), ["범인이 아닌 쪽으로 결과가 났다(검거 실패)"]),
-        (("인물1", "인물0", "사고사"), ["동률이다"]),
-        ((None, None, None), ["아무도 투표하지 않았다"]),
+        ((None, "인물0", "인물0"), ["범인을 검거했다"]),
+        ((None, "인물1", "인물1"), ["범인을 검거하지 못했다(검거 실패)"]),
+        (("인물1", "인물0", "사고사"), ["범인을 검거하지 못했다(검거 실패)"]),     # 동률
+        ((None, None, None), ["범인을 검거하지 못했다(검거 실패)"]),             # 투표 없음
     ):
         host, people, _ = play(client, make_scripted_game, endings, votes=votes(picks), setup_extra=mark_culprit)
         go_to_endings(client, host, 1)
