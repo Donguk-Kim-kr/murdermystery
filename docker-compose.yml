@@ -27,7 +27,7 @@ services:
       MM_DATABASE_URL: "dbname=murder_mystery"
       # AI 플레이어(backend/scripts/ai_players.py)가 쓴다. 프로젝트 폴더의 .env 파일에 ANTHROPIC_API_KEY=... 를 적어 둔다(.env 는 저장소에 올라가지 않는다).
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      MM_AI_MODEL: ${MM_AI_MODEL:-claude-opus-5-5}
+      MM_AI_MODEL: ${MM_AI_MODEL:-claude-haiku-5-5}
       MM_AI_EFFORT: ${MM_AI_EFFORT:-low}
       # (임시) 여러 계정을 만들어 시험하려고 패스워드 최소 글자 수를 1 로 낮췄다. 시험이 끝나면 이 줄을 지우면 기본값 8 로 돌아간다.
     ports:

@@ -6,7 +6,7 @@
   docker compose exec app python backend/scripts/ai_players.py --code 1234 --count 4
 
 * 모델 호출에는 ANTHROPIC_API_KEY 환경변수가 필요하다(도커는 프로젝트 폴더의 .env 에 적어 둔다). 키 없이 흐름만 보려면 `--brain simple`.
-* 모델은 `--model` 또는 MM_AI_MODEL(기본 claude-opus-5-5), 생각 깊이는 `--effort` 또는 MM_AI_EFFORT(기본 low, 빠르다)로 바꾼다.
+* 모델은 `--model` 또는 MM_AI_MODEL(기본 claude-haiku-5-5), 생각 깊이는 `--effort` 또는 MM_AI_EFFORT(기본 low, 빠르다)로 바꾼다.
 * 서버 주소는 `--url`(기본 http://localhost:8000).
 """
 import argparse
@@ -46,7 +46,7 @@ def main() -> None:
     ap.add_argument("--count", type=int, default=4, help="입장시킬 AI 수(기본 4)")
     ap.add_argument("--url", default=os.environ.get("MM_URL", "http://localhost:8000"))
     ap.add_argument("--brain", choices=["claude", "simple"], default="claude", help="claude: Anthropic API, simple: 모델 없이 규칙으로(시험용)")
-    ap.add_argument("--model", default=os.environ.get("MM_AI_MODEL", "claude-opus-5-5"))
+    ap.add_argument("--model", default=os.environ.get("MM_AI_MODEL", "claude-haiku-5-5"))
     ap.add_argument("--effort", default=os.environ.get("MM_AI_EFFORT", "low"), choices=["low", "medium", "high", "xhigh", "max"])
     ap.add_argument("--nicknames", default="", help="쉼표로 구분한 AI 닉네임(기본 'AI 1, AI 2 …')")
     ap.add_argument("--think", type=float, default=8.0, help="AI 한 명이 모델을 부르는 최소 간격(초). 늘리면 호출 수와 비용이 줄어든다")

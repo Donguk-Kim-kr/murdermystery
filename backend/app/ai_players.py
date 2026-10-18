@@ -89,7 +89,7 @@ class Brain(Protocol):
 class ClaudeBrain:
     """Anthropic API 로 다음 행동을 고른다. 호출이 실패하거나 거절되면 아무것도 하지 않는다(게임은 멈추지 않는다)."""
 
-    def __init__(self, model: str = "claude-opus-5-5", effort: str = "low", client: Any = None, log: Callable[[str], None] = print):
+    def __init__(self, model: str = "claude-haiku-5-5", effort: str = "low", client: Any = None, log: Callable[[str], None] = print):
         if client is None:
             import anthropic
 
