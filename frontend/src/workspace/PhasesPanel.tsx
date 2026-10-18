@@ -580,7 +580,7 @@ function AttachedCards({ title, empty, rows, lib, libCol, resource, call, charac
             </button>
           </div>
           <SettingsEditor key={`${selected}:${JSON.stringify(current.설정 ?? null)}`} resource={resource} id={current[idCol] as number}
-            value={current.설정} showTab={isCard} call={call} characters={characters} settingKeys={ref?.사용설정 ?? []} defs={ref?.설정정의 ?? []} />
+            value={current.설정} showTab={isCard} call={call} characters={characters} settingKeys={ref?.사용설정 ?? []} defs={ref?.설정정의 ?? []} declared={ref?.설정정의 != null} />
         </div>
       )}
     </div>
@@ -594,8 +594,8 @@ const asObject = (v: unknown): Record<string, unknown> =>
  * 카드·기믹을 이 페이즈에 놓을 때만 적용하는 세부 설정. 비우면 정의의 기본값을 쓴다.
  * 카드에는 "내용 유지"(이 페이즈가 끝나도 내용을 남겨 계속 볼 수 있게 함)를 따로 보여 준다(기본: 남김). 상세 설명 글은 아직 두지 않는다. 나머지는 JSON 으로 직접 쓴다(내부 구조는 엔진 설계에서 정함).
  */
-function SettingsEditor({ resource, id, value, showTab, call, characters, settingKeys, defs }: {
-  resource: string; id: number; value: unknown; showTab: boolean; call: Call; characters: Row[]; settingKeys: string[]; defs: SettingDef[];
+function SettingsEditor({ resource, id, value, showTab, call, characters, settingKeys, defs, declared }: {
+  resource: string; id: number; value: unknown; showTab: boolean; call: Call; characters: Row[]; settingKeys: string[]; defs: SettingDef[]; declared: boolean;
 }) {
   const current = asObject(value);
   const showPicks = settingKeys.includes(STORY_PICKS);
@@ -626,8 +626,8 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
-    let extra: Record<string, unknown> = {};
-    if (text.trim() !== "") {
+    let extra: Record<string, unknown> = declared ? { ...rest } : {};     // 스크립트가 설정 칸을 정한 카드는 JSON 을 보이지 않는다(칸에 없는 기존 값은 그대로 둔다)
+    if (!declared && text.trim() !== "") {
       try {
         const parsed: unknown = JSON.parse(text);
         if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
@@ -689,10 +689,12 @@ function SettingsEditor({ resource, id, value, showTab, call, characters, settin
       {showCandidates && (
         <CandidatePicks characters={characters} selected={candidates} onChange={setCandidates} extras={extras} onExtras={setExtras} />
       )}
-      <label>
-        그 밖의 세부 설정 (JSON)
-        <textarea rows={4} value={text} placeholder="비우면 정의의 기본값을 씁니다" onChange={(e) => setText(e.target.value)} />
-      </label>
+      {!declared && (
+        <label>
+          그 밖의 세부 설정 (JSON)
+          <textarea rows={4} value={text} placeholder="비우면 정의의 기본값을 씁니다" onChange={(e) => setText(e.target.value)} />
+        </label>
+      )}
       {error && <p role="alert" className="error">{error}</p>}
       <div className="row start">
         <button type="button" className="small" onClick={() => void save()}>설정 저장</button>

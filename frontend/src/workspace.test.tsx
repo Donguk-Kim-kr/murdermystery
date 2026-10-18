@@ -890,6 +890,7 @@ describe("진행 탭", () => {
       await pickCard("1차 조사");
       const card = within(editor().getByRole("group", { name: "1차 조사 수정" }));
       expect(card.queryByLabelText("재투표 후보")).not.toBeInTheDocument();                         // 스크립트가 쓰지 않는 설정은 보이지 않는다
+      expect(card.queryByLabelText(/그 밖의 세부 설정/)).not.toBeInTheDocument();                   // 스크립트가 칸을 정한 카드에는 JSON 칸이 없다
       await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
       expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: null });
       await userEvent.selectOptions(card.getByLabelText("투표가 동률일 때"), "재투표");
@@ -910,6 +911,35 @@ describe("진행 탭", () => {
       await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
       expect(await card.findByText(/능력의 지목 대상: 하나 이상 골라 주세요/)).toBeInTheDocument();
       expect(sent("PATCH /api/works/7/content/phase-steps/9")).toHaveLength(2);
+    });
+
+    it("칸을 선언하지 않은 진행단계(옛 방식)에는 JSON 칸이 남아 있다", async () => {
+      twoPhases();
+      (bundle["phase-steps"] as { 설정: unknown }[])[0].설정 = { 알수없는설정: 3 };
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));
+      await pickCard("1차 조사");
+      const card = within(editor().getByRole("group", { name: "1차 조사 수정" }));
+      expect(card.getByLabelText(/그 밖의 세부 설정/)).toHaveValue(JSON.stringify({ 알수없는설정: 3 }, null, 2));
+    });
+
+    it("칸을 선언한 진행단계는 JSON 칸 없이 저장하고, 칸에 없는 기존 값은 그대로 둔다", async () => {
+      routes["PATCH /api/works/7/content/phase-steps/9"] = () => json({});
+      twoPhases();
+      (bundle.library as { phases: Record<string, object> }).phases[5] = {
+        번호: 5, 이름: "조사", 버전: 1, 설명: "d", 삭제됨: false, 사용설정: ["횟수"],
+        설정정의: [{ 키: "횟수", 이름: "조사 횟수(1인당)", 종류: "숫자", 기본: 3, 최소: 1 }],
+      };
+      (bundle["phase-steps"] as { 설정: unknown }[])[0].설정 = { 알수없는설정: 3 };
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));
+      await pickCard("1차 조사");
+      const card = within(editor().getByRole("group", { name: "1차 조사 수정" }));
+      expect(card.queryByLabelText(/그 밖의 세부 설정/)).not.toBeInTheDocument();
+      await userEvent.clear(card.getByLabelText("조사 횟수(1인당)"));
+      await userEvent.type(card.getByLabelText("조사 횟수(1인당)"), "5");
+      await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({ 설정: { 알수없는설정: 3, 횟수: 5 } });
     });
 
     it("스크립트가 개인 서사 공개를 쓰지 않는 카드에는 서사 선택이 없다", async () => {
