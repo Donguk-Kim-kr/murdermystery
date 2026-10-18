@@ -224,3 +224,16 @@ def test_condition_expressions_cannot_use_functions_that_change_the_game(client,
     post(client, headers, w, "endings", 이름="바꾸기", 조건={"식": '변수설정("a", 1)'}, 내용="x")
     errors = check(client, headers, w)["errors"]
     assert len(errors) == 1 and "알 수 없는 이름 '변수설정'" in errors[0]
+
+
+def test_warns_when_a_choice_question_has_no_choices(client, headers):
+    w = ready(client, headers)
+    lib = client.post("/api/library/phases", headers=headers, json={"이름": "개인 질문", "설명": "x", "규칙": {}}).json()
+    empty = {"질문": {"1": {"질문": "예아니오?", "방식": "선택", "선택": []}}}
+    step = post(client, headers, w, "phase-steps", 진행순서_순서=1, 진행단계_번호=lib["번호"], 설정=empty)
+    result = check(client, headers, w)
+    assert result["errors"] == []
+    assert any("고르는 방식인데 선택지가 없어" in text for text in result["warnings"])
+    for fixed in ({"질문": {"1": {"질문": "예아니오?", "방식": "선택", "선택": ["예"]}}}, {"질문": {"1": {"질문": "누구?", "방식": "인물"}}}):
+        client.patch(f"/api/works/{w}/content/phase-steps/{step['번호']}", headers=headers, json={"설정": fixed})
+        assert not any("고르는 방식인데" in text for text in check(client, headers, w)["warnings"])

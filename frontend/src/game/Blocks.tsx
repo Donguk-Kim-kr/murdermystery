@@ -98,6 +98,8 @@ function VoteBlock({ block, state, onAnswer }: { block: Block; state: GameState;
   const isPlayer = state.나.역할 === "플레이어";
   const chosen = picked ?? mine;
   const nameOf = (value: unknown) => items.find((i) => i.값 === value)?.이름 ?? "";
+  const answering = block.문구 === "답변";            // 개인 질문처럼 투표가 아닌 고르기
+  const verb = answering ? "답변" : "투표";
 
   return (
     <section className="block" aria-label={text(block.이름)}>
@@ -118,7 +120,7 @@ function VoteBlock({ block, state, onAnswer }: { block: Block; state: GameState;
               {!item.기타 && item.종류 !== "장소" && item.종류 !== "단서" && (
                 <span className="muted">{[item.직업, item.나이 != null ? `${item.나이}세` : null, item.성별].filter(Boolean).join(" · ")}</span>
               )}
-              {mine === item.값 && <span className="chip accent">{item.종류 === "기권" ? "내 선택" : "내 투표"}</span>}
+              {mine === item.값 && <span className="chip accent">{item.종류 === "기권" ? "내 선택" : answering ? "내 답변" : "내 투표"}</span>}
             </button>
           </li>
         ))}
@@ -135,18 +137,20 @@ function VoteBlock({ block, state, onAnswer }: { block: Block; state: GameState;
               if (ok) setPicked(null);
             }}
           >
-            {mine === null ? "투표" : "투표 바꾸기"}
+            {mine === null ? verb : `${verb} 바꾸기`}
           </button>
           <span className="muted">
             {mine === null
-              ? "아직 투표하지 않았습니다."
+              ? answering ? "아직 답하지 않았습니다." : "아직 투표하지 않았습니다."
               : mine === "기권" && items.some((i) => i.종류 === "기권")
                 ? "기권했습니다. 다음 단계로 넘어가기 전에는 바꿀 수 있습니다."
-                : `${nameOf(mine)}에게 투표했습니다. 다음 단계로 넘어가기 전에는 바꿀 수 있습니다.`}
+                : answering
+                  ? `${josa(`'${nameOf(mine)}'`, "으로/로")} 답했습니다. 다음 단계로 넘어가기 전에는 바꿀 수 있습니다.`
+                  : `${nameOf(mine)}에게 투표했습니다. 다음 단계로 넘어가기 전에는 바꿀 수 있습니다.`}
           </span>
         </div>
       ) : (
-        <p className="muted">관전 중에는 투표할 수 없습니다.</p>
+        <p className="muted">관전 중에는 {answering ? "답할" : "투표할"} 수 없습니다.</p>
       )}
     </section>
   );

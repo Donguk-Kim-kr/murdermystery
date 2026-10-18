@@ -794,21 +794,34 @@ function storyPicks(raw: unknown): Record<string, number[]> {
   return out;
 }
 
+/** 개인 질문의 답하는 방식: 적어 둔 선택지에서 고르기 / 작품의 인물에서 고르기 / 작품의 장소에서 고르기 / 글로 쓰기. */
+const ANSWER_METHODS = [
+  ["선택", "적어 둔 선택지에서 고르기"],
+  ["인물", "인물 중에서 고르기"],
+  ["장소", "장소 중에서 고르기"],
+  ["글", "글로 쓰기"],
+] as const;
+type AnswerMethod = (typeof ANSWER_METHODS)[number][0];
+
 interface QuestionDraft {
   text: string;
-  /** 선택지. 비우면 자유롭게 글로 답한다 */
+  method: AnswerMethod;
   choices: string[];
 }
 
-/** 저장된 `질문`({"인물 순서": "질문" 또는 {질문, 선택}})을 입력용 값으로 읽는다. 모양이 다른 값은 건너뛴다. */
+const isMethod = (v: unknown): v is AnswerMethod => ANSWER_METHODS.some(([m]) => m === v);
+const newQuestion = (): QuestionDraft => ({ text: "", method: "선택", choices: [] });          // 기본은 고르기
+
+/** 저장된 `질문`({"인물 순서": "질문" 또는 {질문, 방식, 선택}})을 입력용 값으로 읽는다. 모양이 다른 값은 건너뛴다. */
 function readQuestions(raw: unknown): Record<string, QuestionDraft> {
   const out: Record<string, QuestionDraft> = {};
   for (const [key, def] of Object.entries(asObject(raw))) {
-    if (typeof def === "string") out[key] = { text: def, choices: [] };
+    if (typeof def === "string") out[key] = { text: def, method: "글", choices: [] };
     else {
       const d = asObject(def);
-      if (typeof d.질문 === "string")
-        out[key] = { text: d.질문, choices: Array.isArray(d.선택) ? d.선택.filter((c): c is string => typeof c === "string") : [] };
+      if (typeof d.질문 !== "string") continue;
+      const choices = Array.isArray(d.선택) ? d.선택.filter((c): c is string => typeof c === "string") : [];
+      out[key] = { text: d.질문, method: isMethod(d.방식) ? d.방식 : choices.length ? "선택" : "글", choices };
     }
   }
   return out;
@@ -820,12 +833,14 @@ function writeQuestions(drafts: Record<string, QuestionDraft>): Record<string, u
   for (const [key, d] of Object.entries(drafts)) {
     const text = d.text.trim();
     if (!text) continue;
-    out[key] = d.choices.length ? { 질문: text, 선택: d.choices } : text;
+    if (d.method === "글") out[key] = text;
+    else if (d.method === "선택") out[key] = { 질문: text, 방식: "선택", 선택: d.choices };
+    else out[key] = { 질문: text, 방식: d.method };
   }
   return out;
 }
 
-/** 개인 질문 카드: 인물마다 다른 질문을 정한다. 선택지를 하나씩 추가하면 고르는 질문이고, 없으면 글로 답하는 질문이다. 질문을 비운 인물은 답할 것이 없다. */
+/** 개인 질문 카드: 인물마다 다른 질문을 정하고, 질문마다 답하는 방식(선택지·인물·장소 중에서 고르기, 또는 글로 쓰기)을 정한다. 질문을 비운 인물은 답할 것이 없다. */
 function QuestionPicks({ characters, value, onChange }: {
   characters: Row[]; value: Record<string, QuestionDraft>; onChange: (next: Record<string, QuestionDraft>) => void;
 }) {
@@ -834,11 +849,11 @@ function QuestionPicks({ characters, value, onChange }: {
     <fieldset className="story-picks">
       <legend>개인 질문</legend>
       <p className="muted">
-        인물마다 다른 질문을 정합니다. 선택지를 만들면 플레이어가 그중에서 고르고, 만들지 않으면 글로 답합니다(엔딩 조건에서 가르기 쉬운 것은 선택지입니다).
+        인물마다 다른 질문을 정하고, 답하는 방식을 고릅니다. 고르는 방식은 엔딩 조건으로 가르기 쉽고, 고르기가 어울리지 않는 질문은 글로 쓰게 할 수 있습니다.
         질문을 비워 두면 그 인물은 답할 것이 없습니다. 답은 게임 변수 "이름:인물 순서"에 남아 엔딩 조건이 읽습니다.
       </p>
       {players.map((c) => (
-        <QuestionRow key={String(c.순서)} name={String(c.이름)} draft={value[String(c.순서)] ?? { text: "", choices: [] }}
+        <QuestionRow key={String(c.순서)} name={String(c.이름)} draft={value[String(c.순서)] ?? newQuestion()}
           onChange={(draft) => onChange({ ...value, [String(c.순서)]: draft })} />
       ))}
     </fieldset>
@@ -856,6 +871,10 @@ function QuestionRow({ name, draft, onChange }: { name: string; draft: QuestionD
     <div className="question-pick" role="group" aria-label={`${name}의 질문`}>
       <strong>{name}</strong>
       <input aria-label={`${name} 질문`} value={draft.text} maxLength={300} placeholder="질문" onChange={(e) => onChange({ ...draft, text: e.target.value })} />
+      <select aria-label={`${name} 답하는 방식`} value={draft.method} onChange={(e) => onChange({ ...draft, method: e.target.value as AnswerMethod })}>
+        {ANSWER_METHODS.map(([method, label]) => <option key={method} value={method}>{label}</option>)}
+      </select>
+      {draft.method === "선택" && (<>
       <div className="story-pick">
         {draft.choices.map((choice) => (
           <span key={choice} className="chip">
@@ -866,7 +885,7 @@ function QuestionRow({ name, draft, onChange }: { name: string; draft: QuestionD
             </button>
           </span>
         ))}
-        {draft.choices.length === 0 && <span className="muted">선택지 없음(글로 답함)</span>}
+        {draft.choices.length === 0 && draft.text.trim() !== "" && <span className="muted">선택지를 하나 이상 추가해 주세요</span>}
       </div>
       <div className="row start">
         <input
@@ -884,6 +903,7 @@ function QuestionRow({ name, draft, onChange }: { name: string; draft: QuestionD
         />
         <button type="button" className="small secondary" aria-label={`${name} 선택지 추가`} onClick={add}>추가</button>
       </div>
+      </>)}
     </div>
   );
 }

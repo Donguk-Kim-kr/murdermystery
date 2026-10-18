@@ -198,9 +198,12 @@ function ArgInput({ ws, placed, arg, args, n, onChange }: {
     }
     case "질문답": {
       const questions = asObject(settingOf(placed, arg.설정 ?? "질문"));
-      const def = questions[String(args[arg.인물 ?? "인물"])];
-      const picks = asObject(def).선택;
-      if (Array.isArray(picks)) return choose(picks.filter((c): c is string => typeof c === "string").map((c): [string, string] => [c, c]));
+      const def = asObject(questions[String(args[arg.인물 ?? "인물"])]);
+      const method = def.방식 ?? (Array.isArray(def.선택) && def.선택.length > 0 ? "선택" : "글");
+      if (method === "인물") return choose(characters.map((c) => [c.순서 as number, String(c.이름)]));
+      if (method === "장소") return choose(rowsOf(ws, "places").map((p): [string, string] => [`장소:${p.순서}`, String(p.이름)]));
+      if (method === "선택" && Array.isArray(def.선택))
+        return choose(def.선택.filter((c): c is string => typeof c === "string").map((c): [string, string] => [c, c]));
       return (
         <label>
           {label}

@@ -281,17 +281,24 @@ class CardHost:
         return row
 
     def fn_질문정의(self, 정의: Any) -> dict[str, Any] | None:
-        """카드 설정에 적은 질문을 {질문, 선택, 글자수} 로 정리한다. 글자만 적으면 자유롭게 쓰는 질문이고, {"질문": …, "선택": [...]} 이면
-        고르는 질문이다. 읽을 수 없으면 None."""
+        """카드 설정에 적은 질문을 {질문, 방식, 선택, 글자수} 로 정리한다. `방식` 은 "글"(글로 답함), "선택"(적어 둔 선택지에서 고름),
+        "인물"·"장소"(작품의 인물·장소에서 고름) 중 하나이다. 글자만 적으면 글로 답하는 질문이고, {"질문": …, "선택": [...]} 만 있으면
+        선택 질문이다. 선택 질문인데 선택지가 없거나 읽을 수 없으면 None."""
         if isinstance(정의, str) and 정의.strip():
-            return {"질문": 정의.strip(), "선택": [], "글자수": 300}
+            return {"질문": 정의.strip(), "방식": "글", "선택": [], "글자수": 300}
         if not isinstance(정의, dict) or not isinstance(정의.get("질문"), str) or not 정의["질문"].strip():
             return None
         choices = [c.strip() for c in (정의.get("선택") or []) if isinstance(c, str) and c.strip() and len(c.strip()) <= MAX_OPTION_CHARS]
+        choices = list(dict.fromkeys(choices))[:MAX_CANDIDATES]
+        method = 정의.get("방식")
+        if method not in ANSWER_KINDS:
+            method = "선택" if choices else "글"
+        if method == "선택" and not choices:
+            return None
         limit = 정의.get("글자수")
         if not _is_int(limit) or not 1 <= limit <= MAX_INPUT_CHARS:
             limit = 300
-        return {"질문": 정의["질문"].strip(), "선택": list(dict.fromkeys(choices))[:MAX_CANDIDATES], "글자수": limit}
+        return {"질문": 정의["질문"].strip(), "방식": method, "선택": choices if method == "선택" else [], "글자수": limit}
 
     def fn_기타후보(self, 값: Any) -> str | None:
         """인물이 아닌 투표 선택지(예: "사고사")로 쓸 수 있는 글이면 그 글, 아니면 None. 카드 설정의 후보를 읽을 때 쓴다."""
@@ -395,12 +402,14 @@ class CardHost:
             block.update({"동작": actions, "질문ID": f"{self.run.key}:{name}"})
         return block
 
-    def fn_투표칸(self, 이름: str, 후보: Any, 질문: Any = "", 기권: bool = False) -> dict[str, Any]:
+    def fn_투표칸(self, 이름: str, 후보: Any, 질문: Any = "", 기권: bool = False, 문구: str = "투표") -> dict[str, Any]:
         """비공개 투표 칸. 후보는 인물이나 인물이 아닌 선택지(글, 예: "사고사")의 목록이다. 플레이어는 다음 단계로 가기 전까지
         다시 골라 바꿀 수 있고, 자기 인물은 고를 수 없다. 투표하면 `기다리기(이름)` 이 `{플레이어, 값}` 을 돌려준다
         (값은 인물이면 순서 번호, 선택지이면 그 글). `기권` 을 켜면 "기권" 선택이 더해지고, 기권은 투표한 것으로 세지만
-        어느 후보의 표도 아니다(값은 "기권")."""
+        어느 후보의 표도 아니다(값은 "기권"). `문구` 가 "답변" 이면 화면의 버튼과 안내가 투표 대신 답변으로 보인다(개인 질문처럼 투표가 아닌 고르기에 쓴다)."""
         name = str(이름)
+        if 문구 not in ("투표", "답변"):
+            raise ScriptError("투표칸의 문구는 '투표' 나 '답변' 이어야 합니다")
         if ":" in name or name in ("확인", ""):
             raise ScriptError("투표칸의 이름은 비워 둘 수 없고 ':' 이나 '확인' 일 수 없습니다")
         if not isinstance(후보, (list, tuple)) or not 후보 or len(후보) > MAX_CANDIDATES:
@@ -422,7 +431,7 @@ class CardHost:
             self.game.vote_abstain.add(name)
         else:
             self.game.vote_abstain.discard(name)
-        return {"종류": "투표", "이름": name, "질문": _text(질문), "항목": options, "질문ID": f"{self.run.key}:{name}", "기권": bool(기권)}
+        return {"종류": "투표", "이름": name, "질문": _text(질문), "항목": options, "질문ID": f"{self.run.key}:{name}", "기권": bool(기권), "문구": 문구}
 
     def fn_현황(self, 이름: str, 완료: int, 전체: int) -> dict[str, Any]:
         return {"종류": "현황", "이름": str(이름), "완료": int(완료), "전체": int(전체)}
@@ -671,6 +680,7 @@ def _tally(game, name: str) -> dict[int | str, int]:
 
 VOTE_REF_KINDS = ("인물", "장소", "단서")
 ABSTAIN = "기권"
+ANSWER_KINDS = ("글", "선택", "인물", "장소")             # 개인 질문의 답하는 방식
 
 
 def _vote_value(option: Any) -> Any:
@@ -842,10 +852,11 @@ def answer(game, account_id: int, qid: str, value: Any, io) -> None:
     action_block = _card_action_block(game, run, rest)
     if action_block is not None:
         value = _clean_card_action(game, account_id, action_block, value)
-    vote_block = next((b for t in run.screens.values() for b in t.values() if b.get("종류") == "투표" and b.get("이름") == rest), None)
+    mine = [b for target in (ALL, account_id) for b in run.screens.get(target, {}).values()]       # 답하는 사람에게 보이는 블록만(사람마다 같은 이름의 다른 칸이 있을 수 있다)
+    vote_block = next((b for b in mine if b.get("종류") == "투표" and b.get("이름") == rest), None)
     if vote_block is not None and not (_is_int(value) or (isinstance(value, str) and 0 < len(value) <= MAX_OPTION_CHARS)):
         raise AnswerError("invalid", "고른 후보를 읽을 수 없습니다")
-    block = next((b for t in run.screens.values() for b in t.values() if b.get("종류") == "입력" and b.get("이름") == rest), None)
+    block = next((b for b in mine if b.get("종류") == "입력" and b.get("이름") == rest), None)
     if block is not None:
         if not isinstance(value, str) or not value.strip():
             raise AnswerError("invalid", "글자를 입력해 주세요")

@@ -610,6 +610,24 @@ describe("투표 블록", () => {
     expect(screen.getByText("내 선택")).toBeInTheDocument();
   });
 
+  it("개인 질문처럼 답변 문구를 쓰는 고르기는 투표가 아니라 답변으로 보인다", async () => {
+    const user = userEvent.setup();
+    state = makeState({ 화면: [box({ 문구: "답변", 질문: "누가 의심스럽습니까?" })] });
+    render(<GamePage />);
+    expect(await screen.findByText("아직 답하지 않았습니다.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /집사/ }));
+    await user.click(screen.getByRole("button", { name: "답변" }));
+    await waitFor(() => expect(posts.at(-1)?.body).toEqual({ 질문ID: "1:7:최종 투표", 값: 11 }));
+  });
+
+  it("답변한 뒤에는 고른 것으로 답했다고 보인다", async () => {
+    state = makeState({ 화면: [box({ 문구: "답변", 내_선택: 11 })] });
+    render(<GamePage />);
+    expect(await screen.findByText(/'집사'로 답했습니다/)).toBeInTheDocument();
+    expect(screen.getByText("내 답변")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "답변 바꾸기" })).toBeInTheDocument();
+  });
+
   it("관전자는 투표할 수 없다", async () => {
     state = makeState({ 나: { 계정_번호: 9, 역할: "관전자", 인물_순서: null, 방장: false, 진행_권한: false }, 화면: [box()] });
     render(<GamePage />);

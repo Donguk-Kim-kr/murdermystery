@@ -126,6 +126,7 @@ def check_work(conn: Connection, work_id: int) -> dict:
     errors.extend(script_errors(conn, work_id))
     errors.extend(condition_errors(conn, work_id))
     warnings.extend(story_selection_warnings(conn, work_id))
+    warnings.extend(question_warnings(conn, work_id))
     return {"errors": errors, "warnings": warnings, "다음버전": next_version(conn, work_id)}
 
 
@@ -181,6 +182,26 @@ def story_selection_warnings(conn: Connection, work_id: int) -> list[str]:
             if missing:
                 nums = ", ".join(f"서사 {n}" for n in missing)
                 found.append(f"페이즈 {row['phase']}의 {quoted(row['card'], '이/가')} 인물 '{name}'의 {attach(nums, '을/를')} 보여 주도록 했지만 그 서사가 없습니다(서사는 {total}개).")
+    return found
+
+
+def question_warnings(conn: Connection, work_id: int) -> list[str]:
+    """개인 질문 카드에서 고르는 방식인데 선택지를 하나도 적지 않은 질문을 알린다(그 인물에게는 질문이 나오지 않는다)."""
+    names = {r["순서"]: r["이름"] for r in conn.execute('SELECT "순서", "이름" FROM "인물" WHERE "작품_번호" = %s', (work_id,)).fetchall()}
+    found = []
+    rows = conn.execute(
+        'SELECT s."진행순서_순서" AS phase, l."이름" AS card, s."설정" FROM "진행구성" s JOIN "진행단계" l ON l."번호" = s."진행단계_번호" '
+        'WHERE s."작품_번호" = %s AND s."설정" IS NOT NULL ORDER BY s."진행순서_순서", s."번호"', (work_id,)
+    ).fetchall()
+    for row in rows:
+        questions = row["설정"].get("질문") if isinstance(row["설정"], dict) else None
+        if not isinstance(questions, dict):
+            continue
+        for key, definition in questions.items():
+            if not (isinstance(definition, dict) and definition.get("방식") == "선택" and key.isdigit() and int(key) in names):
+                continue
+            if not [c for c in definition.get("선택") or [] if isinstance(c, str) and c.strip()]:
+                found.append(f"페이즈 {row['phase']}의 {quoted(row['card'], '이/가')} 인물 '{names[int(key)]}'의 질문은 고르는 방식인데 선택지가 없어 질문이 나오지 않습니다.")
     return found
 
 

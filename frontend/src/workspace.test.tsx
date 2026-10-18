@@ -320,6 +320,27 @@ describe("작업공간 탭", () => {
       ]);
     });
 
+    it("답이 인물이나 장소를 고르는 질문이면 조건의 답도 인물이나 장소 중에서 고른다", async () => {
+      setup();
+      bundle.places = [{ 순서: 4, 이름: "서재" }, { 순서: 5, 이름: "정원" }];
+      (bundle["phase-steps"] as { 설정: unknown }[])[1].설정 = { 질문: { 1: { 질문: "누구?", 방식: "인물" }, 2: { 질문: "어디?", 방식: "장소" } } };
+      renderApp("/works/7?tab=endings");
+      await userEvent.click(await screen.findByRole("button", { name: "엔딩 분기 추가" }));
+      const form = within(screen.getByRole("form", { name: "엔딩 분기 추가" }));
+      await userEvent.type(form.getByLabelText("이름"), "정원");
+      await userEvent.type(form.getByLabelText("내용"), "정원에 있었다");
+      await userEvent.click(form.getByRole("button", { name: "조건 더하기" }));
+      await userEvent.selectOptions(form.getByLabelText("조건 1 카드"), "10");
+      await userEvent.selectOptions(form.getByLabelText("조건 1"), "이 인물이 이렇게 답했다");
+      await userEvent.selectOptions(form.getByLabelText("조건 1 인물"), "1");
+      expect(within(form.getByLabelText("조건 1 답")).getByRole("option", { name: "집사" })).toBeInTheDocument();   // 인물을 고르는 질문의 답은 인물 목록
+      await userEvent.selectOptions(form.getByLabelText("조건 1 인물"), "2");
+      await userEvent.selectOptions(form.getByLabelText("조건 1 답"), "정원");
+      await userEvent.click(form.getByRole("button", { name: "저장" }));
+      await waitFor(() => expect(sent("POST /api/works/7/content/endings")).toHaveLength(1));
+      expect((await sent("POST /api/works/7/content/endings")[0].req.json()).조건.식).toBe("(변수('개인 질문:2') == \"장소:5\")");
+    });
+
     it("빈칸이 남았으면 저장하지 않고, 인물이 아닌 후보는 카드 설정에서 가져온다", async () => {
       setup();
       renderApp("/works/7?tab=endings");
@@ -866,10 +887,34 @@ describe("진행 탭", () => {
       await userEvent.click(card.getByRole("button", { name: "의사 선택지 추가" }));
       await userEvent.type(card.getByLabelText("의사 새 선택지"), "삭제할 것{Enter}");
       await userEvent.click(card.getByRole("button", { name: "의사 선택지 삭제할 것 삭제" }));
-      expect(card.getByText("선택지 없음(글로 답함)")).toBeInTheDocument();                              // 집사는 선택지가 없다
+      expect(card.getByLabelText("집사 답하는 방식")).toHaveValue("글");                                  // 글자만 적은 옛 질문은 글로 답하는 방식이다
+      expect(card.getByLabelText("의사 답하는 방식")).toHaveValue("선택");                                // 새 질문의 기본은 고르기이다
       await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
       expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({
-        설정: { 질문: { 1: { 질문: "비밀을 알았습니까?", 선택: ["예, 하지만 늦게", "아니오"] }, 2: "기존 질문" } },
+        설정: { 질문: { 1: { 질문: "비밀을 알았습니까?", 방식: "선택", 선택: ["예, 하지만 늦게", "아니오"] }, 2: "기존 질문" } },
+      });
+    });
+
+    it("개인 질문의 답하는 방식을 인물이나 장소 고르기로 바꾸면 선택지 입력이 사라지고 방식만 저장한다", async () => {
+      routes["PATCH /api/works/7/content/phase-steps/9"] = () => json({});
+      twoPhases();
+      (bundle.library as { phases: Record<string, object> }).phases[5] = { 번호: 5, 이름: "개인 질문", 버전: 1, 설명: "d", 삭제됨: false, 사용설정: ["질문"] };
+      bundle.characters = [
+        { 순서: 1, 이름: "의사", 직업: null, NPC: false, 범인: false, 서사_부분수: 1 },
+        { 순서: 2, 이름: "집사", 직업: null, NPC: false, 범인: false, 서사_부분수: 1 },
+      ];
+      renderApp("/works/7?tab=phases");
+      await userEvent.click(await screen.findByRole("listitem", { name: "페이즈 1" }));
+      await pickCard("1차 조사");
+      const card = within(editor().getByRole("group", { name: "1차 조사 수정" }));
+      await userEvent.type(card.getByLabelText("의사 질문"), "누가 범인입니까?");
+      await userEvent.selectOptions(card.getByLabelText("의사 답하는 방식"), "인물");
+      expect(card.queryByLabelText("의사 새 선택지")).not.toBeInTheDocument();
+      await userEvent.type(card.getByLabelText("집사 질문"), "어디에 있었습니까?");
+      await userEvent.selectOptions(card.getByLabelText("집사 답하는 방식"), "장소");
+      await userEvent.click(card.getByRole("button", { name: "설정 저장" }));
+      expect(await sent("PATCH /api/works/7/content/phase-steps/9")[0].req.json()).toEqual({
+        설정: { 질문: { 1: { 질문: "누가 범인입니까?", 방식: "인물" }, 2: { 질문: "어디에 있었습니까?", 방식: "장소" } } },
       });
     });
 
