@@ -2,8 +2,9 @@
 
 사람이 제작 화면에서 입력하는 것과 같은 API 를 호출하므로(검사·확정 규칙이 그대로 적용된다) 이 파일은 작품의 **내용**만 담는다.
 네 인물이 말투로 구분되도록 썼다(다나까체 군인 / 거친 말투의 전직 조폭 / 부드러운 말투의 교사 / 노인 말투의 노인).
-제작자 계정은 로그인할 수 없는 샘플 계정이다(패스워드를 무작위로 만들고 버린다). 같은 제목의 작품이 이미 있으면 아무것도 하지 않는다.
+제작자 계정은 기본으로는 로그인할 수 없는 샘플 계정이다(패스워드를 무작위로 만들고 버린다). 환경변수 MM_SAMPLE_MAKER_PASSWORD 를 정하면 그 패스워드로 로그인할 수 있다. 같은 제목의 작품이 이미 있으면 아무것도 하지 않는다.
 """
+import os
 import secrets
 
 TITLE = "동짓날 마을회관"
@@ -199,15 +200,26 @@ def _ok(res, expect=(200, 201)):
     return res.json() if res.content else None
 
 
+def fixed_password() -> str:
+    """환경변수 MM_SAMPLE_MAKER_PASSWORD 가 있으면 샘플 제작 계정의 패스워드로 쓴다(시연에서 제작 과정을 보여 주려고).
+    없으면 빈 글자이고, 그 경우 패스워드는 무작위로 만들어 버려서 아무도 로그인할 수 없다."""
+    return os.environ.get("MM_SAMPLE_MAKER_PASSWORD", "").strip()
+
+
 def seed(client, conn=None) -> str:
-    """샘플 작품을 만든다. 이미 있으면 "이미 있음", 만들었으면 "만듦"을 돌려준다. `client` 는 앱에 붙은 TestClient 이다."""
-    password = secrets.token_urlsafe(24)
+    """샘플 작품을 만든다. 이미 있으면 "이미 있음", 만들었으면 "만듦"을 돌려준다. `client` 는 앱에 붙은 TestClient 이다.
+
+    MM_SAMPLE_MAKER_PASSWORD 가 있으면 제작 계정(sample_maker)의 패스워드를 그 값으로 한다. 계정이 이미 있어도 그 값으로 맞춘다."""
+    fixed = fixed_password()
+    password = fixed or secrets.token_urlsafe(24)
     signup = client.post("/api/auth/signup", json={"아이디": MAKER_ID, "패스워드": password, "닉네임": MAKER_NICKNAME})
     if signup.status_code == 201:
         login = _ok(client.post("/api/auth/login", json={"아이디": MAKER_ID, "패스워드": password, "접속환경": "PC"}))
         headers = {"Authorization": f"Bearer {login['토큰']}"}
     else:
-        return "이미 있음"                                    # 샘플 계정이 이미 있으면 한 번 만든 것이다(패스워드를 버렸으므로 다시 로그인하지 않는다)
+        if fixed:                                             # 이미 있는 계정도 고정 패스워드로 맞춘다(패스워드 찾기와 같은 방법: 아이디 + 닉네임)
+            _ok(client.post("/api/auth/reset-password", json={"아이디": MAKER_ID, "닉네임": MAKER_NICKNAME, "새_패스워드": fixed}), expect=(204,))
+        return "이미 있음"                                    # 샘플 계정이 이미 있으면 한 번 만든 것이다(고정 패스워드가 없으면 버렸으므로 다시 로그인하지 않는다)
 
     work = _ok(client.post("/api/works", headers=headers, json={
         "제목": TITLE, "시놉시스": SYNOPSIS, "장르": "추리", "예상시간": "15분", "시간형식": "시간만", "공통스토리": COMMON_STORY,
