@@ -16,7 +16,7 @@ const api = async (path, { method = "GET", token, body } = {}) => {
 };
 
 const PROLOGUE = `def 실행(카드):
-    모두.탭("공통 스토리", 글(공통스토리(), "공통 스토리"))
+    모두.탭("공통 스토리", 글("공통 스토리", 공통스토리()))
     읽기(모두, "공통 스토리", 공통스토리())
 `;
 const SELECT = `def 실행(카드):
@@ -39,7 +39,7 @@ const PROFILE = `def 실행(카드):
         if 플레이어.인물 is None:
             continue
         내용 = 서사들(플레이어.인물, [1])
-        플레이어.탭("개인 서사", 글(내용, "개인 서사"))
+        플레이어.탭("개인 서사", 글("개인 서사", 내용))
         읽기(플레이어, "개인 서사", 내용)
 `;
 
@@ -103,20 +103,20 @@ await host.getByRole("alert").filter({ hasText: "캐릭터 선택이 완료되�
 check(true, "아무도 고르기 전에는 넘어갈 수 없고 이유가 보인다");
 
 // 같은 인물을 동시에 확인(먼저 확정되면 다른 사람 화면에서는 그 인물이 곧바로 잠긴다)
-for (const p of pages) await p.getByRole("button", { name: /의사/ }).click();
+for (const p of pages) await p.locator("button.choice", { hasText: /의사/ }).click();
 await Promise.allSettled(pages.map((p) => p.getByRole("button", { name: "확인", exact: true }).click({ timeout: 3000 })));
 await new Promise((r) => setTimeout(r, 1000));
 const mine = await Promise.all(pages.map((p) => p.getByText("내 인물").count()));
 check(mine.reduce((a, c) => a + c, 0) === 1, "같은 인물을 동시에 확인해도 한 명만 갖는다: " + mine.join(","));
 const losers = pages.filter((_, i) => mine[i] === 0);
 const winner = pages.find((_, i) => mine[i] === 1);
-for (const p of losers) await p.getByRole("button", { name: /의사/ }).isDisabled().then((d) => check(d, "다른 사람이 고른 인물은 내 화면에서 잠긴다"));
+for (const p of losers) await p.locator("button.choice", { hasText: /의사/ }).isDisabled().then((d) => check(d, "다른 사람이 고른 인물은 내 화면에서 잠긴다"));
 check((await winner.getByText("이미 다른 사람이 고른 인물입니다").count()) === 0, "이긴 사람 화면에는 안내가 없다");
 
 // 나머지 둘이 서로 다른 인물
-await losers[0].getByRole("button", { name: /집사/ }).click();
+await losers[0].locator("button.choice", { hasText: /집사/ }).click();
 await losers[0].getByRole("button", { name: "확인", exact: true }).click();
-await losers[1].getByRole("button", { name: /하녀/ }).click();
+await losers[1].locator("button.choice", { hasText: /하녀/ }).click();
 await losers[1].getByRole("button", { name: "확인", exact: true }).click();
 for (const p of pages) await p.getByText("선택 완료").first().waitFor();
 await host.getByText("3/3").first().waitFor({ timeout: 8000 });

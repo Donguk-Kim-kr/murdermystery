@@ -146,7 +146,7 @@ await next("최종 투표");
 const vote = async (p, who) => { try { await p.getByRole("button", { name: new RegExp(who) }).first().click({ timeout: 8000 }); } catch (e) { console.log("투표 화면:", (await text(p)).slice(0, 2000)); await p.screenshot({ path: `${OUT}/vote-fail.png` }); throw e; } await p.getByRole("button", { name: /^투표/ }).click(); };
 await vote(host, "사고사"); await host.getByText("사고사에게 투표했습니다").waitFor({ timeout: 8000 });
 await p1.getByText("투표 완료").first().waitFor({ timeout: 8000 });
-check((await text(p1)).includes("1/3"), "최종 투표: 한 명이 투표하면 다른 사람 화면에 1/3 이 보인다");
+check(await p1.getByText("1/3").first().waitFor({ timeout: 8000 }).then(() => true, () => false), "최종 투표: 한 명이 투표하면 다른 사람 화면에 1/3 이 보인다");   // "투표 완료" 칸은 처음부터 있으므로 숫자가 바뀔 때까지 기다린다
 await vote(p1, "사고사"); await vote(p2, "사고사");
 await host.getByText("3/3").first().waitFor({ timeout: 8000 });
 check(!(await text(p2)).includes("내 투표: 집사"), "최종 투표: 남이 누구에게 투표했는지는 보이지 않는다");
