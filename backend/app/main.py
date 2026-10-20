@@ -13,6 +13,7 @@ from .confirm import router as confirm_router
 from .content import router as content_router, schema_router as content_schema_router
 from .db import Conn, create_pool
 from .library import router as library_router
+from .media import file_router as media_file_router, router as media_router
 from .scripts import router as scripts_router
 from .phases import router as phases_router
 from .play import router as play_router
@@ -108,6 +109,8 @@ app.include_router(works_router)
 app.include_router(characters_router)
 app.include_router(content_schema_router)
 app.include_router(content_router)
+app.include_router(media_router)
+app.include_router(media_file_router)
 app.include_router(phases_router)
 app.include_router(play_router)
 app.include_router(library_router)

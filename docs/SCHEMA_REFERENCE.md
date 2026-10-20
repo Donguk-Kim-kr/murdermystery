@@ -589,6 +589,8 @@
 | 8 | 조건 | jsonb | 가능 |  |
 | 9 | 유형 | text | 불가 |  |
 | 10 | 경로 | text | 불가 |  |
+| 11 | 인물_순서 | integer | 가능 |  |
+| 12 | 공통스토리 | boolean | 불가 | false |
 
 **제약조건**
 
@@ -597,16 +599,19 @@
 | PK | `pk_미디어` | `PRIMARY KEY ("번호")` |
 | UNIQUE | `uq_미디어_작품_순서` | `UNIQUE ("작품_번호", "순서")` |
 | FK | `fk_미디어_단서` | `FOREIGN KEY ("작품_번호", "단서_순서") REFERENCES "단서"("작품_번호", "순서") ON DELETE RESTRICT` |
+| FK | `fk_미디어_인물` | `FOREIGN KEY ("작품_번호", "인물_순서") REFERENCES "인물"("작품_번호", "순서") ON DELETE RESTRICT` |
 | FK | `fk_미디어_작품` | `FOREIGN KEY ("작품_번호") REFERENCES "작품"("번호") ON DELETE CASCADE` |
 | FK | `fk_미디어_조합` | `FOREIGN KEY ("작품_번호", "조합_순서") REFERENCES "조합"("작품_번호", "순서") ON DELETE RESTRICT` |
 | FK | `fk_미디어_증언` | `FOREIGN KEY ("작품_번호", "증언_순서") REFERENCES "증언"("작품_번호", "순서") ON DELETE RESTRICT` |
 | FK | `fk_미디어_진행순서` | `FOREIGN KEY ("작품_번호", "진행순서_순서") REFERENCES "진행순서"("작품_번호", "순서") ON DELETE RESTRICT` |
+| CHECK | `ck_미디어_대상` | `CHECK (((num_nonnulls("단서_순서", "증언_순서", "조합_순서", "진행순서_순서", "인물_순서") + CASE WHEN "공통스토리" THEN 1 ELSE 0 END) = 1))` |
 | CHECK | `ck_미디어_순서` | `CHECK (("순서" >= 1))` |
 | CHECK | `ck_미디어_유형` | `CHECK (("유형" = ANY (ARRAY['이미지'::text, '영상'::text])))` |
 
 **추가 인덱스** (PK/UNIQUE 제약이 만드는 인덱스는 제외)
 
 - `ix_미디어_단서`: `CREATE INDEX "ix_미디어_단서" ON public."미디어" USING btree ("작품_번호", "단서_순서")`
+- `ix_미디어_인물`: `CREATE INDEX "ix_미디어_인물" ON public."미디어" USING btree ("작품_번호", "인물_순서")`
 - `ix_미디어_조합`: `CREATE INDEX "ix_미디어_조합" ON public."미디어" USING btree ("작품_번호", "조합_순서")`
 - `ix_미디어_증언`: `CREATE INDEX "ix_미디어_증언" ON public."미디어" USING btree ("작품_번호", "증언_순서")`
 - `ix_미디어_진행순서`: `CREATE INDEX "ix_미디어_진행순서" ON public."미디어" USING btree ("작품_번호", "진행순서_순서")`

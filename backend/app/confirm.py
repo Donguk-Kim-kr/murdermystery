@@ -7,7 +7,7 @@
 * 스냅샷 형식(`형식버전` 1): 최상위에 `작품`(기본정보), `인물`, 각 콘텐츠 테이블 이름 → 행 목록, `라이브러리`.
   행 목록의 각 행은 제작 시점의 `순서`를 그대로 가지며(다른 항목이 이 번호로 가리킨다), `번호`·`작품_번호`는 담지 않는다.
   `진행구성`·`기믹적용`이 가리키는 진행단계·기믹은 **내용 사본**을 `라이브러리`에 넣는다. 삭제된 항목은 뺀다.
-* 사용 가능한 시각은 ISO 8601 글자로 저장한다. 미디어는 아직 지원하지 않아 담지 않는다.
+* 사용 가능한 시각은 ISO 8601 글자로 저장한다. 미디어(`미디어`)는 연결 대상과 파일 키(`경로`)만 담는다(파일 자체는 저장소에 있다).
 """
 import json
 from datetime import date, datetime
@@ -23,6 +23,7 @@ from .auth import CurrentUser
 from .characters import COLUMNS as CHARACTER_COLUMNS
 from .content import RESOURCES, Resource, card_display_names, columns, ensure_mine, key_col, phase_display_names
 from .db import Conn
+from .media import file_exists, snapshot_rows as media_snapshot_rows
 from .works import lock_work
 from .josa import attach, quoted
 
@@ -124,10 +125,22 @@ def check_work(conn: Connection, work_id: int) -> dict:
     ).fetchall():
         warnings.append(f"조합 '{combo['이름']}'에 재료가 없습니다.")
     errors.extend(script_errors(conn, work_id))
+    errors.extend(media_errors(conn, work_id))
     errors.extend(condition_errors(conn, work_id))
     warnings.extend(story_selection_warnings(conn, work_id))
     warnings.extend(question_warnings(conn, work_id))
     return {"errors": errors, "warnings": warnings, "다음버전": next_version(conn, work_id)}
+
+
+def media_errors(conn: Connection, work_id: int) -> list[str]:
+    """붙은 이미지·영상 파일이 저장소에 없으면 확정할 수 없다(확정한 게임이 그 파일을 보여 줘야 한다)."""
+    found = []
+    for row in media_snapshot_rows(conn, work_id):
+        if file_exists(row["경로"]):
+            continue
+        where = "공통 스토리" if row["공통스토리"] else (f"단서 {row['단서_순서']}" if row["단서_순서"] else f"인물 {row['인물_순서']}" if row["인물_순서"] else f"미디어 {row['순서']}")
+        found.append(f"{where}에 붙은 {row['유형']} 파일이 저장소에 없습니다. 다시 올려 주세요.")
+    return found
 
 
 def condition_errors(conn: Connection, work_id: int) -> list[str]:
@@ -260,6 +273,7 @@ def build_snapshot(conn: Connection, work_id: int) -> dict[str, Any]:
             shown = card_display_names([{**r, "번호": i} for i, r in enumerate(rows)], names)
             rows = [{**r, "표시이름": shown[i]} for i, r in enumerate(rows)]
         snap[res.table] = rows
+    snap["미디어"] = media_snapshot_rows(conn, work_id)        # 파일 자체는 저장소에 있고 스냅샷에는 키(`경로`)만 담는다
     # 페이즈 표시 이름(제작자가 정한 이름, 없으면 붙은 진행단계 이름을 이은 것)도 확정 내용에 담는다
     shown_phase = phase_display_names(snap["진행순서"], snap["진행구성"])
     snap["진행순서"] = [{**p, "표시이름": shown_phase[p["순서"]]} for p in snap["진행순서"]]

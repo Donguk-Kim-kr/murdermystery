@@ -58,7 +58,7 @@ def main() -> None:
         print()
 
         cons = q(dbname, f"""
-            SELECT c.contype, c.conname, pg_get_constraintdef(c.oid)
+            SELECT c.contype, c.conname, regexp_replace(pg_get_constraintdef(c.oid), '[[:space:]]+', ' ', 'g')
             FROM pg_constraint c WHERE c.conrelid='"{t}"'::regclass
             ORDER BY CASE c.contype WHEN 'p' THEN 1 WHEN 'u' THEN 2 WHEN 'f' THEN 3 ELSE 4 END, c.conname""")
         if cons:

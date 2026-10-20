@@ -251,6 +251,69 @@ export interface paths {
         patch: operations["update_item_api_works__work_id__content__key___item_id__patch"];
         trace?: never;
     };
+    "/api/works/{work_id}/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Media
+         * @description 내 작품에 붙은 미디어(제작 화면이 미리보기에 쓴다).
+         */
+        get: operations["list_media_api_works__work_id__media_get"];
+        /**
+         * Upload
+         * @description 파일 내용을 그대로 보내(`Content-Type` 은 image/jpeg·image/png·image/webp·video/mp4) 대상에 붙인다. 이미 붙은 것은 바뀐다.
+         *
+         *     `대상` 은 단서·인물(`번호` 는 그 단서·인물의 순서)·공통스토리이다.
+         */
+        put: operations["upload_api_works__work_id__media_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/works/{work_id}/media/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Media */
+        delete: operations["delete_media_api_works__work_id__media__number__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/media/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get File
+         * @description 서명된 주소로 파일을 내려준다(영상은 구간 이동이 되도록 Range 요청을 받는다).
+         */
+        get: operations["get_file_api_media__key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/works/{work_id}/phases/insert": {
         parameters: {
             query?: never;
@@ -1109,6 +1172,8 @@ export interface components {
             "\uC131\uBCC4": string | null;
             /** 선택한 계정 */
             "\uC120\uD0DD\uD55C_\uACC4\uC815": number | null;
+            /** 이미지 */
+            "\uC774\uBBF8\uC9C0"?: string | null;
         };
         /** GameMeOut */
         GameMeOut: {
@@ -2351,6 +2416,146 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_media_api_works__work_id__media_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_api_works__work_id__media_put: {
+        parameters: {
+            query: {
+                "\uB300\uC0C1": string;
+                "\uBC88\uD638"?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_media_api_works__work_id__media__number__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                work_id: number;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_file_api_media__key__get: {
+        parameters: {
+            query: {
+                a: number;
+                e: number;
+                s: string;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

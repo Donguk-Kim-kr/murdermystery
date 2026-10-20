@@ -42,6 +42,7 @@ docker compose up --build
 | 코드를 새로 받은 뒤(`git pull`) | `docker compose up --build` |
 | 데이터까지 모두 지우고 처음부터 | `docker compose down -v` |
 | 시연용 샘플 작품 | 켤 때 자동으로 만들어져 "게임 목록"에 「동짓날 마을회관」(4인)이 나온다. 수동 실행: `docker compose exec app python backend/scripts/seed_demo_work.py` |
+| 시연용 이미지·영상 | 프로젝트의 `demo_media/` 폴더에 `인물-이름.jpg`, `단서-이름.png`, `공통스토리.mp4` 를 두면 샘플 작품을 **처음 만들 때** 자동으로 붙는다(규칙은 `demo_media/README.md`). 업로드한 파일은 `media` 볼륨에 저장되며 `down -v` 하면 지워진다. 이미 만든 작품에는 제작 화면에서 올린다 |
 | 샘플 작품의 제작 계정 | 아이디 `sample_maker`, 패스워드 `sample1234` 로 로그인하면 제작공간에서 「동짓날 마을회관」을 볼 수 있다. 패스워드는 `MM_SAMPLE_MAKER_PASSWORD` 로 바꾼다(로컬 시연 전용, 비우면 로그인할 수 없다) |
 | 내 계정을 운영자로 만들기 | `docker compose exec db psql -U postgres -d murder_mystery -c "UPDATE 계정 SET 권한 = '운영자' WHERE 아이디 = '내아이디'"` |
 

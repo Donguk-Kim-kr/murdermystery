@@ -14,6 +14,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from .media import media_url
+
 
 @dataclass
 class GameIO:
@@ -287,6 +289,7 @@ def view_for(game: Game, account_id: int) -> dict[str, Any]:
                     "순서": c["순서"],
                     **{f: c.get(f) for f in PUBLIC_CHARACTER_FIELDS},
                     "선택한_계정": taken[c["순서"]].account_id if c["순서"] in taken else None,
+                    "이미지": media_url(game.snapshot, account_id, "인물", c["순서"]),
                 }
                 for c in game.characters
             ],

@@ -6,3 +6,7 @@ __pycache__/
 node_modules/
 dist/
 frontend/openapi.json
+
+# 업로드한 이미지·영상(개발 중 기본 저장 폴더). 시연용 파일은 demo_media/ 에 둔다.
+backend/media/
+/media/

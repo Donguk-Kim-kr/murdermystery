@@ -4,6 +4,7 @@ import { api, errorMessage } from "../api/client";
 import type { components } from "../api/schema";
 import { josa } from "../josa";
 import { useConfirm } from "../confirm/ConfirmContext";
+import { MediaField } from "../workspace/MediaField";
 
 export type Character = components["schemas"]["CharacterOut"];
 
@@ -176,6 +177,11 @@ export function CharacterForm({ workId, character, onSaved, onCancel }: Props) {
           범인
         </label>
       </div>
+      {character ? (
+        <MediaField workId={workId} target="인물" order={character.순서} label="캐릭터 이미지" />
+      ) : (
+        <p className="muted">인물을 저장한 뒤 캐릭터 이미지를 붙일 수 있습니다. 캐릭터 선택 화면에서 이 인물의 카드에 보입니다.</p>
+      )}
       {error && <p role="alert" className="error">{error}</p>}
       <div className="row start">
         <button type="submit" disabled={busy}>저장</button>

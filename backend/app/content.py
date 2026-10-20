@@ -614,6 +614,8 @@ def delete_item(work_id: int, key: str, item_id: int, conn: Conn, me: CurrentUse
     res = get_resource(key)
     lock_work(conn, work_id, me.계정.번호)
     fetch_one(conn, res, work_id, item_id)
+    if key == "clues":          # 단서에 붙은 이미지는 단서와 함께 지운다(파일은 다른 확정 버전이 쓸 수 있어 남긴다)
+        conn.execute('DELETE FROM "미디어" WHERE "작품_번호" = %s AND "단서_순서" = %s', (work_id, item_id))
     try:
         conn.execute(
             sql.SQL('DELETE FROM {t} WHERE "작품_번호" = %s AND {k} = %s').format(

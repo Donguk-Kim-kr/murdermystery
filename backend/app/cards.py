@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from . import clues, narrative
+from . import clues, media, narrative
 from .declare import BUILDER_NAMES, DECL_FUNCTIONS
 from .script import VM, Program, Ref, ScriptError, Suspend, builtin_names, compile_expression, compile_source
 from .josa import PAIRS, attach, quoted
@@ -56,7 +56,7 @@ class CardRun:
 MUTATING = {"배정취소", "탭이어쓰기", "변수설정", "배정", "투표", "투표초기화", "조사", "양도", "공개설정", "읽기", "기다리기", "단계_끝내기", "게임_종료"}
 FUNCTION_NAMES = {
     "플레이어들", "플레이어수", "인물들", "공통스토리", "서사들", "배정된_플레이어수", "인물_없는_플레이어가_있다",
-    "공통스토리부분들", "탭이어쓰기", "배정취소", "조사항목들", "토씨", "글", "선택지", "입력", "카드목록", "구역보기", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "모든_장소", "단서들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
+    "공통스토리부분들", "공통스토리영상", "탭이어쓰기", "배정취소", "조사항목들", "토씨", "글", "선택지", "입력", "카드목록", "구역보기", "투표칸", "현황", "거부", "배정", "조사", "양도", "공개설정", "장소들", "모든_장소", "단서들", "보유목록", "받은공개", "인물찾기", "투표", "질문정의", "변수설정", "변수", "가지고_있다", "단서_보유자", "인물의_플레이어", "엔딩분기들", "후일담들", "조건_맞음", "모든_단서", "모든_인물", "서사_전체", "투표수", "최다득표", "투표초기화", "결과", "결과_인물", "결과_기타", "기타후보", "후보값", "읽기", "기다리기",
     "단계_끝내기", "게임_종료",
 }
 FUNCTION_NAMES |= BUILDER_NAMES          # 제작 화면을 정하는 함수들(app/declare.py). 게임 중에 불러도 값만 만들 뿐이다
@@ -363,8 +363,15 @@ class CardHost:
         return any(p.character is None for p in self.game.players.values())
 
     # -- 블록 만들기 --
-    def fn_글(self, 이름: str, 내용: Any) -> dict[str, Any]:
-        return {"종류": "글", "이름": str(이름), "내용": _text(내용)}
+    def fn_공통스토리영상(self) -> str | None:
+        """공통 스토리에 붙은 영상 파일의 키. 붙은 영상이 없으면 None. `글(이름, 내용, 영상)` 의 셋째 값으로 넘긴다."""
+        return media.media_key(self.game.snapshot, "공통스토리")
+
+    def fn_글(self, 이름: str, 내용: Any, 영상: Any = None) -> dict[str, Any]:
+        block = {"종류": "글", "이름": str(이름), "내용": _text(내용)}
+        if isinstance(영상, str) and media.KEY_RE.match(영상):          # 키만 담고, 보는 사람마다 서명한 주소는 화면에 내보낼 때 만든다
+            block["영상"] = 영상
+        return block
 
     def fn_선택지(self, 이름: str, 항목: Any, 한사람당: int = 1, 확인필요: bool = False, 설명보임: bool = False, 공개: bool = False) -> dict[str, Any]:
         """고르는 칸. 인물을 고르는 칸이면 `설명보임` 으로 인물의 캐릭터 설명(`캐릭터설명`)을 함께 보여 줄 수 있다.
@@ -929,7 +936,8 @@ def _item(game, viewer: int, item: Any, show_intro: bool = False, show_holders: 
         row = next((c for c in game.snapshot.get("인물") or [] if c["순서"] == item.key), None)
         taken = next((p.account_id for p in game.players.values() if p.character == item.key), None)
         shown = {"캐릭터설명": (row or {}).get("캐릭터설명")} if show_intro else {}
-        return {"값": item.key, **{f: (row or {}).get(f) for f in PUBLIC_FIELDS}, **shown, "선택한_계정": taken}
+        picture = media.media_url(game.snapshot, viewer, "인물", item.key)
+        return {"값": item.key, **{f: (row or {}).get(f) for f in PUBLIC_FIELDS}, **shown, **({"이미지": picture} if picture else {}), "선택한_계정": taken}
     if isinstance(item, Ref) and item.kind == "장소":
         place = next((p for p in game.snapshot.get("장소") or [] if p["순서"] == item.key), None) or {}
         active = viewer in game.players and clues.next_item(game, viewer, item.key) is not None
@@ -940,6 +948,15 @@ def _item(game, viewer: int, item: Any, show_intro: bool = False, show_holders: 
     if isinstance(item, Ref):
         return {"값": None, "이름": item.kind}
     return {"값": item, "이름": str(item)}
+
+
+def _card_with_picture(game, viewer: int, card: dict[str, Any]) -> dict[str, Any]:
+    """단서 카드에 이미지 주소를 붙인다. 카드목록은 보는 사람이 가졌거나 보여 받은 단서만 담으므로, 이미지도 그 사람에게만 나간다."""
+    if card.get("종류") == "단서" and isinstance(card.get("순서"), int):
+        picture = media.media_url(game.snapshot, viewer, "단서", card["순서"])
+        if picture:
+            return {**card, "이미지": picture}
+    return dict(card)
 
 
 def _clue_label(game, order: int) -> str:
@@ -977,7 +994,12 @@ def _block(game, viewer: int, block: dict[str, Any]) -> dict[str, Any]:
         out["내_선택"] = game.votes.get(block["이름"], {}).get(viewer)
         out["투표수"] = len(game.votes.get(block["이름"], {}))
     elif kind == "카드목록":
-        out["항목"] = list(block.get("항목", []))
+        out["항목"] = [_card_with_picture(game, viewer, card) for card in block.get("항목", [])]
+    elif kind == "글" and block.get("영상"):
+        out.pop("영상", None)
+        key = block["영상"]
+        if media.file_exists(key):
+            out["영상"] = media.signed_url(key, viewer)
     elif kind == "읽기":
         record = game.reads.get(block["질문ID"], {"필요": set(), "확인": set()})
         out["확인함"] = viewer in record["확인"]

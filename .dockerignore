@@ -10,3 +10,5 @@ docs
 db/tests
 db/spec
 backend/tests
+demo_media
+**/media

@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { resetMediaCache } from "./workspace/MediaField";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -81,9 +82,11 @@ beforeEach(() => {
     "GET /api/works/7": () => json(work),
     "GET /api/works/7/characters": () => json([person]),
     "GET /api/works/7/testers": () => json([]),
+    "GET /api/works/7/media": () => json([]),
     "GET /api/content/schema": () => json(schema),
     "GET /api/works/7/content": () => json(bundle),
   };
+  resetMediaCache();
   calls.length = 0;
   localStorage.clear();
   localStorage.setItem("mm.token", "saved");

@@ -15,6 +15,8 @@ interface Item {
   선택한_계정?: number | null;
   /** 인물: 선택 화면에 보일 소개(카드 설정이 켜져 있을 때만 온다) */
   캐릭터설명?: string | null;
+  /** 인물: 캐릭터 이미지(서명된 주소). 제작자가 붙인 인물에만 온다 */
+  이미지?: string | null;
   /** 장소: 종류와 설명, 이 사람이 지금 고를 수 없는지 */
   유형?: string | null;
   특징?: string | null;
@@ -43,6 +45,8 @@ interface Card {
   양도가능?: boolean;
   /** 공개 단서: 누가 보여 준 것인지(캐릭터 이름) */
   주인?: string;
+  /** 이 카드의 단서에 붙은 이미지(서명된 주소). 카드를 가진(보여 받은) 사람에게만 온다 */
+  이미지?: string;
 }
 
 interface Props {
@@ -83,9 +87,15 @@ function Title({ block }: { block: Block }) {
 }
 
 function TextBlock({ block }: { block: Block }) {
+  const video = text(block.영상);
   return (
     <section className="block" aria-label={text(block.이름) || "글"}>
       <Title block={block} />
+      {video && (
+        <video className="story-video" controls preload="metadata" src={video} aria-label={`${text(block.이름) || "공통 스토리"} 영상`}>
+          이 브라우저는 영상을 재생할 수 없습니다.
+        </video>
+      )}
       <p className="prose">{text(block.내용)}</p>
     </section>
   );
@@ -238,7 +248,7 @@ function ClueCard({ card: c, state, actions, onSend }: {
         {c.장소 && <span className="muted">{c.장소}</span>}
         {c.주인 && <span className="chip accent">{josa(c.주인, "이/가")} 단서를 공유했습니다</span>}
       </span>
-      {c.내용 ? (
+      {c.내용 || c.이미지 ? (
         <button type="button" className="clue-head" aria-expanded={open} onClick={() => setOpen(!open)}>
           {title}
           <span className="muted">{open ? "접기" : "눌러서 내용 보기"}</span>
@@ -246,7 +256,12 @@ function ClueCard({ card: c, state, actions, onSend }: {
       ) : (
         <div className="clue-head">{title}</div>
       )}
-      {open && <p className="prose">{c.내용}</p>}
+      {open && (
+        <>
+          {c.이미지 && <img className="clue-image" src={c.이미지} alt={`${shown} 이미지`} loading="lazy" />}
+          <p className="prose">{c.내용}</p>
+        </>
+      )}
       {c.공개 !== undefined && <SharedWith card={c} state={state} />}
       {actions.length > 0 && <CardActions card={c} actions={actions} state={state} onSend={onSend} />}
     </li>
@@ -499,6 +514,7 @@ function ChoiceBlock({ block, state, onAnswer }: { block: Block; state: GameStat
                 disabled={!canPick || taken || busy || item.비활성 === true}
                 onClick={() => (needConfirm ? setPicked(item.값) : void send(item.값))}
               >
+                {item.이미지 && <img className="pick-portrait" src={item.이미지} alt={`${text(item.이름)} 이미지`} loading="lazy" />}
                 <strong>{text(item.이름) || "이름 없음"}</strong>
                 <span className="muted">
                   {[item.직업, item.나이 != null ? `${item.나이}세` : null, item.성별, item.유형, item.특징].filter(Boolean).join(" · ")}

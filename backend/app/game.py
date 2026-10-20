@@ -266,6 +266,7 @@ class GameCharacterOut(BaseModel):
     나이: int | None
     성별: str | None
     선택한_계정: int | None
+    이미지: str | None = None             # 캐릭터 이미지의 서명된 주소(붙인 것이 없으면 없음)
 
 
 class GameTimeOut(BaseModel):

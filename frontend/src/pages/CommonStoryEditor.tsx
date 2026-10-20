@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, errorMessage } from "../api/client";
 import type { components } from "../api/schema";
 import { useConfirm } from "../confirm/ConfirmContext";
+import { MediaField } from "../workspace/MediaField";
 
 type Work = components["schemas"]["WorkOut"];
 
@@ -113,6 +114,7 @@ export function CommonStoryEditor({ work, onSaved }: { work: Work; onSaved: () =
           </span>
         </div>
       </div>
+      <MediaField workId={work.번호} target="공통스토리" label="공통 스토리 영상" />
       {error && <p role="alert" className="error">{error}</p>}
       <div className="row start">
         <button type="button" disabled={busy} onClick={() => void save()}>공통 스토리 저장</button>

@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     db_pool_min: int = 1
     db_pool_max: int = 10
 
+    # 업로드한 이미지·영상을 저장하는 폴더(MM_MEDIA_DIR). 도커는 /app/media 볼륨. 크기 제한은 사용자 결정 2026-10-20 의 가정값이다.
+    media_dir: str = "media"
+    media_max_image_bytes: int = 5 * 1024 * 1024
+    media_max_video_bytes: int = 100 * 1024 * 1024
+
     # 대기실 (docs/DB_RULES.md B38)
     # 폴링(2~3초)이 이 시간 동안 끊기면 대기실에서 나간 것으로 본다. 사용자가 Discord 음성 때문에 다른 창으로 옮기면
     # 브라우저가 백그라운드 탭의 타이머를 늦추므로 너무 짧게 잡으면 쫓겨난다. (오래 숨겨 두면 그래도 끊길 수 있다 — B38 한계)

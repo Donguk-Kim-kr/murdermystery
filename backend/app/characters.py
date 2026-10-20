@@ -210,6 +210,7 @@ def _get(conn: Connection, work_id: int, order: int) -> dict:
 def delete_character(work_id: int, order: int, conn: Conn, me: CurrentUser) -> None:
     work = lock_work(conn, work_id, me.계정.번호)
     _get(conn, work_id, order)
+    conn.execute('DELETE FROM "미디어" WHERE "작품_번호" = %s AND "인물_순서" = %s', (work_id, order))      # 캐릭터 이미지는 인물과 함께 지운다
     try:
         conn.execute('DELETE FROM "인물" WHERE "작품_번호" = %s AND "순서" = %s', (work_id, order))
     except errors.ForeignKeyViolation:

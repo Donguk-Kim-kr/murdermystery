@@ -6,6 +6,8 @@
 """
 import os
 import secrets
+import unicodedata
+from pathlib import Path
 
 TITLE = "동짓날 마을회관"
 MAKER_ID = "sample_maker"
@@ -206,6 +208,39 @@ def fixed_password() -> str:
     return os.environ.get("MM_SAMPLE_MAKER_PASSWORD", "").strip()
 
 
+MEDIA_EXT = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".mp4": "video/mp4"}
+
+
+def attach_demo_media(client, headers, work_id: int, folder: Path, characters: dict[str, int], clues: dict[str, int]) -> list[str]:
+    """`folder` 의 이미지·영상을 작품에 붙인다. 파일 이름으로 대상을 정한다(한글 이름은 맥의 분해형 글자도 같게 본다).
+
+      인물-황칠성.jpg      그 이름의 인물에게 캐릭터 이미지
+      단서-찢어진 편지.png  그 이름의 단서에게 이미지
+      공통스토리.mp4        공통 스토리 영상
+
+    붙인 것과 붙이지 못한 것(이름이 없거나 형식이 맞지 않음)을 한 줄씩 돌려준다. 폴더가 없거나 비어 있으면 아무것도 하지 않는다."""
+    if not folder.is_dir():
+        return []
+    lines = []
+    for path in sorted(folder.iterdir()):
+        mime = MEDIA_EXT.get(path.suffix.lower())
+        stem = unicodedata.normalize("NFC", path.stem).strip()
+        if not path.is_file() or path.name.startswith(".") or mime is None:
+            continue                                         # README 같은 다른 파일은 건너뛴다
+        if stem == "공통스토리":
+            params = {"대상": "공통스토리"}
+        elif stem.startswith("인물-") and stem[3:].strip() in characters:
+            params = {"대상": "인물", "번호": characters[stem[3:].strip()]}
+        elif stem.startswith("단서-") and stem[3:].strip() in clues:
+            params = {"대상": "단서", "번호": clues[stem[3:].strip()]}
+        else:
+            lines.append(f"건너뜀: {path.name} (맞는 인물·단서 이름이 없습니다)")
+            continue
+        res = client.put(f"/api/works/{work_id}/media", params=params, content=path.read_bytes(), headers={**headers, "Content-Type": mime})
+        lines.append(f"붙임: {path.name}" if res.status_code == 201 else f"못 붙임: {path.name} ({res.status_code} {res.text[:120]})")
+    return lines
+
+
 def seed(client, conn=None) -> str:
     """샘플 작품을 만든다. 이미 있으면 "이미 있음", 만들었으면 "만듦"을 돌려준다. `client` 는 앱에 붙은 TestClient 이다.
 
@@ -237,8 +272,9 @@ def seed(client, conn=None) -> str:
         char_order[c["이름"]] = made["순서"]
 
     place_order = {name: post("content/places", 이름=name, 특징=text)["순서"] for name, text in PLACES}
+    clue_order = {}
     for place, name, shown, text in CLUES:
-        post("content/clues", 이름=name, 공개이름=shown, 내용=text, 장소_순서=place_order[place])
+        clue_order[name] = post("content/clues", 이름=name, 공개이름=shown, 내용=text, 장소_순서=place_order[place])["순서"]
     for place, name, shown, text in TESTIMONIES:
         post("content/testimonies", 이름=name, 공개이름=shown, 내용=text, 장소_순서=place_order[place])
 
@@ -261,6 +297,11 @@ def seed(client, conn=None) -> str:
                 raise SeedError(f"공통 진행단계 '{name}' 이 등록되어 있지 않습니다(register_common_phases 를 먼저 실행하세요)")
             post("content/phase-steps", 진행순서_순서=phase["순서"], 진행단계_번호=library[name], **({"설정": settings} if settings else {}))
     del incident
+
+    folder = os.environ.get("MM_DEMO_MEDIA_DIR", "").strip()
+    if folder:
+        for line in attach_demo_media(client, headers, wid, Path(folder), char_order, clue_order):
+            print("  " + line, flush=True)
 
     _ok(client.post(f"/api/works/{wid}/confirm", headers=headers, json={}))
     _ok(client.post(f"/api/works/{wid}/publish", headers=headers))

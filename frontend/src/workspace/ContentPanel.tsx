@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 
 import { errorMessage, http } from "../api/client";
 import { ConditionPicker } from "./ConditionPicker";
+import { MediaField } from "./MediaField";
 import {
   metaOf, refLabel, rowsOf, titleOf, useWorkspace,
   type FieldMeta, type Part, type ResourceMeta, type Row, type Workspace,
@@ -201,6 +202,12 @@ export function RowForm(props: {
         )}
       </div>
       {meta.has_parts && <PartsPicker ws={ws} parts={parts} onChange={setParts} selfOrder={row ? (row.순서 as number) : null} />}
+      {meta.key === "clues" &&
+        (row ? (
+          <MediaField workId={workId} target="단서" order={row.순서 as number} label="단서 이미지" />
+        ) : (
+          <p className="muted">단서를 저장한 뒤 이미지를 붙일 수 있습니다. 이미지는 그 단서를 얻은 플레이어의 내용 카드 안에서만 보입니다.</p>
+        ))}
       {error && <p role="alert" className="error">{error}</p>}
       <div className="row start">
         <button type="submit" disabled={busy}>저장</button>
