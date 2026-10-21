@@ -28,6 +28,9 @@ services:
       # AI 플레이어(backend/scripts/ai_players.py)가 쓴다. 프로젝트 폴더의 .env 파일에 ANTHROPIC_API_KEY=... 를 적어 둔다(.env 는 저장소에 올라가지 않는다).
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       MM_AI_MODEL: ${MM_AI_MODEL:-claude-haiku-5-5}
+      # 대기실의 "AI 추가" 버튼(방장이 누를 때마다 AI 가 한 명씩 입장한다). 위 ANTHROPIC_API_KEY 가 있으면 모델을 쓰는 AI 도, 없으면 규칙으로 움직이는 간단한 AI 만 부를 수 있다.
+      # 비용이 서버의 키로 나가므로 **내 컴퓨터에서만 여는 시연용**(아래 포트는 127.0.0.1 에만 열린다)으로 기본을 켜 두었다. 인터넷에 공개하는 서버에서는 false 로 끈다.
+      MM_AI_ENABLED: ${MM_AI_ENABLED:-true}
       MM_AI_EFFORT: ${MM_AI_EFFORT:-low}
       # 시연용 샘플 작품 「동짓날 마을회관」의 제작 계정(sample_maker)의 패스워드. 제작 과정을 보여 줄 때 이 계정으로 로그인한다. 로컬 시연 전용이며, 인터넷에 공개하는 서버에서는 바꾸거나 비운다(비우면 아무도 로그인할 수 없다).
       # 업로드한 이미지·영상을 저장하는 폴더(아래 media 볼륨). 파일 이름이 내용 해시라서 같은 파일은 한 번만 저장된다.

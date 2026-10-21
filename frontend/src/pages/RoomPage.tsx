@@ -18,9 +18,8 @@ export function RoomPage() {
   const notify = useNotice();
   const [starting, setStarting] = useState(false);
   const [ai, setAi] = useState<AiStatus | null>(null);               // 서버가 AI 추가를 허용하는지(방장의 대기실에서만 묻는다)
-  const [aiKind, setAiKind] = useState<"claude" | "simple">("simple");
   const [aiBusy, setAiBusy] = useState(false);
-  const [aiNote, setAiNote] = useState<string | null>(null);
+  const [aiWaiting, setAiWaiting] = useState<string | null>(null);   // 방금 부른 AI 의 닉네임(방에 나타나면 안내를 거둔다)
   const hostWaiting = !!room && room.내가_방장 && room.상태 === "대기";
 
   useEffect(() => {
@@ -29,7 +28,6 @@ export function RoomPage() {
     api.GET("/api/ai/status").then(({ data }) => {
       if (cancelled || !data) return;
       setAi(data);
-      setAiKind(data.모델사용가능 ? "claude" : "simple");
     }).catch(() => {});                                               // 연결이 끊기면 AI 추가 칸만 보이지 않는다
     return () => {
       cancelled = true;
@@ -88,11 +86,11 @@ export function RoomPage() {
 
   async function addAi() {
     setError(null);
-    setAiNote(null);
+    setAiWaiting(null);
     setAiBusy(true);
-    const { data, error } = await api.POST("/api/rooms/me/ai", { body: { 방식: aiKind } });
+    const { data, error } = await api.POST("/api/rooms/me/ai", { body: { 방식: "claude" } });
     if (error) setError(errorMessage(error, "AI 를 추가하지 못했습니다"));
-    else if (data) setAiNote(`${josa(data.닉네임, "이/가")} 입장하는 중입니다…`);
+    else if (data) setAiWaiting(data.닉네임);
     await refresh();
     setAiBusy(false);
   }
@@ -180,16 +178,15 @@ export function RoomPage() {
         {room.내가_방장 && ai?.사용가능 && (
           <div className="ai-add">
             <div className="row start">
-              <select aria-label="AI 종류" value={aiKind} onChange={(e) => setAiKind(e.target.value as "claude" | "simple")}>
-                <option value="claude" disabled={!ai.모델사용가능}>대화형 AI ({ai.모델})</option>
-                <option value="simple">간단한 AI (규칙)</option>
-              </select>
-              <button type="button" className="secondary" disabled={aiBusy || room.플레이어_수 >= room.작품.최대인원} onClick={() => void addAi()}>
+              <button type="button" className="secondary" disabled={!ai.모델사용가능 || aiBusy || room.플레이어_수 >= room.작품.최대인원} onClick={() => void addAi()}>
                 AI 추가
               </button>
+              <span className="muted">{ai.모델}</span>
             </div>
-            {!ai.모델사용가능 && <p className="muted">서버에 ANTHROPIC_API_KEY 가 없어 대화형 AI는 쓸 수 없습니다.</p>}
-            {aiNote && <p className="muted" role="status">{aiNote}</p>}
+            {!ai.모델사용가능 && <p className="muted">서버에 ANTHROPIC_API_KEY 가 없어 AI 를 부를 수 없습니다.</p>}
+            {aiWaiting && !room.참가자.some((m) => m.닉네임 === aiWaiting) && (
+              <p className="muted" role="status">{josa(aiWaiting, "이/가")} 입장하는 중입니다…</p>
+            )}
           </div>
         )}
         {error && <p role="alert" className="error">{error}</p>}
