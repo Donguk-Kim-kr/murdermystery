@@ -1258,16 +1258,14 @@ describe("라이브러리", () => {
     const lineage = await screen.findByRole("listitem", { name: "진행단계 나만의 조사" });
     expect(within(lineage).getByText("v2")).toBeInTheDocument();
     expect(within(lineage).getByText("변경: 시간 연장")).toBeInTheDocument();
-    expect(screen.getByRole("listitem", { name: "진행단계 토론" })).toHaveTextContent("공통");
+    expect(screen.queryByRole("listitem", { name: "진행단계 토론" })).not.toBeInTheDocument();     // 공통 항목은 보이지 않는다(내 계정이 만든 것만)
   });
 
-  it("일반 사용자에게는 공통 항목 버튼이 없고 이름 변경은 계열 전체로 보낸다", async () => {
+  it("이름 변경은 계열 전체로 보내고, 일반 사용자에게는 공통 항목 선택이 없다", async () => {
     routes["PATCH /api/library/phases/2"] = () => json(item({ 이름: "새 이름" }));
     renderApp("/make/library");
     const lineage = await screen.findByRole("listitem", { name: "진행단계 나만의 조사" });
     expect(screen.queryByLabelText(/공통 항목으로 만들기/)).not.toBeInTheDocument();
-    // 공통 항목은 변경 버튼이 없다
-    expect(within(screen.getByRole("listitem", { name: "진행단계 토론" })).queryByRole("button", { name: "이름 바꾸기" })).not.toBeInTheDocument();
     await userEvent.click(within(lineage).getByRole("button", { name: "이름 바꾸기" }));
     const input = within(lineage).getByLabelText("새 이름");
     await userEvent.clear(input);
@@ -1280,6 +1278,7 @@ describe("라이브러리", () => {
   it("만들기: 같은 이름이면 새 버전, 내용은 JSON 으로 보낸다", async () => {
     routes["POST /api/library/phases"] = () => json(item({ 버전: 3 }), 201);
     renderApp("/make/library");
+    await userEvent.click(await screen.findByRole("button", { name: "새 라이브러리 만들기" }));
     const form = await screen.findByRole("form", { name: "진행단계 만들기" });
     await userEvent.type(within(form).getByLabelText("이름"), "나만의 조사");
     const rule = within(form).getByLabelText("규칙 (JSON)");
@@ -1299,6 +1298,7 @@ describe("라이브러리", () => {
       return json(스크립트.includes("몰라") ? { 정상: false, 오류: "알 수 없는 이름 '몰라'", 줄: 2, 함수: [] } : { 정상: true, 오류: null, 줄: null, 함수: ["실행"] });
     };
     renderApp("/make/library");
+    await userEvent.click(await screen.findByRole("button", { name: "새 라이브러리 만들기" }));
     const form = await screen.findByRole("form", { name: "진행단계 만들기" });
     await userEvent.type(within(form).getByLabelText("이름"), "새 카드");
     const editor = within(form).getByLabelText("스크립트");
@@ -1328,6 +1328,36 @@ describe("라이브러리", () => {
   it("운영자에게는 '공통 항목으로 만들기' 선택이 보인다", async () => {
     routes["GET /api/auth/me"] = () => json({ ...account, 권한: "운영자" });
     renderApp("/make/library");
+    await userEvent.click(await screen.findByRole("button", { name: "새 라이브러리 만들기" }));
     expect((await screen.findAllByLabelText(/공통 항목으로 만들기/)).length).toBeGreaterThan(0);
+  });
+
+  it("진행단계·기믹·함수 카드 셋이 있고, 누른 카드의 내 항목만 보인다(함수는 아직 비어 있다)", async () => {
+    routes["GET /api/library/gimmicks"] = () => json([{ 번호: 9, 이름: "독 퍼뜨리기", 버전: 1, 설명: "g", 변경내역: null, 삭제일시: null, 공개여부: false, 공통: false, 조건: {}, 결과: {} }]);
+    renderApp("/make/library");
+    const phases = await screen.findByRole("button", { name: /^진행단계 / });
+    expect(await within(phases).findByText("내 진행단계 1개")).toBeInTheDocument();          // 공통 '토론'은 세지 않는다
+    expect(await screen.findByText("내 기믹 1개")).toBeInTheDocument();
+    expect(screen.getByText("내 함수 0개")).toBeInTheDocument();
+    expect(phases).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("listitem", { name: "진행단계 나만의 조사" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^기믹 / }));
+    expect(await screen.findByRole("listitem", { name: "기믹 독 퍼뜨리기" })).toBeInTheDocument();
+    expect(screen.queryByRole("listitem", { name: "진행단계 나만의 조사" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^함수 / }));
+    expect(within(screen.getByRole("region", { name: "함수" })).getByText("아직 없습니다.")).toBeInTheDocument();
+    expect(calls.some((c) => c.key.includes("/api/library/functions"))).toBe(false);          // 함수는 서버에 아직 없다
+  });
+
+  it("새 라이브러리 만들기를 누르면 고른 종류의 만들기 양식이 열리고 취소로 닫힌다", async () => {
+    renderApp("/make/library");
+    expect(screen.queryByRole("form", { name: "진행단계 만들기" })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "새 라이브러리 만들기" }));
+    const form = await screen.findByRole("form", { name: "진행단계 만들기" });
+    await userEvent.click(within(form).getByRole("button", { name: "취소" }));
+    expect(screen.queryByRole("form", { name: "진행단계 만들기" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^기믹 / }));
+    await userEvent.click(screen.getByRole("button", { name: "새 라이브러리 만들기" }));
+    expect(await screen.findByRole("form", { name: "기믹 만들기" })).toBeInTheDocument();
   });
 });

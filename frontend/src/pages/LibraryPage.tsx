@@ -23,26 +23,66 @@ const KINDS = [
   { key: "gimmicks", label: "기믹", content: ["조건", "결과"], describe: "조건이 맞으면 결과가 일어나는 장치" },
 ] as const;
 
-/** 진행단계·기믹 라이브러리. 같은 이름으로 만들면 그 계열의 다음 버전이 되고, 이름은 계열 전체를 한꺼번에 바꾼다. */
+type Kind = (typeof KINDS)[number];
+type CardKey = Kind["key"] | "functions";
+
+// 라이브러리 카드. 함수는 화면만 있고 아직 서버에 없어서(목록도 만들기도 없다) 항상 비어 있다.
+const CARDS: { key: CardKey; label: string; describe: string }[] = [
+  ...KINDS.map((k) => ({ key: k.key, label: k.label, describe: k.describe })),
+  { key: "functions", label: "함수", describe: "여러 진행단계와 기믹에서 불러 쓰는 코드" },
+];
+
+/** 라이브러리: 진행단계·기믹·함수 카드 셋 중 하나를 누르면 **내 계정이 만든** 항목만 보인다. 같은 이름으로 만들면 그 계열의 다음 버전이 되고, 이름은 계열 전체를 한꺼번에 바꾼다. */
 export function LibraryPage() {
+  const [selected, setSelected] = useState<CardKey>("phases");
+  const [creating, setCreating] = useState(false);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const kind = KINDS.find((k) => k.key === selected);
+
+  // 카드에 보이는 "내 항목 N개"(삭제하지 않은 것, 이름 하나가 한 계열)
+  const loadCounts = useCallback(async () => {
+    const next: Record<string, number> = { functions: 0 };
+    for (const k of KINDS) {
+      const res = await http<Item[]>("GET", `/api/library/${k.key}?include_deleted=false`);
+      next[k.key] = res.data ? new Set(res.data.filter((i) => !i.공통).map((i) => i.이름)).size : 0;
+    }
+    setCounts(next);
+  }, []);
+
+  useEffect(() => {
+    void loadCounts();
+  }, [loadCounts]);
+
   return (
     <main className="page">
       <Link to="/make" className="back">← 제작공간</Link>
-      <h1>라이브러리</h1>
-      <p className="muted">
-        진행단계와 기믹은 여기서 한 번 만들어 두고 여러 작품의 페이즈에 붙여 씁니다. 만든 내용은 고치지 않고,
-        같은 이름으로 다시 만들면 새 버전이 됩니다.
-      </p>
-      <div className="stack">
-        {KINDS.map((k) => (
-          <KindSection key={k.key} kind={k} />
+      <div className="page-head">
+        <h1>라이브러리</h1>
+        <button type="button" disabled={!kind} onClick={() => setCreating((v) => !v)}>새 라이브러리 만들기</button>
+      </div>
+      <div className="lib-cards">
+        {CARDS.map((c) => (
+          <button key={c.key} type="button" className="lib-card" aria-pressed={selected === c.key}
+            onClick={() => { setSelected(c.key); setCreating(false); }}>
+            <h2>{c.label}</h2>
+            <p>{c.describe}</p>
+            <span className="chip">내 {c.label} {counts[c.key] ?? 0}개</span>
+          </button>
         ))}
       </div>
+      {kind ? (
+        <KindSection key={kind.key} kind={kind} creating={creating} onCreating={setCreating} onChanged={() => void loadCounts()} />
+      ) : (
+        <section className="card" aria-label="함수">
+          <h2>함수</h2>
+          <p className="muted">아직 없습니다.</p>
+        </section>
+      )}
     </main>
   );
 }
 
-function KindSection({ kind }: { kind: (typeof KINDS)[number] }) {
+function KindSection({ kind, creating, onCreating, onChanged }: { kind: Kind; creating: boolean; onCreating: (open: boolean) => void; onChanged: () => void }) {
   const confirm = useConfirm();
   const { state } = useAuth();
   const operator = state.status === "authenticated" && state.account.권한 === "운영자";
@@ -58,7 +98,7 @@ function KindSection({ kind }: { kind: (typeof KINDS)[number] }) {
 
   const load = useCallback(async () => {
     const res = await http<Item[]>("GET", `/api/library/${kind.key}?include_deleted=${showDeleted}`);
-    if (res.data) setItems(res.data);
+    if (res.data) setItems(res.data.filter((i) => !i.공통));        // 내 계정이 만든 것만(공통 항목은 보이지 않는다)
     else setError(errorMessage(res.error, "불러오지 못했습니다"));
   }, [kind.key, showDeleted]);
 
@@ -77,7 +117,10 @@ function KindSection({ kind }: { kind: (typeof KINDS)[number] }) {
     setError(null);
     const res = await http(method, path, body);
     if (res.error) setError(errorMessage(res.error, "처리하지 못했습니다"));
-    else await load();
+    else {
+      await load();
+      onChanged();
+    }
     return !res.error;
   }
 
@@ -102,7 +145,10 @@ function KindSection({ kind }: { kind: (typeof KINDS)[number] }) {
         body.규칙 = { ...(body.규칙 as object), 스크립트: script };
       }
     }
-    if (await act("POST", `/api/library/${kind.key}`, body)) setDraft(blank(kind));
+    if (await act("POST", `/api/library/${kind.key}`, body)) {
+      setDraft(blank(kind));
+      onCreating(false);
+    }
   }
 
   const newVersionFrom = (i: Item) => {
@@ -115,10 +161,50 @@ function KindSection({ kind }: { kind: (typeof KINDS)[number] }) {
       values.규칙 = JSON.stringify(rest);
     }
     setDraft({ 이름: i.이름, 설명: i.설명 ?? "", 변경내역: "", 공통: i.공통, ...values, 스크립트: script });
+    onCreating(true);                                              // 만들기 양식이 열리고 이 버전의 내용이 채워진다
   };
 
   return (
     <section className="card" aria-label={kind.label}>
+      {creating && (
+        <form onSubmit={create} className="subform create-form" aria-label={`${kind.label} 만들기`}>
+          <h3>{kind.label} 만들기</h3>
+          <p className="muted">이미 있는 이름으로 만들면 그 이름의 다음 버전이 됩니다. 이름은 나중에 바꿀 수 있습니다.</p>
+          <div className="field-grid two">
+            <label>
+              <span className="req-label">이름</span>
+              <input value={draft.이름} maxLength={100} onChange={(e) => setDraft({ ...draft, 이름: e.target.value })} required />
+            </label>
+            <label>
+              설명
+              <input value={draft.설명} onChange={(e) => setDraft({ ...draft, 설명: e.target.value })} />
+            </label>
+            <label className="wide">
+              변경내역 (새 버전일 때, 고를 때 함께 보입니다)
+              <input value={draft.변경내역} onChange={(e) => setDraft({ ...draft, 변경내역: e.target.value })} />
+            </label>
+            {kind.content.map((c) => (
+              <label key={c} className="wide">
+                {c} (JSON)
+                <textarea rows={3} spellCheck={false} value={String(draft[c])} onChange={(e) => setDraft({ ...draft, [c]: e.target.value })} />
+              </label>
+            ))}
+          </div>
+          {kind.key === "phases" && (
+            <ScriptEditor value={String(draft.스크립트 ?? "")} onChange={(v) => setDraft({ ...draft, 스크립트: v })} onValid={setScriptOk} />
+          )}
+          {operator && (
+            <label className="check">
+              <input type="checkbox" checked={draft.공통} onChange={(e) => setDraft({ ...draft, 공통: e.target.checked })} />
+              공통 항목으로 만들기 (모든 제작자에게 보입니다)
+            </label>
+          )}
+          <div className="row start">
+            <button type="submit" disabled={kind.key === "phases" && !scriptOk}>만들기</button>
+            <button type="button" className="secondary" onClick={() => onCreating(false)}>취소</button>
+          </div>
+        </form>
+      )}
       <div className="row">
         <h2>{kind.label}</h2>
         <label className="check">
@@ -126,12 +212,11 @@ function KindSection({ kind }: { kind: (typeof KINDS)[number] }) {
           삭제된 항목 보기
         </label>
       </div>
-      <p className="muted">{kind.describe}</p>
       {lineages.size === 0 && <p className="muted">아직 없습니다.</p>}
       <ul className="item-list">
         {[...lineages.entries()].map(([k, versions]) => {
           const head = versions[0];
-          const mayChange = !head.공통 || operator;
+          const mayChange = true;                                  // 내가 만든 항목만 보인다
           return (
             <li key={k} className="lineage" aria-label={`${kind.label} ${head.이름}`}>
               <div className="row">
@@ -142,7 +227,7 @@ function KindSection({ kind }: { kind: (typeof KINDS)[number] }) {
                     <button type="button" className="small secondary" onClick={() => setRenaming(null)}>취소</button>
                   </form>
                 ) : (
-                  <strong>{head.이름} {head.공통 && <span className="chip accent">공통</span>}</strong>
+                  <strong>{head.이름}</strong>
                 )}
                 {mayChange && renaming?.id !== head.번호 && (
                   <span className="row start">
@@ -181,40 +266,6 @@ function KindSection({ kind }: { kind: (typeof KINDS)[number] }) {
           );
         })}
       </ul>
-      <form onSubmit={create} className="subform" aria-label={`${kind.label} 만들기`}>
-        <h3>{kind.label} 만들기</h3>
-        <p className="muted">이미 있는 이름으로 만들면 그 이름의 다음 버전이 됩니다. 이름은 나중에 바꿀 수 있습니다.</p>
-        <div className="field-grid two">
-          <label>
-            <span className="req-label">이름</span>
-            <input value={draft.이름} maxLength={100} onChange={(e) => setDraft({ ...draft, 이름: e.target.value })} required />
-          </label>
-          <label>
-            설명
-            <input value={draft.설명} onChange={(e) => setDraft({ ...draft, 설명: e.target.value })} />
-          </label>
-          <label className="wide">
-            변경내역 (새 버전일 때, 고를 때 함께 보입니다)
-            <input value={draft.변경내역} onChange={(e) => setDraft({ ...draft, 변경내역: e.target.value })} />
-          </label>
-          {kind.content.map((c) => (
-            <label key={c} className="wide">
-              {c} (JSON)
-              <textarea rows={3} spellCheck={false} value={String(draft[c])} onChange={(e) => setDraft({ ...draft, [c]: e.target.value })} />
-            </label>
-          ))}
-        </div>
-        {kind.key === "phases" && (
-          <ScriptEditor value={String(draft.스크립트 ?? "")} onChange={(v) => setDraft({ ...draft, 스크립트: v })} onValid={setScriptOk} />
-        )}
-        {operator && (
-          <label className="check">
-            <input type="checkbox" checked={draft.공통} onChange={(e) => setDraft({ ...draft, 공통: e.target.checked })} />
-            공통 항목으로 만들기 (모든 제작자에게 보입니다)
-          </label>
-        )}
-        <div className="row start"><button type="submit" disabled={kind.key === "phases" && !scriptOk}>만들기</button></div>
-      </form>
       {error && <p role="alert" className="error">{error}</p>}
     </section>
   );

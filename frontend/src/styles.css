@@ -447,6 +447,18 @@ a.work-card:hover {
 .hub-card { display: grid; gap: 0.5rem; padding: 1.4rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
 .hub-card:hover { border-color: var(--accent); text-decoration: none; }
 .hub-card p { color: var(--muted); }
+/* 라이브러리: 진행단계·기믹·함수 카드. 누른 카드의 내 항목이 아래에 보인다 */
+.lib-cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); margin: 0.4rem 0 1.2rem; }
+.lib-card {
+  display: grid; gap: 0.5rem; justify-content: stretch; justify-items: start; align-content: start; text-align: left;
+  padding: 1.2rem 1.3rem; background: var(--surface); color: var(--text); font: inherit; font-weight: 400;
+  border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm);
+}
+.lib-card:hover:not(:disabled) { background: var(--surface); border-color: var(--accent); }
+.lib-card[aria-pressed="true"] { border-color: var(--accent); box-shadow: var(--ring); }
+.lib-card h2 { margin: 0; font-size: 1.1rem; }
+.lib-card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.create-form { margin-bottom: 1.2rem; padding-bottom: 1.2rem; border-bottom: 1px solid var(--border); }
 .work-item { position: relative; display: grid; }
 .work-item > .work-card { height: 100%; }
 .work-delete { position: absolute; top: 0.7rem; right: 0.7rem; }
