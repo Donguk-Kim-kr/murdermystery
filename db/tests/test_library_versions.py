@@ -261,7 +261,7 @@ class TestBackfillOfExistingRows(unittest.TestCase):
         for t in ("진행단계", "기믹"):
             got = self.db.rows(
                 f"""SELECT COALESCE("계정_번호"::text,'공통'), "이름", string_agg("버전"::text, ',' ORDER BY "번호")
-                    FROM "{t}" GROUP BY 1, 2 ORDER BY 1, 2""")
+                    FROM "{t}" GROUP BY 1, 2 ORDER BY COALESCE("계정_번호"::text,'공통') COLLATE "C", "이름" COLLATE "C" """)
             self.assertEqual(got, [["1", "같은 이름", "1,2,3"], ["공통", "같은 이름", "1,2,3"], ["공통", "다른 이름", "1"]])
 
 

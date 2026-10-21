@@ -29,7 +29,12 @@ export function ChatPanel() {
   const listRef = useRef<HTMLUListElement>(null);
 
   const load = useCallback(async () => {
-    const { data } = await api.GET("/api/game/me/chat", { params: { query: { after: last.current } } });
+    let data;
+    try {
+      ({ data } = await api.GET("/api/game/me/chat", { params: { query: { after: last.current } } }));
+    } catch {
+      return;                                              // 연결이 잠깐 끊기면 이번 주기는 건너뛰고 다음 주기에 다시 한다(처리되지 않은 오류로 남기지 않는다)
+    }
     if (!data) return;
     setChat(data);
     if (data.메시지.length > 0) {

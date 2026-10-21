@@ -16,9 +16,11 @@ export default defineConfig({
     // "fetch failed / ECONNREFUSED 127.0.0.1:3000" 이 처리되지 않은 오류로 잡히고 시험이 모두 통과해도 종료 코드가 1 이 된다.
     // 시험 결과와 무관한 이 오류 하나만 걸러서 자동 시험(GitHub Actions)이 이유 없이 빨개지지 않게 한다. 다른 처리되지 않은 오류는 그대로 실패로 센다.
     onUnhandledError(error) {
-      const e = error as { message?: string; cause?: { message?: string } };
-      const text = `${e.message ?? ""} ${e.cause?.message ?? ""}`;
-      if (text.includes("fetch failed") && text.includes("ECONNREFUSED")) return false;
+      // localhost 가 ::1 과 127.0.0.1 둘로 풀리는 환경(GitHub Actions)에서는 원인이 AggregateError 로 한 겹 더 감싸여 온다.
+      type NetError = { message?: string; code?: string; errors?: NetError[] };
+      const e = error as { message?: string; cause?: NetError };
+      const parts = [e.cause?.message, e.cause?.code, ...(e.cause?.errors ?? []).flatMap((x) => [x.message, x.code])];
+      if ((e.message ?? "").includes("fetch failed") && parts.some((p) => p?.includes("ECONNREFUSED"))) return false;
     },
   },
 });
