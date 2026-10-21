@@ -9,6 +9,7 @@ from fastapi import APIRouter
 
 from .auth import CurrentUser
 from .db import Conn
+from .media import cover_url
 from .testers import _TESTABLE
 
 router = APIRouter(prefix="/api/play-works", tags=["play"])
@@ -24,16 +25,21 @@ class PlayWorkOut(BaseModel):
     예상시간: str
     제작자: str
     비공개플레이: bool
+    표지: str | None = None             # 표지 이미지의 서명된 주소(보는 사람 용). 표지가 없으면 None
 
 
 @router.get("", response_model=list[PlayWorkOut])
 def play_works(conn: Conn, me: CurrentUser) -> list[dict]:
-    return conn.execute(
+    rows = conn.execute(
         'SELECT w."번호", w."제목", w."시놉시스", w."장르", w."최소인원", w."최대인원", w."예상시간", '
-        'a."닉네임" AS "제작자", NOT w."공개여부" AS "비공개플레이" '
+        'a."닉네임" AS "제작자", NOT w."공개여부" AS "비공개플레이", c."경로" AS "표지키" '
         'FROM "작품" w JOIN "계정" a ON a."번호" = w."계정_번호" '
         'LEFT JOIN "테스터" t ON t."작품_번호" = w."번호" AND t."계정_번호" = %(me)s '
+        'LEFT JOIN "미디어" c ON c."작품_번호" = w."번호" AND c."표지" '
         f'WHERE w."상태" <> \'삭제\' AND EXISTS (SELECT 1 FROM "버전" v WHERE v."작품_번호" = w."번호") AND (w."공개여부" OR ({_TESTABLE})) '
         'ORDER BY w."번호" DESC',
         {"me": me.계정.번호},
     ).fetchall()
+    for row in rows:
+        row["표지"] = cover_url(row.pop("표지키"), me.계정.번호)
+    return rows

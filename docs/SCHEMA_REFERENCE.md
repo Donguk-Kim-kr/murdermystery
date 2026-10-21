@@ -591,6 +591,7 @@
 | 10 | 경로 | text | 불가 |  |
 | 11 | 인물_순서 | integer | 가능 |  |
 | 12 | 공통스토리 | boolean | 불가 | false |
+| 13 | 표지 | boolean | 불가 | false |
 
 **제약조건**
 
@@ -604,7 +605,7 @@
 | FK | `fk_미디어_조합` | `FOREIGN KEY ("작품_번호", "조합_순서") REFERENCES "조합"("작품_번호", "순서") ON DELETE RESTRICT` |
 | FK | `fk_미디어_증언` | `FOREIGN KEY ("작품_번호", "증언_순서") REFERENCES "증언"("작품_번호", "순서") ON DELETE RESTRICT` |
 | FK | `fk_미디어_진행순서` | `FOREIGN KEY ("작품_번호", "진행순서_순서") REFERENCES "진행순서"("작품_번호", "순서") ON DELETE RESTRICT` |
-| CHECK | `ck_미디어_대상` | `CHECK (((num_nonnulls("단서_순서", "증언_순서", "조합_순서", "진행순서_순서", "인물_순서") + CASE WHEN "공통스토리" THEN 1 ELSE 0 END) = 1))` |
+| CHECK | `ck_미디어_대상` | `CHECK ((((num_nonnulls("단서_순서", "증언_순서", "조합_순서", "진행순서_순서", "인물_순서") + CASE WHEN "공통스토리" THEN 1 ELSE 0 END) + CASE WHEN "표지" THEN 1 ELSE 0 END) = 1))` |
 | CHECK | `ck_미디어_순서` | `CHECK (("순서" >= 1))` |
 | CHECK | `ck_미디어_유형` | `CHECK (("유형" = ANY (ARRAY['이미지'::text, '영상'::text])))` |
 

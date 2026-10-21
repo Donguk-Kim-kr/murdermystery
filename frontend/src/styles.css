@@ -452,6 +452,9 @@ a.work-card:hover {
 .work-delete { position: absolute; top: 0.7rem; right: 0.7rem; }
 .work-item .work-card h3 { padding-right: 3.5rem; }
 .work-card h3 { font-size: 1.05rem; font-weight: 650; }
+/* 작품 표지: 세로가 긴 2:3 포스터. 비율이 다른 이미지는 가운데를 기준으로 잘라 채운다 */
+.work-cover { display: block; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: var(--radius-sm); background: var(--surface-2); }
+.work-cover.empty-cover { display: grid; place-items: center; color: var(--muted); font-size: 0.85rem; border: 1px dashed var(--border-strong); }
 .work-card .synopsis {
   color: var(--muted);
   font-size: 0.875rem;

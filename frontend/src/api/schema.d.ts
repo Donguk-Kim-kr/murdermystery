@@ -267,7 +267,7 @@ export interface paths {
          * Upload
          * @description 파일 내용을 그대로 보내(`Content-Type` 은 image/jpeg·image/png·image/webp·video/mp4) 대상에 붙인다. 이미 붙은 것은 바뀐다.
          *
-         *     `대상` 은 단서·인물(`번호` 는 그 단서·인물의 순서)·공통스토리이다.
+         *     `대상` 은 단서·인물(`번호` 는 그 단서·인물의 순서)·공통스토리·표지이다.
          */
         put: operations["upload_api_works__work_id__media_put"];
         post?: never;
@@ -1395,6 +1395,8 @@ export interface components {
             "\uC81C\uC791\uC790": string;
             /** 비공개플레이 */
             "\uBE44\uACF5\uAC1C\uD50C\uB808\uC774": boolean;
+            /** 표지 */
+            "\uD45C\uC9C0"?: string | null;
         };
         /**
          * PrivatePlayWorkOut

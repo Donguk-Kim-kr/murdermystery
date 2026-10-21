@@ -71,6 +71,11 @@ export function PlayHomePage() {
         <div className="work-grid">
           {works.map((w) => (
             <div key={w.번호} className="work-card">
+              {w.표지 ? (
+                <img className="work-cover" src={w.표지} alt={`${w.제목} 표지`} loading="lazy" />
+              ) : (
+                <div className="work-cover empty-cover" aria-hidden="true">표지 없음</div>
+              )}
               <h3>{w.제목}</h3>
               <p className="synopsis">{w.시놉시스 || "시놉시스가 아직 없습니다."}</p>
               <div className="work-meta">

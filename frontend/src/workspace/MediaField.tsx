@@ -5,10 +5,10 @@ import { getToken } from "../api/token";
 import { useConfirm } from "../confirm/ConfirmContext";
 import { josa } from "../josa";
 
-/** 작품에 붙은 이미지·영상 한 건(서버가 만든 서명된 주소 포함). */
+/** 작품에 붙은 이미지·영상 한 건(서버가 만든 서명된 주소 포함). 공통스토리와 표지는 작품당 하나라 번호가 없다. */
 export interface MediaItem {
   순서: number;
-  대상: "단서" | "인물" | "공통스토리";
+  대상: "단서" | "인물" | "공통스토리" | "표지";
   번호: number | null;
   유형: "이미지" | "영상";
   주소: string | null;
@@ -63,13 +63,13 @@ function useMedia(workId: number): MediaItem[] | null {
 interface Props {
   workId: number;
   target: MediaTarget;
-  /** 단서·인물의 순서. 공통 스토리에는 없다 */
+  /** 단서·인물의 순서. 공통 스토리와 표지에는 없다 */
   order?: number;
   label: string;
 }
 
 /**
- * 이미지·영상 올리기. 단서·인물에는 이미지, 공통 스토리에는 영상을 한 건 붙인다. 다시 올리면 바뀌고 "지우기"로 뗀다.
+ * 이미지·영상 올리기. 단서·인물·표지에는 이미지, 공통 스토리에는 영상을 한 건 붙인다. 다시 올리면 바뀌고 "지우기"로 뗀다.
  * 파일 내용을 그대로 PUT 으로 보내며(서버가 내용으로 형식을 다시 확인한다), 크기·형식은 보내기 전에 먼저 알려 준다.
  */
 export function MediaField({ workId, target, order, label }: Props) {
@@ -77,7 +77,7 @@ export function MediaField({ workId, target, order, label }: Props) {
   const kind = target === "공통스토리" ? "영상" : "이미지";
   const rule = RULES[kind];
   const media = useMedia(workId);
-  const current = media?.find((m) => m.대상 === target && (target === "공통스토리" || m.번호 === order)) ?? null;
+  const current = media?.find((m) => m.대상 === target && (target === "공통스토리" || target === "표지" || m.번호 === order)) ?? null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);

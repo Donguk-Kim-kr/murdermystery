@@ -217,6 +217,7 @@ def attach_demo_media(client, headers, work_id: int, folder: Path, characters: d
       인물-황칠성.jpg      그 이름의 인물에게 캐릭터 이미지
       단서-찢어진 편지.png  그 이름의 단서에게 이미지
       공통스토리.mp4        공통 스토리 영상
+      표지.png              작품 표지 이미지(작품 목록과 플레이 기록에 보임)
 
     붙인 것과 붙이지 못한 것(이름이 없거나 형식이 맞지 않음)을 한 줄씩 돌려준다. 폴더가 없거나 비어 있으면 아무것도 하지 않는다."""
     if not folder.is_dir():
@@ -229,6 +230,8 @@ def attach_demo_media(client, headers, work_id: int, folder: Path, characters: d
             continue                                         # README 같은 다른 파일은 건너뛴다
         if stem == "공통스토리":
             params = {"대상": "공통스토리"}
+        elif stem == "표지":
+            params = {"대상": "표지"}
         elif stem.startswith("인물-") and stem[3:].strip() in characters:
             params = {"대상": "인물", "번호": characters[stem[3:].strip()]}
         elif stem.startswith("단서-") and stem[3:].strip() in clues:

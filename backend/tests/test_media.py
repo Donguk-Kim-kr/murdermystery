@@ -224,6 +224,55 @@ def test_a_clue_image_reaches_only_the_player_who_holds_the_clue(client, game):
     assert "이미지" not in str(block(state(client, second).json(), "조사 대상"))      # 조사 목록에는 이미지가 없다(획득한 사람의 카드 안에서만 보인다)
 
 
+def test_cover_is_an_image_for_the_work_one_per_work_replaced_and_deleted(client, work):
+    owner, wid = work
+    assert put(client, owner, wid, MP4, "video/mp4", 대상="표지").status_code == 422          # 표지는 이미지만
+    first = put(client, owner, wid, PNG, "image/png", 대상="표지")
+    assert first.status_code == 201, first.text
+    assert first.json()["대상"] == "표지" and first.json()["번호"] is None and first.json()["유형"] == "이미지"
+    assert put(client, owner, wid, JPG, "image/jpeg", 대상="표지").status_code == 201          # 다시 올리면 바뀐다
+    listed = client.get(f"/api/works/{wid}/media", headers=owner.headers).json()
+    assert [(m["대상"], m["번호"]) for m in listed] == [("표지", None)]
+    assert client.get(listed[0]["주소"]).content == JPG
+    assert client.delete(f"/api/works/{wid}/media/{listed[0]['순서']}", headers=owner.headers).status_code == 204
+    assert client.get(f"/api/works/{wid}/media", headers=owner.headers).json() == []
+
+
+def test_cover_only_the_owner_can_attach(client, work, make_account):
+    owner, wid = work
+    assert put(client, make_account(), wid, PNG, "image/png", 대상="표지").status_code in (403, 404)
+    assert client.get(f"/api/works/{wid}/media", headers=owner.headers).json() == []
+
+
+def test_play_list_carries_a_cover_address_for_everyone_who_sees_the_work(client, make_account, confirm):
+    from test_play import make_work, titles
+
+    owner, other = make_account(), make_account()
+    with_cover = make_work(client, owner, confirm, "표지 있는 작품", public=True)
+    make_work(client, owner, confirm, "표지 없는 작품", public=True)
+    assert put(client, owner, with_cover, PNG, "image/png", 대상="표지").status_code == 201
+    seen = titles(client, other)
+    assert seen["표지 없는 작품"]["표지"] is None
+    got = client.get(seen["표지 있는 작품"]["표지"])
+    assert got.status_code == 200 and got.content == PNG
+    assert f"a={other.number}" in seen["표지 있는 작품"]["표지"]            # 보는 사람 자신의 주소
+    for f in media.media_dir().glob("*.png"):                              # 저장소에서 파일이 사라지면 표지 없음으로 보인다
+        f.unlink()
+    assert titles(client, other)["표지 있는 작품"]["표지"] is None
+
+
+def test_cover_is_not_part_of_the_confirmed_scenario_and_never_blocks_confirm(client, work, db, media_folder):
+    owner, wid = work
+    assert client.post(f"/api/works/{wid}/phases/insert", headers=owner.headers, json={"position": 1}).status_code == 201
+    assert put(client, owner, wid, PNG, "image/png", 대상="표지").status_code == 201
+    assert client.post(f"/api/works/{wid}/confirm", headers=owner.headers, json={}).status_code == 201
+    snapshot = db.execute('SELECT "시나리오" FROM "버전" WHERE "작품_번호" = %s', (wid,)).fetchone()[0]
+    assert snapshot["미디어"] == []
+    for f in media_folder.glob("*.png"):
+        f.unlink()
+    assert client.get(f"/api/works/{wid}/confirm/check", headers=owner.headers).json()["errors"] == []
+
+
 def test_demo_media_folder_is_attached_by_file_name(client, work, tmp_path):
     """시연용 폴더: 파일 이름으로 인물·단서·공통 스토리를 정한다. 다른 파일과 이름이 없는 파일은 건너뛴다."""
     import unicodedata
@@ -236,13 +285,15 @@ def test_demo_media_folder_is_attached_by_file_name(client, work, tmp_path):
     (folder / unicodedata.normalize("NFD", "인물-가.png")).write_bytes(PNG)               # 맥에서 만든 분해형 이름도 맞는다
     (folder / "단서-편지.jpg").write_bytes(JPG)
     (folder / "공통스토리.mp4").write_bytes(MP4)
+    (folder / "표지.webp").write_bytes(WEBP)
     (folder / "단서-없는 단서.png").write_bytes(PNG)
     (folder / "README.md").write_text("설명")
     (folder / ".DS_Store").write_bytes(b"x")
     lines = attach_demo_media(client, owner.headers, wid, folder, {"가": 1, "나": 2}, {"편지": 1, "안경": 2})
-    assert sorted(l.split(":")[0] for l in lines) == ["건너뜀", "붙임", "붙임", "붙임"]
+    assert sorted(l.split(":")[0] for l in lines) == ["건너뜀", "붙임", "붙임", "붙임", "붙임"]
     assert any("없는 단서" in l for l in lines if l.startswith("건너뜀"))
     listed = client.get(f"/api/works/{wid}/media", headers=owner.headers).json()
     assert sorted((m["대상"], m["번호"]) for m in listed if m["번호"] is not None) == [("단서", 1), ("인물", 1)]
     assert any(m["대상"] == "공통스토리" and m["유형"] == "영상" for m in listed)
+    assert any(m["대상"] == "표지" and m["유형"] == "이미지" for m in listed)
     assert attach_demo_media(client, owner.headers, wid, tmp_path / "없는 폴더", {}, {}) == []

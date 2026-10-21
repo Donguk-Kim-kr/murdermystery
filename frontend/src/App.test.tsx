@@ -512,6 +512,17 @@ describe("작품", () => {
     expect(links.map((l) => l.getAttribute("href"))).toEqual(["/rooms/new/8", "/rooms/new/9"]);
   });
 
+  it("작품 카드에 표지가 있으면 보여 주고, 없으면 자리를 비워 둔다", async () => {
+    routes["GET /api/play-works"] = () => json([
+      { 번호: 8, 제목: "표지 있는 작품", 시놉시스: "", 장르: "추리", 최소인원: 2, 최대인원: 4, 예상시간: "2시간", 제작자: "탐정", 비공개플레이: false, 표지: "/api/media/c.png?a=1&e=2&s=3" },
+      { 번호: 9, 제목: "표지 없는 작품", 시놉시스: "", 장르: "", 최소인원: 1, 최대인원: 3, 예상시간: "1시간", 제작자: "나", 비공개플레이: false, 표지: null },
+    ]);
+    renderApp();
+    expect(await screen.findByAltText("표지 있는 작품 표지")).toHaveAttribute("src", "/api/media/c.png?a=1&e=2&s=3");
+    expect(screen.queryByAltText("표지 없는 작품 표지")).not.toBeInTheDocument();
+    expect(screen.getAllByText("표지 없음")).toHaveLength(1);
+  });
+
   it("플레이할 작품이 없으면 안내한다", async () => {
     renderApp();
     expect(await screen.findByText("지금 플레이할 수 있는 작품이 없습니다.")).toBeInTheDocument();

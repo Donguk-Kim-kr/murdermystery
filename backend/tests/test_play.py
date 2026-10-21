@@ -26,7 +26,8 @@ def test_public_confirmed_work_is_listed_for_everyone_without_secrets(client, ma
     make_work(client, owner, confirm, "공개 작품", public=True)
     got = titles(client, other)["공개 작품"]
     assert got["비공개플레이"] is False and got["제작자"] and got["최대인원"] == 1
-    assert set(got) == {"번호", "제목", "시놉시스", "장르", "최소인원", "최대인원", "예상시간", "제작자", "비공개플레이"}
+    assert set(got) == {"번호", "제목", "시놉시스", "장르", "최소인원", "최대인원", "예상시간", "제작자", "비공개플레이", "표지"}
+    assert got["표지"] is None                  # 표지를 올리지 않은 작품
 
 
 def test_private_work_only_for_owner_and_testers(client, make_account, confirm):

@@ -48,6 +48,14 @@ const show = (props: Partial<Parameters<typeof MediaField>[0]> = {}) =>
 const file = (name: string, type: string, bytes = 10) => new File([new Uint8Array(bytes)], name, { type });
 
 describe("이미지·영상 올리기", () => {
+  it("표지는 번호 없이 이미지로 올리고 작품에 한 건만 붙는다", async () => {
+    show({ target: "표지", order: undefined, label: "표지 이미지" });
+    expect(await screen.findByText("붙은 이미지가 없습니다.")).toBeInTheDocument();
+    await userEvent.upload(screen.getByLabelText("표지 이미지 파일 고르기"), file("cover.png", "image/png", 50));
+    expect(await screen.findByAltText("표지 이미지 미리보기")).toHaveAttribute("src", "/api/media/abc.png?a=1&e=2&s=3");
+    expect(calls.find((c) => c.method === "PUT")!.path).toBe(`/api/works/7/media?${new URLSearchParams({ 대상: "표지" })}`);
+  });
+
   it("붙은 것이 없으면 안내하고, 파일을 고르면 내용 그대로 올린 뒤 미리보기가 보인다", async () => {
     show();
     expect(await screen.findByText("붙은 이미지가 없습니다.")).toBeInTheDocument();

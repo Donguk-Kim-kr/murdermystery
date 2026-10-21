@@ -6,6 +6,7 @@ import type { components } from "../api/schema";
 import { useAuth } from "../auth/AuthContext";
 import { ConfirmPanel } from "../workspace/ConfirmPanel";
 import { ContentPanel } from "../workspace/ContentPanel";
+import { MediaField } from "../workspace/MediaField";
 import { FlowReview, PhasesPanel } from "../workspace/PhasesPanel";
 import { CharacterForm, type Character } from "./CharacterForm";
 import { CommonStoryEditor } from "./CommonStoryEditor";
@@ -134,6 +135,11 @@ export function WorkPage() {
         <div className="work-layout">
           <div className="col">
             <WorkInfoForm work={work} onSaved={load} />
+            <section className="card" aria-label="표지">
+              <h2>표지</h2>
+              <p className="muted">작품 목록과 플레이 기록에 보이는 대표 이미지입니다. 세로가 긴 이미지(2:3)가 잘 어울립니다.</p>
+              <MediaField workId={workId} target="표지" label="표지 이미지" />
+            </section>
             <FlowReview workId={workId} />
             <ConfirmPanel workId={workId} onConfirmed={load} />
           </div>
