@@ -198,9 +198,7 @@ function VoteBlock({ block, state, onAnswer }: { block: Block; state: GameState;
                   : `${nameOf(mine)}에게 투표했습니다. 다음 단계로 넘어가기 전에는 바꿀 수 있습니다.`}
           </span>
         </div>
-      ) : (
-        <p className="muted">관전 중에는 {answering ? "답할" : "투표할"} 수 없습니다.</p>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -399,9 +397,7 @@ function InputBlock({ block, onAnswer, isPlayer }: { block: Block; onAnswer: Pro
           </button>
           <span className={length > limit ? "error" : "muted"}>{length}/{limit}자</span>
         </div>
-      ) : (
-        <p className="muted">관전 중에는 답할 수 없습니다.</p>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -491,7 +487,6 @@ function ChoiceBlock({ block, state, onAnswer }: { block: Block; state: GameStat
             </ul>
           </div>
         ))}
-        {!isPlayer && <p className="muted">관전 중에는 고를 수 없습니다.</p>}
       </section>
     );
   }
@@ -542,7 +537,6 @@ function ChoiceBlock({ block, state, onAnswer }: { block: Block; state: GameStat
           </span>
         </div>
       )}
-      {!isPlayer && <p className="muted">관전 중에는 고를 수 없습니다.</p>}
     </section>
   );
 }

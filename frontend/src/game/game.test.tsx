@@ -177,7 +177,8 @@ describe("플레이 화면", () => {
       화면: [choice(), { 종류: "읽기", 이름: "공통 스토리", 내용: "이야기", 질문ID: "1:4:읽기:공통 스토리", 확인필요: false, 확인함: false, 현황: { 완료: 1, 전체: 3 } }],
     });
     render(<GamePage />);
-    await screen.findByText("관전 중에는 고를 수 없습니다.");
+    await screen.findByRole("button", { name: /의사/ });
+    expect(screen.queryByText("관전 중에는 고를 수 없습니다.")).not.toBeInTheDocument();          // 안내 글은 두지 않는다(고를 수 없는 것은 비활성으로만 보인다)
     expect(screen.queryByRole("button", { name: "확인" })).toBeNull();
     expect(screen.getByRole("button", { name: /의사/ })).toBeDisabled();
     expect(screen.getByText("확인 1/3")).toBeInTheDocument();
@@ -666,9 +667,9 @@ describe("투표 블록", () => {
   it("관전자는 투표할 수 없다", async () => {
     state = makeState({ 나: { 계정_번호: 9, 역할: "관전자", 인물_순서: null, 방장: false, 진행_권한: false }, 화면: [box()] });
     render(<GamePage />);
-    await screen.findByText("관전 중에는 투표할 수 없습니다.");
+    expect(await screen.findByRole("button", { name: /집사/ })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "투표" })).toBeNull();
-    expect(screen.getByRole("button", { name: /집사/ })).toBeDisabled();
+    expect(screen.queryByText(/관전 중에는/)).not.toBeInTheDocument();                  // 안내 글은 두지 않는다
   });
 });
 

@@ -135,13 +135,11 @@ export function ChatPanel() {
         ))}
       </ul>
       {error && <p role="alert" className="error">{error}</p>}
-      {player ? (
+      {player && (
         <form className="chat-form" onSubmit={(e) => void submit(e)}>
           <input value={text} onChange={(e) => setText(e.target.value)} maxLength={500} aria-label="메시지" placeholder={`${viewing}에 말하기`} autoComplete="off" />
           <button type="submit" disabled={busy || text.trim() === ""}>보내기</button>
         </form>
-      ) : (
-        <p className="muted">{gm ? "GM 관전: 모든 장소의 대화를 볼 수 있고, 쓸 수는 없습니다." : "관전자는 전체 대화를 볼 수만 있습니다."}</p>
       )}
     </section>
     </>

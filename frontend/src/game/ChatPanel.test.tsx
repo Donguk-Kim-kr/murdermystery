@@ -78,7 +78,7 @@ describe("게임 채팅", () => {
     expect(await within(await screen.findByRole("list", { name: "전체 대화" })).findByText("공개 말")).toBeInTheDocument();
     expect(screen.queryByLabelText("메시지")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /밀담 A/ })).toBeDisabled();
-    expect(screen.getByText("관전자는 전체 대화를 볼 수만 있습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("관전자는 전체 대화를 볼 수만 있습니다.")).not.toBeInTheDocument();          // 안내 글은 두지 않는다
   });
 
   it("GM 관전자는 밀담 장소를 골라 그 대화를 읽는다", async () => {

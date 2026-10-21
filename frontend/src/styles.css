@@ -735,6 +735,8 @@ ul.versions { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4re
 .choice-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 0.6rem; }
 .choice {
   width: 100%; text-align: left; display: grid; gap: 0.25rem; align-content: start; min-height: 5rem;
+  /* 전역 button 의 가운데 맞춤(justify-content)이 칸을 가운데로 모으지 않게 하고, 글과 칩은 왼쪽에 붙인다(칩은 내용 폭만큼만 차지) */
+  justify-content: stretch; justify-items: start;
   background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 0.7rem 0.8rem; cursor: pointer; font: inherit;
 }
 .choice:hover:not(:disabled) { border-color: var(--accent); }
