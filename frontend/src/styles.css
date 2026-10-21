@@ -455,6 +455,19 @@ a.work-card:hover {
 /* 작품 표지: 세로가 긴 2:3 포스터. 비율이 다른 이미지는 가운데를 기준으로 잘라 채운다 */
 .work-cover { display: block; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: var(--radius-sm); background: var(--surface-2); }
 .work-cover.empty-cover { display: grid; place-items: center; color: var(--muted); font-size: 0.85rem; border: 1px dashed var(--border-strong); }
+/* 플레이 첫 화면의 작품 카드: 표지가 카드 전체이고, 제목·소개·정보는 포스터 아래쪽에 겹쳐 놓는다 */
+.work-card.poster-card { position: relative; padding: 0; gap: 0; overflow: hidden; aspect-ratio: 2 / 3; }
+.poster-card .work-cover { position: absolute; inset: 0; height: 100%; aspect-ratio: auto; border-radius: 0; border: 0; }
+.poster-info {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: grid; gap: 0.5rem; padding: 3.5rem 1rem 1rem;
+  background: linear-gradient(to top, rgba(8, 10, 18, 0.95) 0%, rgba(8, 10, 18, 0.85) 55%, rgba(8, 10, 18, 0) 100%);
+  color: #fff;
+}
+.poster-info h3 { color: #fff; }
+.poster-card .synopsis { color: rgba(255, 255, 255, 0.82); min-height: 0; }
+.poster-info .chip { background: rgba(255, 255, 255, 0.14); color: #fff; border-color: rgba(255, 255, 255, 0.28); }
+.poster-info .chip.accent { background: var(--accent); border-color: transparent; }
 .work-card .synopsis {
   color: var(--muted);
   font-size: 0.875rem;

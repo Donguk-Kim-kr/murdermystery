@@ -6,6 +6,7 @@ import type { components } from "../api/schema";
 import { SPACES } from "../spaces";
 import { useConfirm } from "../confirm/ConfirmContext";
 import { josa } from "../josa";
+import { peopleText } from "../people";
 
 type Work = components["schemas"]["WorkOut"];
 
@@ -75,7 +76,7 @@ export function WorksListPage() {
                   <span className={w.공개여부 ? "chip success" : "chip"}>{w.공개여부 ? "공개" : "비공개"}</span>
                   <span className="chip">{w.상태}</span>
                   <span className="chip">{w.장르 || "장르 미정"}</span>
-                  <span className="chip">인원 {w.최소인원}~{w.최대인원}명</span>
+                  <span className="chip">인원 {peopleText(w.최소인원, w.최대인원)}</span>
                 </div>
               </Link>
               <button type="button" className="small secondary work-delete" aria-label={`${w.제목} 삭제`} onClick={() => void remove(w)}>

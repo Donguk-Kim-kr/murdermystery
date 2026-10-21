@@ -15,6 +15,7 @@ import { TestersPanel } from "./TestersPanel";
 import { VisibilityPanel } from "./VisibilityPanel";
 import { useConfirm } from "../confirm/ConfirmContext";
 import { josa } from "../josa";
+import { peopleText } from "../people";
 import { TIME_FORMATS, type TimeFormat } from "../timeFormat";
 
 type Work = components["schemas"]["WorkOut"];
@@ -305,7 +306,7 @@ function WorkInfoForm({ work, onSaved }: { work: Work; onSaved: () => Promise<vo
         </div>
         <div className="capacity">
           <span className="capacity-label">플레이 인원</span>
-          <span className="chip accent">{work.최소인원 === work.최대인원 ? `${work.최대인원}명` : `${work.최소인원}~${work.최대인원}명`}</span>
+          <span className="chip accent">{peopleText(work.최소인원, work.최대인원)}</span>
           <span className="muted">
             인물에서 자동으로 계산됩니다. 최대는 NPC가 아닌 인물 수이고, 최소는 최대에서 "NPC가 될 수 있는 인물" 수를 뺀 값입니다
           </span>

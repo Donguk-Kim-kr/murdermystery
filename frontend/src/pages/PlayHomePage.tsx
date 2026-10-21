@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { api, errorMessage } from "../api/client";
 import type { components } from "../api/schema";
 import { useConfirm } from "../confirm/ConfirmContext";
+import { peopleText } from "../people";
 import { useRoom } from "../rooms/RoomContext";
 import { JoinCodeDialog } from "./JoinRoomPage";
 
@@ -70,22 +71,23 @@ export function PlayHomePage() {
       {works && works.length > 0 && (
         <div className="work-grid">
           {works.map((w) => (
-            <div key={w.번호} className="work-card">
+            <div key={w.번호} className="work-card poster-card">
               {w.표지 ? (
                 <img className="work-cover" src={w.표지} alt={`${w.제목} 표지`} loading="lazy" />
               ) : (
                 <div className="work-cover empty-cover" aria-hidden="true">표지 없음</div>
               )}
-              <h3>{w.제목}</h3>
-              <p className="synopsis">{w.시놉시스 || "시놉시스가 아직 없습니다."}</p>
-              <div className="work-meta">
-                {w.비공개플레이 && <span className="chip accent">비공개 플레이</span>}
-                <span className="chip">{w.장르 || "장르 미정"}</span>
-                <span className="chip">인원 {w.최소인원}~{w.최대인원}명</span>
-                <span className="chip">{w.예상시간}</span>
-                <span className="chip">제작 {w.제작자}</span>
+              <div className="poster-info">
+                <h3>{w.제목}</h3>
+                <p className="synopsis">{w.시놉시스 || "시놉시스가 아직 없습니다."}</p>
+                <div className="work-meta">
+                  {w.비공개플레이 && <span className="chip accent">비공개 플레이</span>}
+                  <span className="chip">{w.장르 || "장르 미정"}</span>
+                  <span className="chip">인원 {peopleText(w.최소인원, w.최대인원)}</span>
+                  <span className="chip">{w.예상시간}</span>
+                </div>
+                <Link to={`/rooms/new/${w.번호}`} state={{ title: w.제목 }} className="button small">방 만들기</Link>
               </div>
-              <Link to={`/rooms/new/${w.번호}`} state={{ title: w.제목 }} className="button small">방 만들기</Link>
             </div>
           ))}
         </div>

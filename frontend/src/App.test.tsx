@@ -289,7 +289,7 @@ describe("작품", () => {
     routes["GET /api/works"] = () => json([work]);
     renderApp("/make/games");
     expect(await screen.findByText("저택의 비밀")).toBeInTheDocument();
-    for (const chip of ["추리", "개발", "비공개", "인원 1~1명"]) expect(screen.getByText(chip)).toBeInTheDocument();
+    for (const chip of ["추리", "개발", "비공개", "인원 1명"]) expect(screen.getByText(chip)).toBeInTheDocument();
   });
 
   it("작품이 없으면 안내 문구를 보여 준다", async () => {
@@ -506,7 +506,9 @@ describe("작품", () => {
     expect(screen.queryByLabelText("입장코드")).not.toBeInTheDocument();             // 입장코드 입력은 버튼을 눌러야 나온다
     expect(screen.getByRole("button", { name: "입장코드" })).toBeInTheDocument();
     expect(await screen.findByText("공개 작품")).toBeInTheDocument();
-    expect(screen.getByText("제작 탐정")).toBeInTheDocument();
+    expect(screen.queryByText("제작 탐정")).not.toBeInTheDocument();                       // 제작자 이름은 카드에 보이지 않는다
+    expect(screen.getByText("인원 2~4명")).toBeInTheDocument();
+    expect(screen.getByText("인원 1~3명")).toBeInTheDocument();
     expect(screen.getAllByText("비공개 플레이")).toHaveLength(1);                       // 테스트 작품에만 붙는다
     const links = screen.getAllByRole("link", { name: "방 만들기" });
     expect(links.map((l) => l.getAttribute("href"))).toEqual(["/rooms/new/8", "/rooms/new/9"]);
@@ -515,12 +517,13 @@ describe("작품", () => {
   it("작품 카드에 표지가 있으면 보여 주고, 없으면 자리를 비워 둔다", async () => {
     routes["GET /api/play-works"] = () => json([
       { 번호: 8, 제목: "표지 있는 작품", 시놉시스: "", 장르: "추리", 최소인원: 2, 최대인원: 4, 예상시간: "2시간", 제작자: "탐정", 비공개플레이: false, 표지: "/api/media/c.png?a=1&e=2&s=3" },
-      { 번호: 9, 제목: "표지 없는 작품", 시놉시스: "", 장르: "", 최소인원: 1, 최대인원: 3, 예상시간: "1시간", 제작자: "나", 비공개플레이: false, 표지: null },
+      { 번호: 9, 제목: "표지 없는 작품", 시놉시스: "", 장르: "", 최소인원: 4, 최대인원: 4, 예상시간: "1시간", 제작자: "나", 비공개플레이: false, 표지: null },
     ]);
     renderApp();
     expect(await screen.findByAltText("표지 있는 작품 표지")).toHaveAttribute("src", "/api/media/c.png?a=1&e=2&s=3");
     expect(screen.queryByAltText("표지 없는 작품 표지")).not.toBeInTheDocument();
     expect(screen.getAllByText("표지 없음")).toHaveLength(1);
+    expect(screen.getByText("인원 4명")).toBeInTheDocument();                              // 최소와 최대가 같으면 "4~4명"이 아니라 "4명"
   });
 
   it("플레이할 작품이 없으면 안내한다", async () => {
