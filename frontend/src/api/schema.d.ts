@@ -710,6 +710,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ai/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ai Status */
+        get: operations["ai_status_api_ai_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rooms/me/ai": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Ai
+         * @description 내 대기실에 AI 한 명을 부른다(방장만). AI 는 몇 초 안에 입장하고, 게임이 시작되면 플레이한다.
+         */
+        post: operations["add_ai_api_rooms_me_ai_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/rooms/me/start": {
         parameters: {
             query?: never;
@@ -958,6 +995,27 @@ export interface components {
              * @enum {string}
              */
             "\uAD8C\uD55C": "사용자" | "관리자" | "운영자";
+        };
+        /** AiAddIn */
+        AiAddIn: {
+            /** 방식 */
+            "\uBC29\uC2DD"?: ("claude" | "simple") | null;
+        };
+        /** AiAddOut */
+        AiAddOut: {
+            /** 닉네임 */
+            "\uB2C9\uB124\uC784": string;
+            /** 방식 */
+            "\uBC29\uC2DD": string;
+        };
+        /** AiStatusOut */
+        AiStatusOut: {
+            /** 사용가능 */
+            "\uC0AC\uC6A9\uAC00\uB2A5": boolean;
+            /** 모델사용가능 */
+            "\uBAA8\uB378\uC0AC\uC6A9\uAC00\uB2A5": boolean;
+            /** 모델 */
+            "\uBAA8\uB378": string;
         };
         /** CharacterIn */
         CharacterIn: {
@@ -3431,6 +3489,72 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_status_api_ai_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_ai_api_rooms_me_ai_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiAddIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiAddOut"];
+                };
             };
             /** @description Validation Error */
             422: {

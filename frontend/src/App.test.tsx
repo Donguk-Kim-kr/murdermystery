@@ -27,6 +27,7 @@ beforeEach(() => {
     "GET /api/works": () => json([]),
     "GET /api/private-play-works": () => json([]),
     "GET /api/rooms/me": () => json(null),
+    "GET /api/ai/status": () => json({ 사용가능: false, 모델사용가능: false, 모델: "claude-haiku-5-5" }),
   };
   calls.length = 0;
   localStorage.clear();
@@ -877,6 +878,49 @@ describe("방", () => {
     expect(within(list).queryByRole("button", { name: "방 닫기" })).not.toBeInTheDocument();            // 방 닫기·참여 선택·시작 조건 안내는 없다
     expect(within(list).queryByLabelText("나도 플레이어로 참여")).not.toBeInTheDocument();
     expect(within(list).queryByText(/시작할 수 있습니다/)).not.toBeInTheDocument();
+  });
+
+  it("대기실: AI 추가가 허용된 서버에서는 방장이 종류를 고르고 AI 추가를 누를 때마다 한 명씩 부른다", async () => {
+    routes["GET /api/ai/status"] = () => json({ 사용가능: true, 모델사용가능: true, 모델: "claude-haiku-5-5" });
+    routes["GET /api/rooms/me"] = () => json(baseRoom);
+    let body: unknown = null;
+    routes["POST /api/rooms/me/ai"] = async (req) => {
+      body = await req.json();
+      return json({ 닉네임: "AI 1", 방식: "claude" }, 202);
+    };
+    renderApp("/room");
+    const user = userEvent.setup();
+    const list = await screen.findByRole("region", { name: "참가자" });
+    const kind = await within(list).findByLabelText("AI 종류");
+    expect(kind).toHaveValue("claude");                                         // 모델을 쓸 수 있으면 기본은 대화형
+    await user.selectOptions(kind, "simple");
+    await user.click(within(list).getByRole("button", { name: "AI 추가" }));
+    await waitFor(() => expect(body).toEqual({ 방식: "simple" }));
+    expect(await within(list).findByRole("status")).toHaveTextContent("AI 1");
+  });
+
+  it("대기실: 서버에 모델 키가 없으면 대화형 AI 는 고를 수 없고, AI 추가를 허용하지 않는 서버나 방장이 아닌 사람에게는 칸이 없다", async () => {
+    routes["GET /api/ai/status"] = () => json({ 사용가능: true, 모델사용가능: false, 모델: "claude-haiku-5-5" });
+    routes["GET /api/rooms/me"] = () => json(baseRoom);
+    const first = renderApp("/room");
+    const list = await screen.findByRole("region", { name: "참가자" });
+    expect(await within(list).findByLabelText("AI 종류")).toHaveValue("simple");
+    expect(within(list).getByRole("option", { name: /대화형 AI/ })).toBeDisabled();
+    expect(within(list).getByText(/ANTHROPIC_API_KEY/)).toBeInTheDocument();
+    first.unmount();
+
+    routes["GET /api/ai/status"] = () => json({ 사용가능: false, 모델사용가능: false, 모델: "m" });
+    const second = renderApp("/room");
+    await screen.findByRole("region", { name: "참가자" });
+    await waitFor(() => expect(calls.filter((c) => c.key === "GET /api/ai/status").length).toBeGreaterThan(1));
+    expect(screen.queryByLabelText("AI 종류")).not.toBeInTheDocument();
+    second.unmount();
+
+    routes["GET /api/ai/status"] = () => json({ 사용가능: true, 모델사용가능: true, 모델: "m" });
+    routes["GET /api/rooms/me"] = () => json({ ...baseRoom, 내가_방장: false });
+    renderApp("/room");
+    await screen.findByRole("region", { name: "참가자" });
+    expect(screen.queryByLabelText("AI 종류")).not.toBeInTheDocument();
   });
 
   it("대기실: 누구나 참가·관전 제목을 눌러 자기 자리를 옮기고, 관전 방식은 일반↔GM 으로 바뀐다", async () => {

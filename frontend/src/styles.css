@@ -455,6 +455,9 @@ a.work-card:hover {
 /* 작품 표지: 세로가 긴 2:3 포스터. 비율이 다른 이미지는 가운데를 기준으로 잘라 채운다 */
 .work-cover { display: block; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: var(--radius-sm); background: var(--surface-2); }
 .work-cover.empty-cover { display: grid; place-items: center; color: var(--muted); font-size: 0.85rem; border: 1px dashed var(--border-strong); }
+/* 대기실의 AI 추가: 종류를 고르고 버튼을 누를 때마다 AI 가 한 명씩 입장한다 */
+.ai-add { display: grid; gap: 0.4rem; margin: 0.8rem 0 0.2rem; padding-top: 0.7rem; border-top: 1px dashed var(--border); }
+.ai-add select { min-width: 12rem; }
 /* 플레이 첫 화면의 작품 카드: 표지가 카드 전체이고, 제목·소개·정보는 포스터 아래쪽에 겹쳐 놓는다 */
 .work-card.poster-card { position: relative; padding: 0; gap: 0; overflow: hidden; aspect-ratio: 2 / 3; }
 .poster-card .work-cover { position: absolute; inset: 0; height: 100%; aspect-ratio: auto; border-radius: 0; border: 0; }

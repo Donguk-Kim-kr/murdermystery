@@ -5,6 +5,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from psycopg import Error
 
+from .ai_room import router as ai_router, runner_url
+from .ai_runner import AiRunner
 from .auth import router as auth_router
 from .characters import router as characters_router
 from .config import get_settings
@@ -45,6 +47,7 @@ def sweep_rooms(app: FastAPI) -> None:
         for room_id in expire_rooms(conn):
             app.state.rooms.remove_room(room_id)
             app.state.games.remove(room_id)
+            app.state.ai_runner.stop_room(room_id)
         open_ids = app.state.rooms.room_ids()
         if open_ids:
             alive = {
@@ -57,6 +60,7 @@ def sweep_rooms(app: FastAPI) -> None:
                 if room_id not in alive:
                     app.state.rooms.remove_room(room_id)
                     app.state.games.remove(room_id)
+                    app.state.ai_runner.stop_room(room_id)
 
 
 def tick_games(app: FastAPI) -> None:
@@ -93,6 +97,7 @@ async def lifespan(app: FastAPI):
     app.state.rooms = RoomRegistry(settings.room_member_timeout_seconds)
     app.state.games = GameRegistry(away_seconds=settings.game_away_seconds)
     app.state.join_limiter = JoinLimiter(settings.room_join_fail_limit, settings.room_join_fail_window_seconds)
+    app.state.ai_runner = AiRunner(runner_url(), settings.ai_max_processes)
     sweeper = asyncio.create_task(sweep_loop(app, settings.room_sweep_seconds))
     ticker = asyncio.create_task(tick_loop(app, settings.game_tick_seconds))
     try:
@@ -100,6 +105,7 @@ async def lifespan(app: FastAPI):
     finally:
         sweeper.cancel()
         ticker.cancel()
+        app.state.ai_runner.stop_all()
         pool.close()
 
 
@@ -119,6 +125,7 @@ app.include_router(confirm_router)
 app.include_router(publishing_router)
 app.include_router(testers_router)
 app.include_router(rooms_router)
+app.include_router(ai_router)
 app.include_router(game_router)
 app.include_router(game_state_router)
 app.include_router(chat_router)

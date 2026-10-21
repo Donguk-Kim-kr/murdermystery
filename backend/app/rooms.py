@@ -362,6 +362,7 @@ def leave_room(conn: Conn, me: CurrentUser, request: Request) -> None:
             raise HTTPException(status.HTTP_409_CONFLICT, "진행 중인 방은 나갈 수 없습니다")
         conn.execute('UPDATE "방" SET "상태" = \'종료\' WHERE "번호" = %s', (row["번호"],))
         reg.remove_room(row["번호"])
+        request.app.state.ai_runner.stop_room(row["번호"])               # 방이 닫히면 그 방의 AI 도 멈춘다
     else:
         reg.leave(me.계정.번호)
         game = request.app.state.games.get(row["번호"])

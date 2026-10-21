@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     media_max_image_bytes: int = 5 * 1024 * 1024
     media_max_video_bytes: int = 100 * 1024 * 1024
 
+    # 대기실에서 방장이 "AI 추가"를 눌러 AI 플레이어를 부를 수 있게 한다(MM_AI_ENABLED). 서버가 AI 러너(scripts/ai_players.py)를 자식 프로세스로 띄운다.
+    # 끄면(기본) 버튼이 보이지 않고 API 도 거절한다. 모델을 쓰는 AI 는 서버의 ANTHROPIC_API_KEY 로 비용이 나가므로, 인터넷에 공개하는 서버에서는 켜지 않는다.
+    ai_enabled: bool = False
+    # AI 러너가 서버에 접속하는 주소. 비우면 이 서버 자신(http://127.0.0.1:PORT)이다.
+    ai_url: str = ""
+    # 서버가 동시에 돌릴 수 있는 AI 프로세스 수(한 프로세스가 AI 한 명)
+    ai_max_processes: int = Field(default=12, ge=1)
+
     # 대기실 (docs/DB_RULES.md B38)
     # 폴링(2~3초)이 이 시간 동안 끊기면 대기실에서 나간 것으로 본다. 사용자가 Discord 음성 때문에 다른 창으로 옮기면
     # 브라우저가 백그라운드 탭의 타이머를 늦추므로 너무 짧게 잡으면 쫓겨난다. (오래 숨겨 두면 그래도 끊길 수 있다 — B38 한계)
