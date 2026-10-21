@@ -251,7 +251,6 @@ function ClueCard({ card: c, state, actions, onSend }: {
       {c.내용 || c.이미지 ? (
         <button type="button" className="clue-head" aria-expanded={open} onClick={() => setOpen(!open)}>
           {title}
-          <span className="muted">{open ? "접기" : "눌러서 내용 보기"}</span>
         </button>
       ) : (
         <div className="clue-head">{title}</div>
